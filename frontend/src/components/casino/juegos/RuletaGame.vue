@@ -100,6 +100,15 @@ function animar(hasta: number) {
   const duracion = 3400
   girando.value = true
 
+  // Seguridad: si requestAnimationFrame se pausa (pestania en segundo plano),
+  // la ruleta se queda girando. Se garantiza el estado final.
+  const seguro = window.setTimeout(() => {
+    window.cancelAnimationFrame(animacion)
+    rotacion.value = hasta
+    dibujar()
+    girando.value = false
+  }, duracion + 300)
+
   const paso = (ahora: number) => {
     const t = Math.min(1, (ahora - inicio) / duracion)
     const eased = 1 - Math.pow(1 - t, 3)
@@ -108,6 +117,7 @@ function animar(hasta: number) {
     if (t < 1) {
       animacion = requestAnimationFrame(paso)
     } else {
+      window.clearTimeout(seguro)
       girando.value = false
     }
   }
@@ -123,7 +133,7 @@ watch(
   },
 )
 
-onMounted(dibujar())
+onMounted(() => dibujar())
 
 function jugar() {
   if (tipo.value === 'pleno') emit('jugar', { tipo: 'pleno', numero: numero.value })

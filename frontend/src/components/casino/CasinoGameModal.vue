@@ -125,6 +125,9 @@ function repetir() {
         <button class="btn btn-ghost" @click="repetir">Jugar de nuevo</button>
         <button class="btn btn-primary" @click="emit('cerrar')">Cerrar</button>
       </div>
+      <div v-else class="acciones-resultado">
+        <button class="btn btn-ghost" @click="emit('cerrar')">Cerrar</button>
+      </div>
 
       <p class="nota">
         Resultado generado en el servidor · provably fair ·
