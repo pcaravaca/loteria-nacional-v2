@@ -4,6 +4,7 @@ import { api } from '@/api/client'
 import { useAuthStore } from '@/stores/auth'
 import type { CasinoGame, PlayResponse } from '@/types'
 import { colones } from '@/utils/formato'
+import { reproducir } from '@/utils/sfx'
 import Modal from '@/components/Modal.vue'
 import { heroes, type CodigoJuego } from '@/assets/casino'
 import DadosGame from './juegos/DadosGame.vue'
@@ -34,6 +35,7 @@ function ajustar(delta: number) {
 async function jugar(params: Record<string, unknown>) {
   error.value = ''
   cargando.value = true
+  reproducir('ficha')
   try {
     const { data } = await api.post<PlayResponse>('/casino/play', {
       game: props.juego.codigo,
@@ -43,6 +45,7 @@ async function jugar(params: Record<string, unknown>) {
     })
     respuesta.value = data
     rondaKey.value++
+    reproducir(data.premio > 0 ? 'ganar' : 'perder')
     await auth.cargar()
   } catch (e: any) {
     error.value = e.message

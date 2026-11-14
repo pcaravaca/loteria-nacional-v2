@@ -1,8 +1,11 @@
 package handlers
 
 import (
+	"fmt"
+	"log"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
@@ -143,6 +146,9 @@ func (h *CasinoHandler) Play(c *gin.Context) {
 	}
 	if user.Saldo < req.Monto {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "saldo insuficiente", "saldo": user.Saldo, "monto": req.Monto})
+		return
+	}
+	if !h.verificarLimite(c, user, juego.Codigo, req.Monto) {
 		return
 	}
 
@@ -297,7 +303,78 @@ func (h *CasinoHandler) Stats(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "no se pudieron cargar las estadisticas"})
 		return
 	}
+	// El blackjack guarda sus manos aparte, asi que se suman sus totales.
+	var bjTotal struct {
+		Jugadas   int64
+		Apostado  int64
+		Premios   int64
+		Beneficio int64
+	}
+	h.db.Model(&models.BlackjackMano{}).
+		Select("count(*) as jugadas, COALESCE(sum(monto),0) as apostado, COALESCE(sum(premio),0) as premios, COALESCE(sum(monto - premio),0) as beneficio").
+		Scan(&bjTotal)
+	if bjTotal.Jugadas > 0 {
+		encontrado := false
+		for i := range filas {
+			if filas[i].Juego == models.CasinoBlackjack {
+				filas[i].Jugadas += bjTotal.Jugadas
+				filas[i].Apostado += bjTotal.Apostado
+				filas[i].Premios += bjTotal.Premios
+				filas[i].Beneficio += bjTotal.Beneficio
+				encontrado = true
+				break
+			}
+		}
+		if !encontrado {
+			filas = append(filas, fila{models.CasinoBlackjack, bjTotal.Jugadas, bjTotal.Apostado, bjTotal.Premios, bjTotal.Beneficio})
+		}
+	}
 	c.JSON(http.StatusOK, filas)
+}
+
+// ActualizarJuego cambia los ajustes de un juego: activo, limites y tope diario.
+// Solo lo puede hacer un admin.
+func (h *CasinoHandler) ActualizarJuego(c *gin.Context) {
+	codigo := c.Param("codigo")
+	var existente models.CasinoGame
+	if err := h.db.Where("codigo = ?", codigo).First(&existente).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "juego no encontrado"})
+		return
+	}
+	var req struct {
+		Activo       *bool  `json:"activo"`
+		MinApuesta   *int64 `json:"min_apuesta"`
+		MaxApuesta   *int64 `json:"max_apuesta"`
+		LimiteDiario *int64 `json:"limite_diario"`
+	}
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "datos invalidos: " + err.Error()})
+		return
+	}
+	campos := map[string]any{}
+	if req.Activo != nil {
+		campos["activo"] = *req.Activo
+	}
+	if req.MinApuesta != nil && *req.MinApuesta >= 0 {
+		campos["min_apuesta"] = *req.MinApuesta
+	}
+	if req.MaxApuesta != nil && *req.MaxApuesta >= 0 {
+		campos["max_apuesta"] = *req.MaxApuesta
+	}
+	if req.LimiteDiario != nil && *req.LimiteDiario >= 0 {
+		campos["limite_diario"] = *req.LimiteDiario
+	}
+	if len(campos) == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "no hay cambios que aplicar"})
+		return
+	}
+	if err := h.db.Model(&models.CasinoGame{}).Where("codigo = ?", codigo).Updates(campos).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "no se pudo guardar el juego"})
+		return
+	}
+	var actualizado models.CasinoGame
+	_ = h.db.Where("codigo = ?", codigo).First(&actualizado)
+	c.JSON(http.StatusOK, actualizado)
 }
 
 // ------------------------------------------------------------ blackjack
@@ -336,6 +413,62 @@ func (h *CasinoHandler) semillaCliente(c *gin.Context, clientSeed string) string
 	return "cli-" + strconv.FormatUint(uint64(user.ID), 10) + "-" + strconv.FormatInt(user.CasinoNonce, 10)
 }
 
+// zonaCR es la hora de Costa Rica (UTC-6), que es la que usa el tope diario.
+var zonaCR = time.FixedZone("CR", -6*60*60)
+
+func inicioDiaCR() time.Time {
+	ahora := time.Now().In(zonaCR)
+	return time.Date(ahora.Year(), ahora.Month(), ahora.Day(), 0, 0, 0, 0, zonaCR)
+}
+
+// apostadoHoy suma lo que el usuario ya aposto hoy en un juego.
+func (h *CasinoHandler) apostadoHoy(userID uint, codigo string, desde time.Time) int64 {
+	var total int64
+	if err := h.db.Model(&models.CasinoRound{}).
+		Where("user_id = ? AND game_codigo = ? AND created_at >= ?", userID, codigo, desde).
+		Select("COALESCE(SUM(monto),0)").Scan(&total).Error; err != nil {
+		// Si la consulta falla, no se puede aplicar el tope: se evita jugar.
+		log.Printf("casino: no se pudo calcular el tope diario: %v", err)
+		return -1
+	}
+	if codigo == models.CasinoBlackjack {
+		var bj int64
+		if err := h.db.Model(&models.BlackjackMano{}).
+			Where("user_id = ? AND created_at >= ?", userID, desde).
+			Select("COALESCE(SUM(monto),0)").Scan(&bj).Error; err == nil {
+			total += bj
+		}
+	}
+	return total
+}
+
+// verificarLimite rechaza la jugada si el usuario ya llego a su tope diario.
+// Devuelve true si la jugada puede continuar.
+func (h *CasinoHandler) verificarLimite(c *gin.Context, user models.User, codigo string, monto int64) bool {
+	var juego models.CasinoGame
+	if err := h.db.Where("codigo = ?", codigo).First(&juego).Error; err != nil {
+		return true
+	}
+	if juego.LimiteDiario <= 0 {
+		return true
+	}
+	usado := h.apostadoHoy(user.ID, codigo, inicioDiaCR())
+	if usado < 0 {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "no se pudo verificar el limite diario"})
+		return false
+	}
+	if usado+monto > juego.LimiteDiario {
+		c.JSON(http.StatusTooManyRequests, gin.H{
+			"error":        fmt.Sprintf("limite diario alcanzado: llevas %d de %d", usado, juego.LimiteDiario),
+			"limite":       juego.LimiteDiario,
+			"usado":        usado,
+			"disponible":   juego.LimiteDiario - usado,
+		})
+		return false
+	}
+	return true
+}
+
 // BlackjackStart reparte las dos primeras cartas y descuenta la apuesta.
 func (h *CasinoHandler) BlackjackStart(c *gin.Context) {
 	var req blackjackRequest
@@ -353,6 +486,9 @@ func (h *CasinoHandler) BlackjackStart(c *gin.Context) {
 	}
 	if user.Saldo < req.Monto {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "saldo insuficiente"})
+		return
+	}
+	if !h.verificarLimite(c, user, models.CasinoBlackjack, req.Monto) {
 		return
 	}
 
@@ -452,6 +588,9 @@ func (h *CasinoHandler) blackjackTurno(c *gin.Context, accion string) {
 	if accion == "double" {
 		if user.Saldo < bj.Monto {
 			c.JSON(http.StatusBadRequest, gin.H{"error": "saldo insuficiente para doblar"})
+			return
+		}
+		if !h.verificarLimite(c, user, models.CasinoBlackjack, bj.Monto) {
 			return
 		}
 		mano = append(mano, mazo[2*len(mano)])

@@ -3,6 +3,7 @@ import { onMounted, ref } from 'vue'
 import { api } from '@/api/client'
 import type { CasinoGame, CasinoRound, SemillaResponse } from '@/types'
 import { colones } from '@/utils/formato'
+import { alternarSfx, sfxHabilitado } from '@/utils/sfx'
 import { cartas, type CodigoJuego } from '@/assets/casino'
 import Modal from '@/components/Modal.vue'
 import EmptyState from '@/components/EmptyState.vue'
@@ -12,6 +13,7 @@ const juegos = ref<CasinoGame[]>([])
 const rondas = ref<CasinoRound[]>([])
 const cargando = ref(true)
 const error = ref('')
+const sonido = ref(sfxHabilitado())
 const abierto = ref<CasinoGame | null>(null)
 const clientSeed = ref('')
 const semillaHash = ref('')
@@ -61,6 +63,7 @@ async function verificar(ronda: CasinoRound) {
       <p class="hash-line">
         Semilla del servidor: <span class="hash">{{ semillaHash.slice(0, 24) }}</span>
         · <button class="link" @click="cargar">Rotar semilla</button>
+        · <button class="link" @click="sonido = alternarSfx()">{{ sonido ? '🔊 Sonido' : '🔇 Mudo' }}</button>
       </p>
     </div>
 

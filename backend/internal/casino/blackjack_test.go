@@ -3,18 +3,21 @@ package casino
 import "testing"
 
 func TestBlackjackValor(t *testing.T) {
+	// Ojo: el indice de carta no es el valor. i%13 da la posicion y el valor es
+	// v+1 para v<10 (10=J, 11=Q, 12=K), con el as (v=0) valiendo 11.
 	casos := []struct {
-		mano    []int
-		valor   int
-		soft    bool
-		pasado  bool
+		mano   []int
+		valor  int
+		soft   bool
+		pasado bool
 	}{
-		{[]int{0, 10}, 21, false, false},   // A + J
-		{[]int{11, 5}, 17, false, false},   // Q + 5
-		{[]int{12, 6}, 16, false, false},   // K + 6
+		{[]int{0, 10}, 21, true, false},    // A + J (as aun valiendo 11)
+		{[]int{11, 5}, 16, false, false},   // Q + 6
+		{[]int{12, 6}, 17, false, false},   // K + 7
 		{[]int{0, 0}, 12, true, false},     // A + A
-		{[]int{10, 9, 5}, 24, false, true}, // J + 9 + 5
-		{[]int{0, 9, 8}, 18, false, false}, // A + 9 + 8 (el as baja a 1)
+		{[]int{10, 9, 5}, 26, false, true}, // J + 10 + 6
+		{[]int{0, 9, 8}, 20, false, false}, // A + 10 + 9 (el as baja a 1)
+		{[]int{9, 9, 9}, 30, false, true},  // 10 + 10 + 10
 	}
 	for i, c := range casos {
 		v, soft, pasado := ValorBlackjack(c.mano)

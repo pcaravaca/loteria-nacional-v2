@@ -1,17 +1,18 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue'
 import { api } from '@/api/client'
-import type { Loteria, Sorteo, User } from '@/types'
+import type { CasinoGame, CasinoStats, Loteria, Sorteo, User } from '@/types'
 import { colones, estadoSorteo, fechaHora, tipoLabel } from '@/utils/formato'
 import Modal from '@/components/Modal.vue'
 import EmptyState from '@/components/EmptyState.vue'
 
-type Tab = 'usuarios' | 'loterias' | 'sorteos'
+type Tab = 'usuarios' | 'loterias' | 'sorteos' | 'casino'
 
 const tabs: { id: Tab; label: string; ico: string }[] = [
   { id: 'usuarios', label: 'Usuarios', ico: '👥' },
   { id: 'loterias', label: 'Loterías', ico: '🎰' },
   { id: 'sorteos', label: 'Sorteos', ico: '📅' },
+  { id: 'casino', label: 'Casino', ico: '🎲' },
 ]
 const tab = ref<Tab>('usuarios')
 
@@ -20,19 +21,25 @@ const error = ref('')
 const usuarios = ref<User[]>([])
 const loterias = ref<Loteria[]>([])
 const sorteos = ref<Sorteo[]>([])
+const juegos = ref<CasinoGame[]>([])
+const stats = ref<CasinoStats[]>([])
 
 async function cargar() {
   cargando.value = true
   error.value = ''
   try {
-    const [u, l, s] = await Promise.all([
+    const [u, l, s, j, st] = await Promise.all([
       api.get<User[]>('/admin/usuarios'),
       api.get<Loteria[]>('/loterias', { params: { todas: 1 } }),
       api.get<Sorteo[]>('/sorteos'),
+      api.get<CasinoGame[]>('/casino/games'),
+      api.get<CasinoStats[]>('/admin/casino/stats'),
     ])
     usuarios.value = u.data
     loterias.value = l.data
     sorteos.value = s.data
+    juegos.value = j.data
+    stats.value = st.data
   } catch (e: any) {
     error.value = e.message
   } finally {
@@ -41,6 +48,32 @@ async function cargar() {
 }
 
 onMounted(cargar)
+
+const guardandoJuego = ref('')
+const mensaje = ref('')
+
+function statsDe(codigo: string) {
+  return stats.value.find((s) => s.juego === codigo)
+}
+
+async function guardarJuego(j: CasinoGame) {
+  guardandoJuego.value = j.codigo
+  mensaje.value = ''
+  try {
+    await api.patch(`/admin/casino/games/${j.codigo}`, {
+      activo: j.activo,
+      min_apuesta: j.min_apuesta,
+      max_apuesta: j.max_apuesta,
+      limite_diario: j.limite_diario,
+    })
+    mensaje.value = `${j.nombre} guardado`
+    await cargar()
+  } catch (e: any) {
+    mensaje.value = e.message
+  } finally {
+    guardandoJuego.value = ''
+  }
+}
 
 const ajuste = reactive({ abierto: false, userId: 0, nombre: '', monto: 0, descripcion: '' })
 const guardando = ref(false)
@@ -276,6 +309,45 @@ async function cerrarSorteo() {
         </div>
       </div>
       <EmptyState v-else-if="!cargando" icono="📅" titulo="Sin sorteos" />
+    </div>
+
+    <div v-show="tab === 'casino'">
+      <p v-if="mensaje" class="hint" style="color: var(--prim-2)">{{ mensaje }}</p>
+      <div v-if="juegos.length" class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Juego</th><th>Activo</th><th>Mín</th><th>Máx</th>
+              <th>Tope diario</th><th>Jugadas</th><th>Beneficio</th><th></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="j in juegos" :key="j.codigo">
+              <td class="fuerte">{{ j.nombre }}</td>
+              <td>
+                <button
+                  class="badge btn-sm"
+                  :class="j.activo ? 'badge-ok' : 'badge-muted'"
+                  @click="j.activo = !j.activo"
+                >{{ j.activo ? 'activo' : 'pausado' }}</button>
+              </td>
+              <td><input v-model.number="j.min_apuesta" type="number" class="input input-sm" /></td>
+              <td><input v-model.number="j.max_apuesta" type="number" class="input input-sm" /></td>
+              <td><input v-model.number="j.limite_diario" type="number" class="input input-sm" /></td>
+              <td class="mono">{{ statsDe(j.codigo)?.jugadas ?? 0 }}</td>
+              <td class="mono" :class="(statsDe(j.codigo)?.beneficio ?? 0) >= 0 ? 'texto-pos' : 'texto-neg'">
+                {{ colones(statsDe(j.codigo)?.beneficio ?? 0) }}
+              </td>
+              <td>
+                <button class="btn btn-primary btn-sm" :disabled="guardandoJuego === j.codigo" @click="guardarJuego(j)">
+                  {{ guardandoJuego === j.codigo ? '…' : 'Guardar' }}
+                </button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <EmptyState v-else-if="!cargando" icono="🎲" titulo="Sin juegos" />
     </div>
 
     <Modal v-if="ajuste.abierto" titulo="Ajustar saldo" :sub="ajuste.nombre" @cerrar="ajuste.abierto = false">

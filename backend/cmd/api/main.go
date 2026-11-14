@@ -111,6 +111,7 @@ func main() {
 	authed.GET("/casino/rounds", casinoH.Rounds)
 	authed.GET("/casino/rounds/:id/verify", casinoH.Verify)
 	admin.GET("/casino/stats", casinoH.Stats)
+	admin.PATCH("/casino/games/:codigo", casinoH.ActualizarJuego)
 
 	// Blackjack: una mano de varios turnos.
 	authed.POST("/casino/blackjack", casinoH.BlackjackStart)

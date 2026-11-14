@@ -99,6 +99,15 @@ export interface CasinoGame {
   max_multiplicador: number
   orden: number
   activo: boolean
+  limite_diario: number
+}
+
+export interface CasinoStats {
+  juego: string
+  jugadas: number
+  apostado: number
+  premios: number
+  beneficio: number
 }
 
 export interface CasinoRound {

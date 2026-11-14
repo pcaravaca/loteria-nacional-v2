@@ -211,6 +211,9 @@ table.table { width: 100%; border-collapse: collapse; font-size: 14px; }
 .table tr:last-child td { border-bottom: none; }
 .table tr:hover td { background: rgba(255, 255, 255, .015); }
 .table .fuerte { color: var(--text); font-weight: 600; }
+/* Campos numéricos dentro de tablas (p. ej. limites del casino) */
+.table td .input { width: 96px; padding: 8px 10px; font-size: 13px; }
+.table td .badge.btn-sm { cursor: pointer; font-size: 11px; }
 .numeros { display: inline-flex; gap: 5px; }
 .num {
   min-width: 26px; height: 26px; padding: 0 6px; border-radius: 8px; display: inline-grid; place-items: center;

@@ -27,6 +27,7 @@ type CasinoGame struct {
 	MaxApuesta  int64   `gorm:"not null;default:50000" json:"max_apuesta"`
 	RTP         float64 `gorm:"not null;default:96" json:"rtp"`
 	MaxMultipl  int64   `gorm:"not null;default:10" json:"max_multiplicador"`
+	LimiteDiario int64  `gorm:"not null;default:200000" json:"limite_diario"` // 0 = sin limite
 	Orden       int     `gorm:"not null;default:0" json:"orden"`
 	Activo      bool    `gorm:"not null;default:true" json:"activo"`
 }
