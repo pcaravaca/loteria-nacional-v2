@@ -86,3 +86,46 @@ export interface Resumen {
   loterias_activas: number
   usuarios: number
 }
+
+// ---------------- Mini casino ----------------
+
+export interface CasinoGame {
+  codigo: string
+  nombre: string
+  descripcion: string
+  min_apuesta: number
+  max_apuesta: number
+  rtp: number
+  max_multiplicador: number
+  orden: number
+  activo: boolean
+}
+
+export interface CasinoRound {
+  id: number
+  game: string
+  monto: number
+  multiplicador: number
+  premio: number
+  client_seed: string
+  server_seed_hash: string
+  nonce: number
+  resultado: any
+  created_at: string
+}
+
+export interface PlayResponse {
+  saldo: number
+  premio: number
+  multiplicador: number
+  resultado: any
+  server_seed_hash: string
+  nonce: number
+  ronda_id: number
+}
+
+export interface SemillaResponse {
+  hash: string
+  nonce: number
+  client_seed: string
+}

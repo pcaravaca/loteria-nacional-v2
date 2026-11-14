@@ -50,6 +50,9 @@ func main() {
 		if err := database.Seed(db); err != nil {
 			log.Fatalf("seed: %v", err)
 		}
+		if err := database.SeedCasino(db); err != nil {
+			log.Fatalf("seed casino: %v", err)
+		}
 	}
 
 	r := gin.Default()
@@ -65,6 +68,7 @@ func main() {
 	apuestasH := handlers.NewApuestasHandler(db)
 	reportesH := handlers.NewReportesHandler(db)
 	adminH := handlers.NewAdminHandler(db)
+	casinoH := handlers.NewCasinoHandler(db)
 
 	api.POST("/auth/register", authH.Register)
 	api.POST("/auth/login", authH.Login)
@@ -98,6 +102,15 @@ func main() {
 	adminAgente := authed.Group("/admin")
 	adminAgente.Use(middleware.RoleRequired(models.RolAdmin, models.RolAgente))
 	adminAgente.POST("/sorteos/:id/cerrar", adminH.CerrarSorteo)
+
+	// Mini casino: el resultado y el pago se resuelven en el servidor.
+	authed.GET("/casino/games", casinoH.Games)
+	authed.GET("/casino/seed", casinoH.Seed)
+	authed.POST("/casino/seed/rotate", casinoH.RotarSemilla)
+	authed.POST("/casino/play", casinoH.Play)
+	authed.GET("/casino/rounds", casinoH.Rounds)
+	authed.GET("/casino/rounds/:id/verify", casinoH.Verify)
+	admin.GET("/casino/stats", casinoH.Stats)
 
 	log.Printf("Loteria CR API escuchando en :%s (db=%s)", cfg.Port, cfg.DatabasePath)
 	if err := r.Run(":" + cfg.Port); err != nil {

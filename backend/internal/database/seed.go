@@ -98,5 +98,38 @@ func Seed(db *gorm.DB) error {
 	}
 
 	log.Println("seed: admin@loteria.test/admin123 · agente@loteria.test/agente123 · cliente@loteria.test/cliente123")
+
+	return nil
+}
+
+// SeedCasino crea los juegos del mini casino si faltan. Es idempotente y se
+// puede llamar en cada arranque (las tablas de casino pueden no existir en
+// bases creadas antes de esta version).
+func SeedCasino(db *gorm.DB) error {
+	juegos := []models.CasinoGame{
+		{Codigo: models.CasinoDados, Nombre: "Dados del Sur", Descripcion: "Acerta la suma de dos dados.", MinApuesta: 200, MaxApuesta: 50000, RTP: 88.0, MaxMultipl: 30, Orden: 1, Activo: true},
+		{Codigo: models.CasinoSlots, Nombre: "Fortuna CR", Descripcion: "Tragamonedas de 3 rodillos y 6 simbolos.", MinApuesta: 500, MaxApuesta: 50000, RTP: 94.7, MaxMultipl: 50, Orden: 2, Activo: true},
+		{Codigo: models.CasinoRuleta, Nombre: "Rueda Fortuna", Descripcion: "Ruleta de 37 casillas: pleno o color.", MinApuesta: 500, MaxApuesta: 50000, RTP: 94.4, MaxMultipl: 35, Orden: 3, Activo: true},
+		{Codigo: models.CasinoRaspa, Nombre: "Raspa y Gana", Descripcion: "Tres casillas: si coinciden, ganaste.", MinApuesta: 200, MaxApuesta: 50000, RTP: 92.1, MaxMultipl: 18, Orden: 4, Activo: true},
+		{Codigo: models.CasinoKeno, Nombre: "Keno CR", Descripcion: "Elegi 5 numeros y salen 15.", MinApuesta: 500, MaxApuesta: 50000, RTP: 92.5, MaxMultipl: 65, Orden: 5, Activo: true},
+		{Codigo: models.CasinoBlackjack, Nombre: "21 Blackjack", Descripcion: "Proximamente.", MinApuesta: 500, MaxApuesta: 50000, RTP: 99.4, MaxMultipl: 3, Orden: 6, Activo: false},
+	}
+	for i := range juegos {
+		var existente models.CasinoGame
+		if err := db.Where("codigo = ?", juegos[i].Codigo).First(&existente).Error; err == nil {
+			continue
+		}
+		// Select("*") para que GORM no omita los campos con valor cero que
+		// llevan `default` en el tag (activo:false se ignoraria si no).
+		// GORM rellena los campos con `default` en el propio struct durante el
+		// Create (mutando Activo a true), asi que se guarda el valor a mano.
+		activo := juegos[i].Activo
+		if err := db.Select("*").Create(&juegos[i]).Error; err != nil {
+			return err
+		}
+		if err := db.Exec("UPDATE casino_juegos SET activo = ? WHERE codigo = ?", activo, juegos[i].Codigo).Error; err != nil {
+			return err
+		}
+	}
 	return nil
 }

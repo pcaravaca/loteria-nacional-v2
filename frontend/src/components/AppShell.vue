@@ -16,6 +16,7 @@ const titulos: Record<string, string> = {
   'mis-apuestas': 'Mis apuestas',
   resultados: 'Resultados',
   reportes: 'Reportes',
+  casino: 'Casino',
   perfil: 'Mi perfil',
   admin: 'Administración',
   agente: 'Panel de agente',
@@ -31,6 +32,7 @@ const nav = computed(() => {
     { to: '/mis-apuestas', label: 'Mis apuestas', ico: '🎟' },
     { to: '/resultados', label: 'Resultados', ico: '🏆' },
     { to: '/reportes', label: 'Reportes', ico: '📊' },
+    { to: '/casino', label: 'Casino', ico: '🎰' },
   ]
   if (auth.esAgente) {
     items.push({ to: '/agente', label: 'Agente', ico: '🧾' })

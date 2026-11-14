@@ -36,8 +36,10 @@ const (
 	MovApuesta = "apuesta"
 	MovPremio  = "premio"
 	MovBono    = "bono"
-	MovRetiro  = "retiro"
-	MovAjuste  = "ajuste"
+	MovRetiro    = "retiro"
+	MovAjuste    = "ajuste"
+	MovCasinoApuesta = "casino_apuesta"
+	MovCasinoPremio  = "casino_premio"
 )
 
 // Nombres de tabla explícitos (en español, plural) para no depender de la
@@ -58,8 +60,12 @@ type User struct {
 	Telefono     string    `json:"telefono"`
 	Saldo        int64     `gorm:"not null;default:0" json:"saldo"`
 	Bono         int64     `gorm:"not null;default:0" json:"bono"`
-	CreatedAt    time.Time `json:"created_at"`
-	UpdatedAt    time.Time `json:"updated_at"`
+	// Semilla del casino (provably fair): el hash se publica antes de jugar y
+	// la semilla se revela al verificar la ronda.
+	CasinoSeed  string `gorm:"size:64" json:"-"`
+	CasinoNonce int64  `json:"-"`
+	CreatedAt   time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
 }
 
 // Loteria es un juego (Lotería Nacional, Quiniela, etc.).
