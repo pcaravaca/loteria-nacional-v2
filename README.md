@@ -76,6 +76,21 @@ Al cerrar un sorteo el backend evalúa las apuestas pendientes y paga premios:
 - acierto parcial → `ganadora`, premio = monto × 2
 - acierto total → `pagada`, premio = monto × multiplicador del juego
 
+## Mini casino (planeado)
+
+Además de loterías y quinielas, está previsto un mini casino dentro de la misma app
+(mismo saldo y misma sesión). Ver el plan completo en el Vault:
+`Plans/Mini-Casino-Plan.md`. Resumen:
+
+- **Stack:** componentes Vue con DOM/CSS (slots, blackjack) y canvas 2D (ruleta,
+  dados, raspa, keno). Cero dependencias nuevas.
+- **Backend:** lógica de resultado y pago en Go, con esquema *provably fair*
+  (`server_seed` + `client_seed` + `nonce` → HMAC-SHA256) y modelos `CasinoGame` /
+  `CasinoRound`.
+- **Juegos:** slots, ruleta, dados, blackjack, raspa y gana, keno.
+- **Pendiente de decisión:** regulación de juegos de azar en Costa Rica y tope de
+  premios por ronda.
+
 ## API (resumen)
 
 ```
