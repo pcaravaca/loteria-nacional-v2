@@ -51,6 +51,49 @@ type CasinoRound struct {
 func (CasinoGame) TableName() string  { return "casino_juegos" }
 func (CasinoRound) TableName() string { return "casino_rondas" }
 
+// CasinoBlackjack es el estado de una mano de blackjack. A diferencia de los
+// demas juegos, el blackjack necesita varios turnos (pedir, plantarse, doblar),
+// por eso la mano vive en su propia tabla hasta que se resuelve.
+type BlackjackMano struct {
+	ID             uint      `gorm:"primaryKey" json:"id"`
+	UserID         uint      `gorm:"not null;index" json:"user_id"`
+	Monto          int64     `gorm:"not null" json:"monto"`
+	ManoRaw        string    `gorm:"column:mano_raw" json:"-"`
+	Mano           []int     `gorm:"-" json:"mano"`
+	CrupierRaw     string    `gorm:"column:crupier_raw" json:"-"`
+	Crupier        []int     `gorm:"-" json:"crupier"`
+	Estado         string    `gorm:"not null;default:abierta" json:"estado"`
+	Multiplicador  float64   `gorm:"not null;default:0" json:"multiplicador"`
+	Premio         int64     `gorm:"not null;default:0" json:"premio"`
+	ClientSeed     string    `gorm:"size:64" json:"client_seed"`
+	ServerSeedHash string    `gorm:"size:64" json:"server_seed_hash"`
+	Nonce          int64     `json:"nonce"`
+	CreatedAt      time.Time `json:"created_at"`
+}
+
+func (BlackjackMano) TableName() string { return "casino_blackjack" }
+
+func (b *BlackjackMano) BeforeSave(tx *gorm.DB) error {
+	mb, err := json.Marshal(b.Mano)
+	if err != nil {
+		return err
+	}
+	cb, err := json.Marshal(b.Crupier)
+	if err != nil {
+		return err
+	}
+	b.ManoRaw = string(mb)
+	b.CrupierRaw = string(cb)
+	return nil
+}
+
+func (b *BlackjackMano) AfterFind(tx *gorm.DB) error {
+	if err := json.Unmarshal([]byte(b.ManoRaw), &b.Mano); err != nil {
+		return err
+	}
+	return json.Unmarshal([]byte(b.CrupierRaw), &b.Crupier)
+}
+
 func (r *CasinoRound) BeforeSave(tx *gorm.DB) error {
 	b, err := json.Marshal(r.Resultado)
 	if err != nil {

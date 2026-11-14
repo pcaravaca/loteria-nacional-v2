@@ -35,6 +35,7 @@ func Open(path string) (*gorm.DB, error) {
 		&models.Movimiento{},
 		&models.CasinoGame{},
 		&models.CasinoRound{},
+		&models.BlackjackMano{},
 	); err != nil {
 		return nil, fmt.Errorf("automigrate: %w", err)
 	}

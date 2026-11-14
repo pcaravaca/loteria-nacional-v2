@@ -112,6 +112,12 @@ func main() {
 	authed.GET("/casino/rounds/:id/verify", casinoH.Verify)
 	admin.GET("/casino/stats", casinoH.Stats)
 
+	// Blackjack: una mano de varios turnos.
+	authed.POST("/casino/blackjack", casinoH.BlackjackStart)
+	authed.POST("/casino/blackjack/:id/hit", casinoH.BlackjackHit)
+	authed.POST("/casino/blackjack/:id/stand", casinoH.BlackjackStand)
+	authed.POST("/casino/blackjack/:id/double", casinoH.BlackjackDouble)
+
 	log.Printf("Loteria CR API escuchando en :%s (db=%s)", cfg.Port, cfg.DatabasePath)
 	if err := r.Run(":" + cfg.Port); err != nil {
 		log.Fatalf("servidor: %v", err)

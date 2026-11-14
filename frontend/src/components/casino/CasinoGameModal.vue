@@ -11,6 +11,7 @@ import SlotsGame from './juegos/SlotsGame.vue'
 import RuletaGame from './juegos/RuletaGame.vue'
 import RaspaGame from './juegos/RaspaGame.vue'
 import KenoGame from './juegos/KenoGame.vue'
+import BlackjackGame from './juegos/BlackjackGame.vue'
 
 const props = defineProps<{ juego: CasinoGame; clientSeed: string }>()
 const emit = defineEmits<{ cerrar: [] }>()
@@ -119,6 +120,11 @@ function repetir() {
         :premio="respuesta?.premio ?? 0"
         :cargando="cargando"
         @jugar="jugar"
+      />
+      <BlackjackGame
+        v-else-if="juego.codigo === 'blackjack'"
+        :monto="monto"
+        :client-seed="clientSeed"
       />
 
       <div v-if="respuesta" class="acciones-resultado">
