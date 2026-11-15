@@ -6,25 +6,38 @@ import (
 	"path/filepath"
 
 	"github.com/glebarez/sqlite"
+	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 
+	"loteria-backend/internal/config"
 	"loteria-backend/internal/models"
 )
 
-// Open abre (y crea si falta) la base SQLite y aplica AutoMigrate.
-func Open(path string) (*gorm.DB, error) {
-	if dir := filepath.Dir(path); dir != "" && dir != "." {
-		if err := os.MkdirAll(dir, 0o755); err != nil {
-			return nil, fmt.Errorf("crear directorio de datos: %w", err)
-		}
-	}
+// Open abre la base y aplica AutoMigrate. Usa PostgreSQL si cfg.DatabaseURL
+// esta definido; si no, crea/usa el archivo SQLite de cfg.DatabasePath.
+func Open(cfg *config.Config) (*gorm.DB, error) {
+	gormCfg := &gorm.Config{Logger: logger.Default.LogMode(logger.Warn)}
 
-	db, err := gorm.Open(sqlite.Open(path), &gorm.Config{
-		Logger: logger.Default.LogMode(logger.Warn),
-	})
-	if err != nil {
-		return nil, fmt.Errorf("abrir sqlite %s: %w", path, err)
+	var (
+		db  *gorm.DB
+		err error
+	)
+	if cfg.DatabaseURL != "" {
+		db, err = gorm.Open(postgres.Open(cfg.DatabaseURL), gormCfg)
+		if err != nil {
+			return nil, fmt.Errorf("abrir postgres: %w", err)
+		}
+	} else {
+		if dir := filepath.Dir(cfg.DatabasePath); dir != "" && dir != "." {
+			if err := os.MkdirAll(dir, 0o755); err != nil {
+				return nil, fmt.Errorf("crear directorio de datos: %w", err)
+			}
+		}
+		db, err = gorm.Open(sqlite.Open(cfg.DatabasePath), gormCfg)
+		if err != nil {
+			return nil, fmt.Errorf("abrir sqlite %s: %w", cfg.DatabasePath, err)
+		}
 	}
 
 	if err := db.AutoMigrate(

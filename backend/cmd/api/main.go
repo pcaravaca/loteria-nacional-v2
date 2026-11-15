@@ -41,7 +41,7 @@ func cors() gin.HandlerFunc {
 func main() {
 	cfg := config.Load()
 
-	db, err := database.Open(cfg.DatabasePath)
+	db, err := database.Open(cfg)
 	if err != nil {
 		log.Fatalf("base de datos: %v", err)
 	}
@@ -119,7 +119,11 @@ func main() {
 	authed.POST("/casino/blackjack/:id/stand", casinoH.BlackjackStand)
 	authed.POST("/casino/blackjack/:id/double", casinoH.BlackjackDouble)
 
-	log.Printf("Loteria CR API escuchando en :%s (db=%s)", cfg.Port, cfg.DatabasePath)
+	if cfg.DatabaseURL != "" {
+		log.Printf("Loteria CR API escuchando en :%s (postgres dbname=%s)", cfg.Port, cfg.DatabaseName())
+	} else {
+		log.Printf("Loteria CR API escuchando en :%s (sqlite %s)", cfg.Port, cfg.DatabasePath)
+	}
 	if err := r.Run(":" + cfg.Port); err != nil {
 		log.Fatalf("servidor: %v", err)
 	}

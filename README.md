@@ -8,7 +8,7 @@ Costa Rica. Migración moderna del proyecto legacy `loteria-nacional`
 
 | Capa    | Tecnología                                             |
 | ------- | ------------------------------------------------------ |
-| Backend | Go 1.22 · Gin · GORM · SQLite                          |
+| Backend | Go 1.22 · Gin · GORM · SQLite o PostgreSQL             |
 | Auth    | JWT (bcrypt para claves)                               |
 | Frontend| Vue 3 · Vite · TypeScript · Pinia · Vue Router · Axios  |
 | Estilos | CSS propio (design system oscuro, sin framework UI)    |
@@ -37,6 +37,21 @@ frontend/
 - Go 1.22+
 - Node 18+ y npm
 
+## Base de datos
+
+Por defecto usa un archivo SQLite (`./data/loteria.db`). Si se define
+`DATABASE_URL` (o `DB_HOST`), el backend usa **PostgreSQL** y crea el esquema con
+`AutoMigrate` en cada arranque.
+
+```bash
+# PostgreSQL en el servidor de desarrollo
+export DATABASE_URL="postgres://loteria:CLAVE@100.89.167.67:5499/loteria_dev?sslmode=disable"
+# o por variables sueltas: DB_HOST, DB_PORT, DB_USER, DB_PASSWORD, DB_NAME, DB_TZ
+```
+
+La base de desarrollo real vive en `100.89.167.67:5499` (contenedor `fcfeed-pgdev`,
+base `loteria_dev`, rol `loteria`). Ver `Plans/Loteria-DB-Postgres.md` en el Vault.
+
 ## Backend
 
 ```bash
@@ -45,8 +60,8 @@ cp ../.env.example ../.env      # opcional, hay valores por defecto
 go run ./cmd/api
 ```
 
-Por defecto escucha en `:8080` y usa `./data/loteria.db`. Con `SEED=true`
-(por defecto) crea datos de demostración la primera vez.
+Por defecto escucha en `:8080`. Con `SEED=true` (por defecto) crea datos de
+demostración la primera vez.
 
 Credenciales semilla:
 
