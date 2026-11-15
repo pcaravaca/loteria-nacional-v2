@@ -52,6 +52,16 @@ export DATABASE_URL="postgres://loteria:CLAVE@100.89.167.67:5499/loteria_dev?ssl
 La base de desarrollo real vive en `100.89.167.67:5499` (contenedor `fcfeed-pgdev`,
 base `loteria_dev`, rol `loteria`). Ver `Plans/Loteria-DB-Postgres.md` en el Vault.
 
+### Datos de prueba
+
+`backend/scripts/demo-data.sql` puebla la base con usuarios demo (clave
+`demo1234`), sorteos abiertos y cerrados, apuestas, movimientos, rondas de los 5
+juegos rapidos y manos de blackjack. Es idempotente:
+
+```bash
+ssh peter@100.89.167.67 "docker exec -i fcfeed-pgdev psql -U dba -d loteria_dev" < backend/scripts/demo-data.sql
+```
+
 ## Backend
 
 ```bash
@@ -118,9 +128,14 @@ Rutas del casino:
 GET  /api/casino/games            POST /api/casino/play
 GET  /api/casino/seed             POST /api/casino/seed/rotate
 POST /api/casino/blackjack        POST /api/casino/blackjack/:id/hit|stand|double
+POST /api/casino/blackjack/:id/surrender | /insurance
 GET  /api/casino/rounds           GET  /api/casino/rounds/:id/verify
 GET  /api/admin/casino/stats      PATCH /api/admin/casino/games/:codigo
 ```
+
+El blackjack incluye rendicion (late surrender: recupera la mitad de la apuesta,
+solo con la mano inicial) y seguro (con As visible del crupier: cuesta la mitad
+y paga 2:1 si el crupier tiene blackjack natural).
 
 ## API (resumen)
 

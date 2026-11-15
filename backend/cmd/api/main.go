@@ -118,6 +118,8 @@ func main() {
 	authed.POST("/casino/blackjack/:id/hit", casinoH.BlackjackHit)
 	authed.POST("/casino/blackjack/:id/stand", casinoH.BlackjackStand)
 	authed.POST("/casino/blackjack/:id/double", casinoH.BlackjackDouble)
+	authed.POST("/casino/blackjack/:id/surrender", casinoH.BlackjackSurrender)
+	authed.POST("/casino/blackjack/:id/insurance", casinoH.BlackjackInsurance)
 
 	if cfg.DatabaseURL != "" {
 		log.Printf("Loteria CR API escuchando en :%s (postgres dbname=%s)", cfg.Port, cfg.DatabaseName())

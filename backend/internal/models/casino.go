@@ -67,6 +67,7 @@ type BlackjackMano struct {
 	Estado         string    `gorm:"not null;default:abierta" json:"estado"`
 	Multiplicador  float64   `gorm:"not null;default:0" json:"multiplicador"`
 	Premio         int64     `gorm:"not null;default:0" json:"premio"`
+	Seguro         int64     `gorm:"not null;default:0" json:"seguro"` // costo del seguro cobrado; 0 = sin seguro
 	ClientSeed     string    `gorm:"size:64" json:"client_seed"`
 	ServerSeedHash string    `gorm:"size:64" json:"server_seed_hash"`
 	Nonce          int64     `json:"nonce"`

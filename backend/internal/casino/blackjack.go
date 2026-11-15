@@ -128,3 +128,18 @@ func BlackjackResultado(jugador, crupier []int, apostado int64) (string, int64, 
 // Palo y Figura se exponen para dibujar las cartas en el cliente.
 func PaloCarta(i int) string { return blackjackPalo(i) }
 func FiguraCarta(i int) string { return blackjackFigura(i) }
+
+// Rendirse (surrender): solo con la mano inicial de dos cartas, antes de pedir.
+// Devuelve la mitad de lo apostado; el resto lo queda la casa.
+func BlackjackRendicion(apostado int64) int64 { return apostado / 2 }
+
+// SeguroAplica indica si se puede asegurar: la carta visible del crupier es un As.
+func SeguroAplica(crupier []int) bool {
+	return len(crupier) > 0 && crupier[0]%13 == 0
+}
+
+// SeguroCosto es la mitad de la apuesta; paga 2:1 si el crupier tiene blackjack.
+func SeguroCosto(apostado int64) int64 { return apostado / 2 }
+
+// SeguroPaga devuelve lo que acredita el seguro cuando el crupier tiene natural.
+func SeguroPaga(apostado int64) int64 { return SeguroCosto(apostado) * 2 }

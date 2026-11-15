@@ -13,6 +13,7 @@ const mano = ref<number[]>([])
 const crupier = ref<number[]>([])
 const estado = ref('')
 const premio = ref(0)
+const seguro = ref(0)
 const cargando = ref(false)
 const error = ref('')
 
@@ -45,12 +46,20 @@ const valor = (cartas: number[]) => {
 const valorJugador = computed(() => valor(mano.value))
 const valorCrupier = computed(() => valor(crupier.value))
 const cerrada = computed(() => estado.value !== '' && estado.value !== 'abierta')
+// El seguro solo aplica con un As visible del crupier y una sola vez por mano.
+const puedeAsegurar = computed(
+  () => !cerrada.value && crupier.value.length > 0 && crupier.value[0] % 13 === 0 && seguro.value === 0,
+)
+// Rendirse es con la mano inicial de dos cartas, antes de pedir o doblar.
+const puedeRendirse = computed(() => !cerrada.value && mano.value.length === 2)
 
 const etiquetas: Record<string, { texto: string; clase: string }> = {
   blackjack: { texto: 'Blackjack · pagas 3:2', clase: 'gana' },
   ganada: { texto: 'Ganaste', clase: 'gana' },
   perdida: { texto: 'Perdiste', clase: 'pierde' },
   empate: { texto: 'Empate · devuelve tu apuesta', clase: 'empate' },
+  rendida: { texto: 'Te rendiste · recuperas la mitad', clase: 'empate' },
+  seguro: { texto: 'El crupier tenía blackjack · recuperaste tu apuesta (seguro)', clase: 'empate' },
 }
 
 async function llamar(path: string, body: any = {}) {
@@ -63,6 +72,7 @@ async function llamar(path: string, body: any = {}) {
     crupier.value = data.crupier
     estado.value = data.estado
     premio.value = data.premio ?? 0
+    seguro.value = data.seguro ?? 0
     await auth.cargar()
   } catch (e: any) {
     error.value = e.message
@@ -76,12 +86,15 @@ function empezar() {
   crupier.value = []
   estado.value = ''
   premio.value = 0
+  seguro.value = 0
   llamar('/casino/blackjack', { monto: props.monto, client_seed: props.clientSeed })
 }
 
 function pedir() { llamar(`/casino/blackjack/${manoId.value}/hit`) }
 function plantarse() { llamar(`/casino/blackjack/${manoId.value}/stand`) }
 function doblar() { llamar(`/casino/blackjack/${manoId.value}/double`) }
+function rendirse() { llamar(`/casino/blackjack/${manoId.value}/surrender`) }
+function asegurar() { llamar(`/casino/blackjack/${manoId.value}/insurance`) }
 
 // Al montar se reparte sola la primera mano.
 empezar()
@@ -132,6 +145,10 @@ empezar()
       <button class="btn btn-primary" :disabled="cargando" @click="pedir">Pedir</button>
       <button class="btn btn-ghost" :disabled="cargando" @click="plantarse">Plantarse</button>
       <button class="btn btn-gold" :disabled="cargando" @click="doblar">Doblar</button>
+      <button v-if="puedeAsegurar" class="btn btn-ghost" :disabled="cargando" title="Mitad de la apuesta; paga 2:1 si el crupier tiene blackjack" @click="asegurar">
+        Seguro {{ colones(Math.floor(monto / 2)) }}
+      </button>
+      <button v-if="puedeRendirse" class="btn btn-ghost" :disabled="cargando" @click="rendirse">Rendirse</button>
     </div>
     <button v-else class="btn btn-primary btn-block" :disabled="cargando" @click="empezar">
       {{ cargando ? 'Repartiendo…' : 'Otra mano' }}
@@ -170,6 +187,6 @@ empezar()
 .estado.pierde { color: var(--muted); }
 .estado.empate { color: var(--gold); }
 .estado strong { color: var(--gold); font-size: 18px; margin-left: 6px; }
-.acciones { display: flex; gap: 8px; }
-.acciones .btn { flex: 1; }
+.acciones { display: flex; gap: 8px; flex-wrap: wrap; }
+.acciones .btn { flex: 1 1 96px; }
 </style>

@@ -95,3 +95,41 @@ func TestBarajaDeterminista(t *testing.T) {
 		visto[c] = true
 	}
 }
+
+func TestBlackjackRendicion(t *testing.T) {
+	casos := []struct {
+		apostado int64
+		premio   int64
+	}{
+		{1000, 500},
+		{500, 250},
+		{700, 350}, // impar: el premio es la mitad entera
+		{1, 0},
+	}
+	for i, c := range casos {
+		if p := BlackjackRendicion(c.apostado); p != c.premio {
+			t.Errorf("caso %d: rendicion de %d dio %d, esperaba %d", i, c.apostado, p, c.premio)
+		}
+	}
+}
+
+func TestSeguroAplica(t *testing.T) {
+	if !SeguroAplica([]int{0, 9}) { // As visible
+		t.Error("con As del crupier el seguro deberia aplicar")
+	}
+	if SeguroAplica([]int{12, 9}) { // K visible
+		t.Error("sin As visible el seguro no aplica")
+	}
+	if SeguroAplica(nil) {
+		t.Error("sin cartas del crupier el seguro no aplica")
+	}
+}
+
+func TestSeguroCostoYPaga(t *testing.T) {
+	if c := SeguroCosto(1000); c != 500 {
+		t.Errorf("costo del seguro de 1000 deberia ser 500, fue %d", c)
+	}
+	if p := SeguroPaga(1000); p != 1000 {
+		t.Errorf("el seguro deberia pagar 1000 (2:1 sobre 500), pago %d", p)
+	}
+}

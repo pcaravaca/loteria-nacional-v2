@@ -729,3 +729,144 @@ func (h *CasinoHandler) blackjackTurno(c *gin.Context, accion string) {
 		"saldo":         actualizado.Saldo,
 	})
 }
+
+// BlackjackSurrender cierra la mano devolviendo la mitad de la apuesta. Solo se
+// permite con la mano inicial (dos cartas), antes de pedir o doblar.
+func (h *CasinoHandler) BlackjackSurrender(c *gin.Context) {
+	userID := c.GetUint("userID")
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "id invalido"})
+		return
+	}
+	var bj models.BlackjackMano
+	if err := h.db.Where("id = ? AND user_id = ?", id, userID).First(&bj).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "mano no encontrada"})
+		return
+	}
+	if bj.Estado != "abierta" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "la mano ya esta cerrada"})
+		return
+	}
+	if len(bj.Mano) != 2 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "solo se puede rendir con la mano inicial"})
+		return
+	}
+
+	premio := casino.BlackjackRendicion(bj.Monto)
+	bj.Estado = "rendida"
+	bj.Premio = premio
+	bj.Multiplicador = 0.5
+
+	err = h.db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Save(&bj).Error; err != nil {
+			return err
+		}
+		if err := tx.Model(&models.User{}).Where("id = ?", userID).
+			Update("saldo", gorm.Expr("saldo + ?", premio)).Error; err != nil {
+			return err
+		}
+		mov := models.Movimiento{UserID: userID, Tipo: models.MovCasinoPremio, Monto: premio, Descripcion: "Casino 21 Blackjack (rendicion)"}
+		return tx.Create(&mov).Error
+	})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "no se pudo resolver la rendicion"})
+		return
+	}
+
+	var actualizado models.User
+	_ = h.db.First(&actualizado, userID)
+	c.JSON(http.StatusOK, gin.H{
+		"mano_id":  bj.ID,
+		"mano":     bj.Mano,
+		"crupier":  bj.Crupier,
+		"estado":   bj.Estado,
+		"premio":   bj.Premio,
+		"saldo":    actualizado.Saldo,
+	})
+}
+
+// BlackjackInsurance cobra el seguro (mitad de la apuesta) cuando el crupier
+// muestra un As. Si el crupier tiene blackjack natural, el seguro paga 2:1 y el
+// jugador recupera su apuesta; si no, pierde el seguro y la mano sigue abierta.
+func (h *CasinoHandler) BlackjackInsurance(c *gin.Context) {
+	userID := c.GetUint("userID")
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "id invalido"})
+		return
+	}
+	var bj models.BlackjackMano
+	if err := h.db.Where("id = ? AND user_id = ?", id, userID).First(&bj).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "mano no encontrada"})
+		return
+	}
+	if bj.Estado != "abierta" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "la mano ya esta cerrada"})
+		return
+	}
+	if bj.Seguro > 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "el seguro ya fue tomado"})
+		return
+	}
+	if !casino.SeguroAplica(bj.Crupier) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "el seguro solo aplica con As del crupier"})
+		return
+	}
+
+	var user models.User
+	_ = h.db.First(&user, userID)
+	costo := casino.SeguroCosto(bj.Monto)
+	if user.Saldo < costo {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "saldo insuficiente para el seguro"})
+		return
+	}
+	if !h.verificarLimite(c, user, models.CasinoBlackjack, costo) {
+		return
+	}
+
+	natural := casino.BlackjackNatural(bj.Crupier)
+	bj.Seguro = costo
+
+	err = h.db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Model(&models.User{}).Where("id = ?", userID).
+			Update("saldo", gorm.Expr("saldo - ?", costo)).Error; err != nil {
+			return err
+		}
+		mov := models.Movimiento{UserID: userID, Tipo: models.MovCasinoApuesta, Monto: -costo, Descripcion: "Casino 21 Blackjack (seguro)"}
+		if err := tx.Create(&mov).Error; err != nil {
+			return err
+		}
+		if natural {
+			bj.Estado = "seguro"
+			bj.Premio = casino.SeguroPaga(bj.Monto)
+			if err := tx.Save(&bj).Error; err != nil {
+				return err
+			}
+			if err := tx.Model(&models.User{}).Where("id = ?", userID).
+				Update("saldo", gorm.Expr("saldo + ?", bj.Premio)).Error; err != nil {
+				return err
+			}
+			movPremio := models.Movimiento{UserID: userID, Tipo: models.MovCasinoPremio, Monto: bj.Premio, Descripcion: "Premio casino 21 Blackjack (seguro)"}
+			return tx.Create(&movPremio).Error
+		}
+		// Sin natural: el seguro se pierde y la mano continua.
+		return tx.Save(&bj).Error
+	})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "no se pudo tomar el seguro"})
+		return
+	}
+
+	var actualizado models.User
+	_ = h.db.First(&actualizado, userID)
+	c.JSON(http.StatusOK, gin.H{
+		"mano_id":  bj.ID,
+		"mano":     bj.Mano,
+		"crupier":  bj.Crupier,
+		"estado":   bj.Estado,
+		"premio":   bj.Premio,
+		"seguro":   bj.Seguro,
+		"saldo":    actualizado.Saldo,
+	})
+}

@@ -67,6 +67,10 @@ async function verificar(ronda: CasinoRound) {
       </p>
     </div>
 
+    <p class="juego-responsable">
+      Juega con responsabilidad · Solo mayores de 18 años · Los topes diarios se aplican por juego y usuario.
+    </p>
+
     <p v-if="error" class="error-text" style="margin-bottom: 14px">{{ error }}</p>
     <div v-if="cargando" class="cargando"><span class="spinner"></span> Cargando casino…</div>
 
@@ -88,6 +92,9 @@ async function verificar(ronda: CasinoRound) {
             <div>Min<b>{{ colones(j.min_apuesta) }}</b></div>
             <div>RTP<b>{{ j.rtp }}%</b></div>
             <div>Max<b>x{{ j.max_multiplicador }}</b></div>
+          </div>
+          <div v-if="j.max_premio > 0" class="techo">
+            Premio maximo por jugada: <b>{{ colones(j.max_premio) }}</b>
           </div>
           <button class="btn btn-primary btn-block" :disabled="!j.activo" @click="abierto = j">
             Jugar
@@ -159,6 +166,10 @@ async function verificar(ronda: CasinoRound) {
 .hash-line { font-size: 12px; color: var(--faint); margin-top: 8px; }
 .hash { font-family: ui-monospace, monospace; color: var(--muted); }
 .link { background: none; border: 0; color: var(--prim-2); cursor: pointer; font-size: 12px; padding: 0; }
+.juego-responsable {
+  margin: 0 0 18px; font-size: 12px; color: var(--faint);
+  border: 1px solid var(--border-soft); border-radius: 10px; padding: 8px 12px;
+}
 .juego { display: flex; flex-direction: column; }
 .juego .arte { position: relative; height: 150px; border-radius: 12px; overflow: hidden; border: 1px solid var(--border-soft); margin-bottom: 12px; }
 .juego .arte img { width: 100%; height: 100%; object-fit: cover; display: block; }
@@ -167,6 +178,8 @@ async function verificar(ronda: CasinoRound) {
 .juego .meta { display: flex; gap: 12px; padding: 10px 0; margin: 0 0 12px; border-top: 1px solid var(--border-soft); border-bottom: 1px solid var(--border-soft); }
 .juego .meta div { font-size: 11px; color: var(--faint); text-transform: uppercase; letter-spacing: .06em; }
 .juego .meta b { display: block; color: var(--text); font-size: 13px; letter-spacing: 0; text-transform: none; margin-top: 2px; }
+.juego .techo { font-size: 11px; color: var(--faint); margin: -4px 0 10px; }
+.juego .techo b { color: var(--muted); }
 .juego.apagada .arte img { filter: grayscale(.6) brightness(.6); }
 .proximamente {
   position: absolute; inset: 0; display: grid; place-items: center;
