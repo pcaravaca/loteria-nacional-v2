@@ -105,14 +105,20 @@ func Seed(db *gorm.DB) error {
 // SeedCasino crea los juegos del mini casino si faltan. Es idempotente y se
 // puede llamar en cada arranque (las tablas de casino pueden no existir en
 // bases creadas antes de esta version).
+//
+// MaxPremio es el techo absoluto por jugada (0 = sin techo). El valor por
+// defecto es una politica propuesta para una instalacion nueva; como se vende
+// la plataforma a clientes que operan con sus propios permisos, cada operador
+// lo ajusta desde el panel de administracion. En bases ya existentes el
+// seed no toca las filas, asi que el techo queda en 0 hasta que se configure.
 func SeedCasino(db *gorm.DB) error {
 	juegos := []models.CasinoGame{
-		{Codigo: models.CasinoDados, Nombre: "Dados del Sur", Descripcion: "Acerta la suma de dos dados.", MinApuesta: 200, MaxApuesta: 50000, RTP: 88.0, MaxMultipl: 30, Orden: 1, LimiteDiario: 200000, Activo: true},
-		{Codigo: models.CasinoSlots, Nombre: "Fortuna CR", Descripcion: "Tragamonedas de 3 rodillos y 6 simbolos.", MinApuesta: 500, MaxApuesta: 50000, RTP: 94.7, MaxMultipl: 50, Orden: 2, LimiteDiario: 200000, Activo: true},
-		{Codigo: models.CasinoRuleta, Nombre: "Rueda Fortuna", Descripcion: "Ruleta de 37 casillas: pleno o color.", MinApuesta: 500, MaxApuesta: 50000, RTP: 94.4, MaxMultipl: 35, Orden: 3, LimiteDiario: 200000, Activo: true},
-		{Codigo: models.CasinoRaspa, Nombre: "Raspa y Gana", Descripcion: "Tres casillas: si coinciden, ganaste.", MinApuesta: 200, MaxApuesta: 50000, RTP: 92.1, MaxMultipl: 18, Orden: 4, LimiteDiario: 200000, Activo: true},
-		{Codigo: models.CasinoKeno, Nombre: "Keno CR", Descripcion: "Elegi 5 numeros y salen 15.", MinApuesta: 500, MaxApuesta: 50000, RTP: 92.5, MaxMultipl: 65, Orden: 5, LimiteDiario: 200000, Activo: true},
-		{Codigo: models.CasinoBlackjack, Nombre: "21 Blackjack", Descripcion: "Pedir, plantarse o doblar contra la casa.", MinApuesta: 500, MaxApuesta: 50000, RTP: 99.4, MaxMultipl: 3, Orden: 6, LimiteDiario: 200000, Activo: true},
+		{Codigo: models.CasinoDados, Nombre: "Dados del Sur", Descripcion: "Acerta la suma de dos dados.", MinApuesta: 200, MaxApuesta: 50000, RTP: 88.0, MaxMultipl: 30, MaxPremio: 1000000, Orden: 1, LimiteDiario: 200000, Activo: true},
+		{Codigo: models.CasinoSlots, Nombre: "Fortuna CR", Descripcion: "Tragamonedas de 3 rodillos y 6 simbolos.", MinApuesta: 500, MaxApuesta: 50000, RTP: 94.7, MaxMultipl: 50, MaxPremio: 1000000, Orden: 2, LimiteDiario: 200000, Activo: true},
+		{Codigo: models.CasinoRuleta, Nombre: "Rueda Fortuna", Descripcion: "Ruleta de 37 casillas: pleno o color.", MinApuesta: 500, MaxApuesta: 50000, RTP: 94.4, MaxMultipl: 35, MaxPremio: 1000000, Orden: 3, LimiteDiario: 200000, Activo: true},
+		{Codigo: models.CasinoRaspa, Nombre: "Raspa y Gana", Descripcion: "Tres casillas: si coinciden, ganaste.", MinApuesta: 200, MaxApuesta: 50000, RTP: 92.1, MaxMultipl: 18, MaxPremio: 1000000, Orden: 4, LimiteDiario: 200000, Activo: true},
+		{Codigo: models.CasinoKeno, Nombre: "Keno CR", Descripcion: "Elegi 5 numeros y salen 15.", MinApuesta: 500, MaxApuesta: 50000, RTP: 92.5, MaxMultipl: 65, MaxPremio: 1000000, Orden: 5, LimiteDiario: 200000, Activo: true},
+		{Codigo: models.CasinoBlackjack, Nombre: "21 Blackjack", Descripcion: "Pedir, plantarse o doblar contra la casa.", MinApuesta: 500, MaxApuesta: 50000, RTP: 99.4, MaxMultipl: 3, MaxPremio: 1000000, Orden: 6, LimiteDiario: 200000, Activo: true},
 	}
 	for i := range juegos {
 		var existente models.CasinoGame

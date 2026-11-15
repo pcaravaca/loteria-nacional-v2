@@ -20,13 +20,14 @@ backend/
   cmd/api/            punto de entrada (GIN, rutas, CORS)
   internal/config/    variables de entorno
   internal/database/  conexión GORM + seed de demostración
-  internal/handlers/  auth, juegos, apuestas, reportes, admin
+  internal/handlers/  auth, juegos, apuestas, reportes, admin, casino
+  internal/casino/    RNG provably fair y lógica de los 6 juegos
   internal/middleware/ JWT + control de roles
   internal/models/    modelos GORM (User, Loteria, Sorteo, Apuesta, Movimiento)
 frontend/
   src/api/            cliente Axios con interceptor de token
   src/components/     AppShell, Modal, NumPad, tarjetas
-  src/views/          landing, auth, dashboard, juegos, reportes, admin, agente
+  src/views/          landing, auth, dashboard, juegos, reportes, admin, agente, casino
   src/stores/         Pinia (auth)
   src/styles/         design system
 ```
@@ -76,20 +77,35 @@ Al cerrar un sorteo el backend evalúa las apuestas pendientes y paga premios:
 - acierto parcial → `ganadora`, premio = monto × 2
 - acierto total → `pagada`, premio = monto × multiplicador del juego
 
-## Mini casino (planeado)
+## Mini casino (implementado)
 
-Además de loterías y quinielas, está previsto un mini casino dentro de la misma app
-(mismo saldo y misma sesión). Ver el plan completo en el Vault:
-`Plans/Mini-Casino-Plan.md`. Resumen:
+Además de loterías y quinielas, la app incluye un mini casino con el mismo saldo y la
+misma sesión. Ver el plan completo en el Vault: `Plans/Mini-Casino-Plan.md`. Resumen:
 
 - **Stack:** componentes Vue con DOM/CSS (slots, blackjack) y canvas 2D (ruleta,
-  dados, raspa, keno). Cero dependencias nuevas.
-- **Backend:** lógica de resultado y pago en Go, con esquema *provably fair*
-  (`server_seed` + `client_seed` + `nonce` → HMAC-SHA256) y modelos `CasinoGame` /
-  `CasinoRound`.
+  dados, raspa, keno). Cero dependencias nuevas; SFX sintetizados con Web Audio.
+- **Backend:** lógica de resultado y pago en Go (`internal/casino/`), con esquema
+  *provably fair* (`server_seed` + `client_seed` + `nonce` → HMAC-SHA256) y modelos
+  `CasinoGame` / `CasinoRound`.
 - **Juegos:** slots, ruleta, dados, blackjack, raspa y gana, keno.
-- **Pendiente de decisión:** regulación de juegos de azar en Costa Rica y tope de
-  premios por ronda.
+- **Operación:** topes diarios por juego y usuario, techo de premio por jugada
+  (`max_premio`; acota la apuesta máxima sin tocar el multiplicador que audita
+  el jugador) y panel de admin en `/admin` (activar/pausar, límites, jugadas y
+  beneficio). El blackjack no usa más valores fijos: toma mínimo/máximo del
+  juego configurado.
+- **Modelo:** venta B2B de la plataforma; el cliente opera con sus propios permisos
+  (ver `Plans/Regulacion-Juegos-CR.md`). Pendiente: si el blackjack necesita
+  seguro y rendirse.
+
+Rutas del casino:
+
+```
+GET  /api/casino/games            POST /api/casino/play
+GET  /api/casino/seed             POST /api/casino/seed/rotate
+POST /api/casino/blackjack        POST /api/casino/blackjack/:id/hit|stand|double
+GET  /api/casino/rounds           GET  /api/casino/rounds/:id/verify
+GET  /api/admin/casino/stats      PATCH /api/admin/casino/games/:codigo
+```
 
 ## API (resumen)
 

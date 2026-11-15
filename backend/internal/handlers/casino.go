@@ -25,13 +25,28 @@ func NewCasinoHandler(db *gorm.DB) *CasinoHandler {
 }
 
 // Games devuelve el catalogo de juegos activos.
+type juegoResponse struct {
+	models.CasinoGame
+	ApuestaMax int64 `json:"apuesta_max"` // max_apuesta ya recortado por el techo de premio
+}
+
+// Games lista los juegos con la apuesta maxima real: si hay techo de premio, es
+// menor que max_apuesta. El cliente usa este valor para no ofrecer apuestas que
+// el backend rechazaria.
 func (h *CasinoHandler) Games(c *gin.Context) {
 	var juegos []models.CasinoGame
 	if err := h.db.Order("orden").Find(&juegos).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "no se pudieron cargar los juegos"})
 		return
 	}
-	c.JSON(http.StatusOK, juegos)
+	salida := make([]juegoResponse, 0, len(juegos))
+	for _, j := range juegos {
+		salida = append(salida, juegoResponse{
+			CasinoGame: j,
+			ApuestaMax: casino.ApuestaMaxima(j.MaxApuesta, j.MaxMultipl, j.MaxPremio, j.Codigo),
+		})
+	}
+	c.JSON(http.StatusOK, salida)
 }
 
 type semillaResponse struct {
@@ -130,8 +145,11 @@ func (h *CasinoHandler) Play(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "el minimo es " + strconv.FormatInt(juego.MinApuesta, 10)})
 		return
 	}
-	if req.Monto > juego.MaxApuesta {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "el maximo es " + strconv.FormatInt(juego.MaxApuesta, 10)})
+	// El techo de premio acota la apuesta maxima: con el peor multiplicador
+	// posible el premio nunca supera MaxPremio.
+	apuestaMax := casino.ApuestaMaxima(juego.MaxApuesta, juego.MaxMultipl, juego.MaxPremio, juego.Codigo)
+	if req.Monto > apuestaMax {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "el maximo es " + strconv.FormatInt(apuestaMax, 10), "maximo": apuestaMax})
 		return
 	}
 	if req.ClientSeed == "" {
@@ -346,6 +364,7 @@ func (h *CasinoHandler) ActualizarJuego(c *gin.Context) {
 		MinApuesta   *int64 `json:"min_apuesta"`
 		MaxApuesta   *int64 `json:"max_apuesta"`
 		LimiteDiario *int64 `json:"limite_diario"`
+		MaxPremio    *int64 `json:"max_premio"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "datos invalidos: " + err.Error()})
@@ -363,6 +382,35 @@ func (h *CasinoHandler) ActualizarJuego(c *gin.Context) {
 	}
 	if req.LimiteDiario != nil && *req.LimiteDiario >= 0 {
 		campos["limite_diario"] = *req.LimiteDiario
+	}
+	if req.MaxPremio != nil && *req.MaxPremio >= 0 {
+		campos["max_premio"] = *req.MaxPremio
+	}
+
+	// Se revisa sobre los valores que quedarian guardados, no solo sobre lo
+	// que viene en el request.
+	min := existente.MinApuesta
+	max := existente.MaxApuesta
+	premio := existente.MaxPremio
+	if v, ok := campos["min_apuesta"]; ok {
+		min = v.(int64)
+	}
+	if v, ok := campos["max_apuesta"]; ok {
+		max = v.(int64)
+	}
+	if v, ok := campos["max_premio"]; ok {
+		premio = v.(int64)
+	}
+	if max < min {
+		c.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("el maximo %d no puede ser menor que el minimo %d", max, min)})
+		return
+	}
+	mult := casino.MultiplicadorMaximo(codigo, existente.MaxMultipl)
+	if premio > 0 && mult > 0 && premio/mult < min {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error": fmt.Sprintf("con un techo de premio de %d y multiplicador %d no se podria pagar ni el minimo (%d): subi el techo o baja el minimo", premio, mult, min),
+		})
+		return
 	}
 	if len(campos) == 0 {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "no hay cambios que aplicar"})
@@ -480,8 +528,18 @@ func (h *CasinoHandler) BlackjackStart(c *gin.Context) {
 	if !ok {
 		return
 	}
-	if req.Monto < 500 || req.Monto > 50000 {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "la apuesta debe estar entre 500 y 50000"})
+	var bjJuego models.CasinoGame
+	if err := h.db.Where("codigo = ?", models.CasinoBlackjack).First(&bjJuego).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "el juego no esta configurado"})
+		return
+	}
+	if req.Monto < bjJuego.MinApuesta {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "la apuesta debe ser de al menos " + strconv.FormatInt(bjJuego.MinApuesta, 10)})
+		return
+	}
+	apuestaMax := casino.ApuestaMaxima(bjJuego.MaxApuesta, bjJuego.MaxMultipl, bjJuego.MaxPremio, bjJuego.Codigo)
+	if req.Monto > apuestaMax {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "el maximo es " + strconv.FormatInt(apuestaMax, 10), "maximo": apuestaMax})
 		return
 	}
 	if user.Saldo < req.Monto {

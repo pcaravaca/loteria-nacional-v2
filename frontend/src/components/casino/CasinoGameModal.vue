@@ -27,9 +27,12 @@ const rondaKey = ref(0)
 
 const rapidos = [500, 1000, 5000, 10000]
 const saldo = computed(() => auth.user?.saldo ?? 0)
+// El tope de premio puede recortar la apuesta maxima; el backend envia ese valor
+// ya calculado y es el que vale.
+const apuestaMax = computed(() => props.juego.apuesta_max ?? props.juego.max_apuesta)
 
 function ajustar(delta: number) {
-  monto.value = Math.max(props.juego.min_apuesta, Math.min(props.juego.max_apuesta, monto.value + delta))
+  monto.value = Math.max(props.juego.min_apuesta, Math.min(apuestaMax.value, monto.value + delta))
 }
 
 async function jugar(params: Record<string, unknown>) {
@@ -81,7 +84,7 @@ function repetir() {
           :key="r"
           class="chip"
           :class="{ activa: monto === r }"
-          @click="monto = Math.max(juego.min_apuesta, Math.min(juego.max_apuesta, r))"
+          @click="monto = Math.max(juego.min_apuesta, Math.min(apuestaMax, r))"
         >{{ colones(r) }}</button>
         <span class="saldo">Saldo: <b>{{ colones(saldo) }}</b></span>
       </div>

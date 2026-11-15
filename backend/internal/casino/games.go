@@ -348,6 +348,38 @@ func Jugar(codigo string, monto int64, draws []int, p Params) (Outcome, error) {
 	}
 }
 
+// MultiplicadorMaximo devuelve el peor multiplicador posible de un juego. El
+// blackjack puede doblar y ganar, asi que paga hasta 4 veces la apuesta; el
+// natural (3:2) solo se da antes de doblar.
+func MultiplicadorMaximo(codigo string, maxMultipl int64) int64 {
+	if codigo == "blackjack" {
+		return 4
+	}
+	if maxMultipl > 0 {
+		return maxMultipl
+	}
+	return 0
+}
+
+// ApuestaMaxima devuelve la apuesta maxima que respeta el techo de premio por
+// jugada. maxPremio <= 0 significa sin techo y se respeta maxApuesta tal cual.
+// Asi el premio nunca supera el techo sin tocar el multiplicador del sorteo
+// (que es lo que verifica el jugador).
+func ApuestaMaxima(maxApuesta, maxMultipl, maxPremio int64, codigo string) int64 {
+	if maxPremio <= 0 || maxApuesta <= 0 {
+		return maxApuesta
+	}
+	mult := MultiplicadorMaximo(codigo, maxMultipl)
+	if mult <= 0 {
+		return maxApuesta
+	}
+	tope := maxPremio / mult
+	if tope >= maxApuesta {
+		return maxApuesta
+	}
+	return tope
+}
+
 // Draws indica cuantos numeros necesita cada juego para resolver una jugada.
 func Draws(codigo string) int {
 	switch codigo {

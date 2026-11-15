@@ -97,6 +97,8 @@ export interface CasinoGame {
   max_apuesta: number
   rtp: number
   max_multiplicador: number
+  max_premio: number
+  apuesta_max?: number
   orden: number
   activo: boolean
   limite_diario: number

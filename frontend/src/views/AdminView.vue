@@ -65,6 +65,7 @@ async function guardarJuego(j: CasinoGame) {
       min_apuesta: j.min_apuesta,
       max_apuesta: j.max_apuesta,
       limite_diario: j.limite_diario,
+      max_premio: j.max_premio,
     })
     mensaje.value = `${j.nombre} guardado`
     await cargar()
@@ -318,7 +319,7 @@ async function cerrarSorteo() {
           <thead>
             <tr>
               <th>Juego</th><th>Activo</th><th>Mín</th><th>Máx</th>
-              <th>Tope diario</th><th>Jugadas</th><th>Beneficio</th><th></th>
+              <th>Tope premio</th><th>Tope diario</th><th>Jugadas</th><th>Beneficio</th><th></th>
             </tr>
           </thead>
           <tbody>
@@ -333,6 +334,9 @@ async function cerrarSorteo() {
               </td>
               <td><input v-model.number="j.min_apuesta" type="number" class="input input-sm" /></td>
               <td><input v-model.number="j.max_apuesta" type="number" class="input input-sm" /></td>
+              <td title="Premio máximo por jugada. 0 = sin techo.">
+                <input v-model.number="j.max_premio" type="number" class="input input-sm" />
+              </td>
               <td><input v-model.number="j.limite_diario" type="number" class="input input-sm" /></td>
               <td class="mono">{{ statsDe(j.codigo)?.jugadas ?? 0 }}</td>
               <td class="mono" :class="(statsDe(j.codigo)?.beneficio ?? 0) >= 0 ? 'texto-pos' : 'texto-neg'">
