@@ -7,6 +7,7 @@ import (
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 
+	"loteria-backend/internal/casino"
 	"loteria-backend/internal/models"
 )
 
@@ -131,6 +132,26 @@ func SeedCasino(db *gorm.DB) error {
 	{Codigo: models.CasinoParley, Nombre: "Parley de 2", Descripcion: "Marcá 2 números de 20 y ganá si salen en las 4 bolillas.", MinApuesta: 200, MaxApuesta: 50000, RTP: 91.0, MaxMultipl: 18, MaxPremio: 1000000, Orden: 13, LimiteDiario: 200000, Activo: true},
 	{Codigo: models.CasinoBaccarat, Nombre: "Baccarat", Descripcion: "Jugador, banca o empate: el empate paga x8 y la banca cobra 5% de comisión.", MinApuesta: 500, MaxApuesta: 50000, RTP: 98.7, MaxMultipl: 8, MaxPremio: 1000000, Orden: 14, LimiteDiario: 200000, Activo: true},
 	}
+		// Catalogo AST Casino: tragamonedas y video poker. Sin techo de premio
+		// (MaxPremio 0) porque la volatilidad de las lineas hace que el techo recorte
+		// demasiado la apuesta maxima; los limites diarios siguen aplicando.
+		orden := 15
+		for _, spec := range casino.SpecsAST() {
+			juegos = append(juegos, models.CasinoGame{
+				Codigo:      spec.Codigo,
+				Nombre:      spec.Nombre,
+				Descripcion: spec.Descripcion,
+				MinApuesta:  500,
+				MaxApuesta:  50000,
+				RTP:         spec.RTP,
+				MaxMultipl:  spec.MaxMultipl,
+				MaxPremio:   0,
+				Orden:       orden,
+				LimiteDiario: 200000,
+				Activo:      true,
+			})
+			orden++
+		}
 	for i := range juegos {
 		var existente models.CasinoGame
 		if err := db.Where("codigo = ?", juegos[i].Codigo).First(&existente).Error; err == nil {

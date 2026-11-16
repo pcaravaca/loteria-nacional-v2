@@ -21,16 +21,16 @@ func TestSeedCasino(t *testing.T) {
 	if err := db.Table("casino_juegos").Count(&total).Error; err != nil {
 		t.Fatalf("contar: %v", err)
 	}
-	if total != 14 {
-		t.Fatalf("se esperaban 14 juegos, hay %d", total)
+	if total != 34 {
+		t.Fatalf("se esperaban 34 juegos, hay %d", total)
 	}
 
 	var activos int64
 	if err := db.Table("casino_juegos").Where("activo = ?", true).Count(&activos).Error; err != nil {
 		t.Fatalf("contar activos: %v", err)
 	}
-	if activos != 14 {
-		t.Fatalf("los catorce juegos deberian quedar activos, hay %d", activos)
+	if activos != 34 {
+		t.Fatalf("los juegos deberian quedar activos, hay %d", activos)
 	}
 
 	var techo int64

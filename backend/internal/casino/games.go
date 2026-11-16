@@ -742,9 +742,15 @@ func Jugar(codigo string, monto int64, draws []int, p Params) (Outcome, error) {
 		return jugarParley(monto, draws, p)
 	case "baccarat":
 		return jugarBaccarat(monto, draws, p)
-	default:
-		return Outcome{}, fmt.Errorf("juego no soportado: %s", codigo)
 	}
+	// Catalogo AST Casino: maquinas tragamonedas y mesas de video poker.
+	if _, ok := BuscarSlot(codigo); ok {
+		return jugarAstSlot(codigo, monto, draws, p)
+	}
+	if _, ok := BuscarPoker(codigo); ok {
+		return jugarAstPoker(codigo, monto, draws, p)
+	}
+	return Outcome{}, fmt.Errorf("juego no soportado: %s", codigo)
 }
 
 // MultiplicadorMaximo devuelve el peor multiplicador posible de un juego. El
@@ -753,6 +759,12 @@ func Jugar(codigo string, monto int64, draws []int, p Params) (Outcome, error) {
 func MultiplicadorMaximo(codigo string, maxMultipl int64) int64 {
 	if codigo == "blackjack" {
 		return 4
+	}
+	if m := MaxMultiplSlot(codigo); m > 0 {
+		return m
+	}
+	if m := MaxMultiplPoker(codigo); m > 0 {
+		return m
 	}
 	if maxMultipl > 0 {
 		return maxMultipl
@@ -798,9 +810,17 @@ func Draws(codigo string) int {
 		return 4
 	case "baccarat":
 		return 6
-	default:
-		return 1
 	}
+	// Catalogo AST: cada rodillo y fila de la ventana consume un draw.
+	if s, ok := BuscarSlot(codigo); ok {
+		return s.Rodillos * s.Filas
+	}
+	// Video poker: cinco cartas iniciales y hasta cinco de reemplazo. Se piden
+	// de sobra porque los duplicados se descartan al elegir las cartas.
+	if _, ok := BuscarPoker(codigo); ok {
+		return 25
+	}
+	return 1
 }
 
 // RTP aproximado por simulacion (util para afinar multiplicadores).

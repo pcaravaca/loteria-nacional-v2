@@ -7,6 +7,7 @@ import { colones } from '@/utils/formato'
 import { reproducir } from '@/utils/sfx'
 import Modal from '@/components/Modal.vue'
 import { heroes, type CodigoJuego } from '@/assets/casino'
+import { astSlots, astPokers } from '@/assets/ast'
 import DadosGame from './juegos/DadosGame.vue'
 import SlotsGame from './juegos/SlotsGame.vue'
 import RuletaGame from './juegos/RuletaGame.vue'
@@ -18,6 +19,8 @@ import HiloGame from './juegos/HiloGame.vue'
 import AltoGame from './juegos/AltoGame.vue'
 import FortunaGame from './juegos/FortunaGame.vue'
 import BaccaratGame from './juegos/BaccaratGame.vue'
+import AstSlotGame from './juegos/AstSlotGame.vue'
+import PokerGame from './juegos/PokerGame.vue'
 
 const props = defineProps<{ juego: CasinoGame; clientSeed: string }>()
 const emit = defineEmits<{ cerrar: [] }>()
@@ -34,7 +37,7 @@ const rapidos = [500, 1000, 5000, 10000]
 // Guía por juego (aprobada por Peter: se muestra arriba del tablero).
 // Los multiplicadores son los del backend (internal/casino/games.go).
 type Guia = { pasos: { t: string; d: string }[]; premios: { etq: string; mult: string }[] }
-const guias: Record<CodigoJuego, Guia> = {
+const guias: Partial<Record<CodigoJuego, Guia>> = {
   dados: {
     pasos: [
       { t: 'Elegí la suma', d: 'Del 2 al 12. Cuanto más rara, más paga.' },
@@ -160,7 +163,35 @@ const guias: Record<CodigoJuego, Guia> = {
     premios: [{ etq: 'Jugador', mult: 'x2' }, { etq: 'Banca', mult: 'x2 menos 5%' }, { etq: 'Empate', mult: 'x8' }],
   },
 }
-const guia = computed(() => guias[props.juego.codigo as CodigoJuego])
+
+// Guías genéricas para el catalogo AST (slots y video poker).
+const guiaAstSlot: Guia = {
+  pasos: [
+    { t: 'Definí el monto', d: 'La apuesta se reparte entre todas las lineas.' },
+    { t: 'Girá los rodillos', d: 'Las lineas se leen de izquierda a derecha; paga la mayor coincidencia.' },
+    { t: 'Cobrar', d: 'El servidor acredita el premio al instante y la ronda queda verificable.' },
+  ],
+  premios: [],
+}
+const guiaAstPoker: Guia = {
+  pasos: [
+    { t: 'Definí el monto', d: 'Corresponde a cinco fichas: la tabla paga como apuesta maxima.' },
+    { t: 'Reparto automático', d: 'El sistema sostiene la mejor jugada y completa las cartas que no se quedan.' },
+    { t: 'Cobrar', d: 'Se paga la tabla según la mano final.' },
+  ],
+  premios: [],
+}
+
+const guia = computed<Guia | undefined>(() => {
+  const codigo = props.juego.codigo as CodigoJuego
+  const propia = guias[codigo]
+  if (propia) return propia
+  if (astSlots.some((s) => s.codigo === codigo)) return guiaAstSlot
+  if (astPokers.some((p) => p.codigo === codigo)) return guiaAstPoker
+  return undefined
+})
+const esSlotAst = computed(() => astSlots.some((s) => s.codigo === props.juego.codigo))
+const esPokerAst = computed(() => astPokers.some((p) => p.codigo === props.juego.codigo))
 const saldo = computed(() => auth.user?.saldo ?? 0)
 // El tope de premio puede recortar la apuesta maxima; el backend envia ese valor
 // ya calculado y es el que vale.
@@ -317,6 +348,23 @@ function repetir() {
         :premio="respuesta?.premio ?? 0"
         :monto="monto"
         :cargando="cargando"
+        @jugar="jugar"
+      />
+      <AstSlotGame
+        v-else-if="esSlotAst"
+        :codigo="juego.codigo"
+        :resultado="respuesta?.resultado ?? null"
+        :premio="respuesta?.premio ?? 0"
+        :cargando="cargando"
+        :ronda-key="rondaKey"
+        @jugar="jugar"
+      />
+      <PokerGame
+        v-else-if="esPokerAst"
+        :resultado="respuesta?.resultado ?? null"
+        :premio="respuesta?.premio ?? 0"
+        :cargando="cargando"
+        :ronda-key="rondaKey"
         @jugar="jugar"
       />
 

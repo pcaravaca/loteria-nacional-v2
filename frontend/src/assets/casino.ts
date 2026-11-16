@@ -1,4 +1,5 @@
 // Assets del mini casino (generados, paleta oscura + esmeralda + dorado).
+import { astSlots, astPokers, astTile } from './ast'
 import dadosCard from './casino/cards/dados.webp'
 import slotsCard from './casino/cards/slots.webp'
 import ruletaCard from './casino/cards/ruleta.webp'
@@ -51,6 +52,39 @@ export type CodigoJuego =
   | 'suertudo'
   | 'parley'
   | 'baccarat'
+  // Catalogo AST Casino
+  | 'spy'
+  | 'tuttifruti'
+  | 'venice'
+  | 'viking'
+  | 'winplaceshow'
+  | 'winterfest'
+  | 'witchhouse'
+  | 'wonderland'
+  | 'worldcup'
+  | 'xmasmobile'
+  | 'xmas'
+  | 'zoomerzang'
+  | 'acesandfaces'
+  | 'allamerican'
+  | 'deucewild'
+  | 'eightsandaces'
+  | 'jacksorbetter'
+  | 'jokerpoker'
+  | 'tensorbetter'
+  | 'twowaysroyal'
+
+// Arte de los juegos del catalogo AST: se genera como SVG (no hay imagenes).
+const astArte: Record<string, string> = {}
+const astArteHeroe: Record<string, string> = {}
+for (const s of astSlots) {
+  astArte[s.codigo] = astTile(s.codigo, s.nombre)
+  astArteHeroe[s.codigo] = astTile(s.codigo, s.nombre, 1024, 512)
+}
+for (const p of astPokers) {
+  astArte[p.codigo] = astTile(p.codigo, p.nombre)
+  astArteHeroe[p.codigo] = astTile(p.codigo, p.nombre, 1024, 512)
+}
 
 export const cartas: Record<CodigoJuego, string> = {
   dados: dadosCard,
@@ -67,7 +101,8 @@ export const cartas: Record<CodigoJuego, string> = {
   suertudo: suertudoCard,
   parley: parleyCard,
   baccarat: baccaratCard,
-}
+  ...astArte,
+} as Record<CodigoJuego, string>
 
 export const heroes: Record<CodigoJuego, string> = {
   dados: dadosHero,
@@ -84,7 +119,8 @@ export const heroes: Record<CodigoJuego, string> = {
   suertudo: suertudoHero,
   parley: parleyHero,
   baccarat: baccaratHero,
-}
+  ...astArteHeroe,
+} as Record<CodigoJuego, string>
 
 export const simbolos: Record<string, string> = {
   cereza,
