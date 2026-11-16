@@ -7,20 +7,22 @@ import (
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 
+	"loteria-backend/internal/config"
 	"loteria-backend/internal/models"
 )
 
 type ApuestasHandler struct {
-	db *gorm.DB
+	db  *gorm.DB
+	cfg *config.Config
 }
 
-func NewApuestasHandler(db *gorm.DB) *ApuestasHandler {
-	return &ApuestasHandler{db: db}
+func NewApuestasHandler(db *gorm.DB, cfg *config.Config) *ApuestasHandler {
+	return &ApuestasHandler{db: db, cfg: cfg}
 }
 
 type crearApuestaRequest struct {
-	SorteoID uint   `json:"sorteo_id" binding:"required"`
-	Numeros  []int  `json:"numeros" binding:"required,min=1,dive,min=0"`
+	SorteoID uint  `json:"sorteo_id" binding:"required"`
+	Numeros  []int `json:"numeros" binding:"required,min=1,dive,min=0"`
 }
 
 func (h *ApuestasHandler) Crear(c *gin.Context) {
@@ -69,8 +71,19 @@ func (h *ApuestasHandler) Crear(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "usuario no encontrado"})
 		return
 	}
+	if !GuardJugada(c, h.cfg, user) {
+		return
+	}
 	if user.Saldo < monto {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "saldo insuficiente", "monto": monto, "saldo": user.Saldo})
+		return
+	}
+	// Limites voluntarios de gasto del jugador (juego responsable).
+	if excede, disponible, motivo := EvaluarGasto(h.db, userID, monto); excede {
+		c.JSON(http.StatusTooManyRequests, gin.H{
+			"error":      "tu limite " + motivo + " de gasto se excederia con esta apuesta",
+			"disponible": disponible, "motivo": motivo,
+		})
 		return
 	}
 

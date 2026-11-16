@@ -4,6 +4,7 @@ dist/
 frontend/dist/
 backend/data/
 backend/bin/
+backend/deploy-api
 backend/loteria.db
 *.log
 

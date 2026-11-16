@@ -11,7 +11,46 @@ export interface User {
   telefono: string
   saldo: number
   bono: number
+  tipo_documento?: string
+  numero_documento?: string
+  documento_verificado?: boolean
+  fecha_nacimiento?: string | null
+  autoexcluido_hasta?: string | null
+  tiene_foto?: boolean
   created_at: string
+}
+
+// ---------------- Cumplimiento (juego responsable y fiscalizacion) ----------
+
+export interface Limites {
+  user_id: number
+  deposito_diario: number
+  deposito_semanal: number
+  deposito_mensual: number
+  gasto_diario: number
+  gasto_semanal: number
+  gasto_mensual: number
+  actualizado_en: string
+}
+
+export interface AuditEntry {
+  id: number
+  actor_id: number
+  actor_nombre: string
+  accion: string
+  entidad: string
+  entidad_id: string
+  detalle: string
+  ip: string
+  created_at: string
+}
+
+export const TIPOS_DOCUMENTO: Record<string, string> = {
+  CEDULA_FISICA: 'Cédula física',
+  CEDULA_JURIDICA: 'Cédula jurídica',
+  DIMEX: 'DIMEX',
+  PASAPORTE: 'Pasaporte',
+  CONSUMIDOR_FINAL: 'Consumidor final (sin documento)',
 }
 
 export interface Loteria {

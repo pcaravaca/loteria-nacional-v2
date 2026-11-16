@@ -1,8 +1,12 @@
 package handlers
 
 import (
+	"encoding/json"
+	"fmt"
 	"net/http"
+	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -26,6 +30,45 @@ func (h *AdminHandler) ListUsers(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, users)
+}
+
+// VerificarUsuario marca el documento del jugador como verificado (KYC).
+func (h *AdminHandler) VerificarUsuario(c *gin.Context) {
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "id invalido"})
+		return
+	}
+	var user models.User
+	if err := h.db.First(&user, id).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "usuario no encontrado"})
+		return
+	}
+	faltantes := []string{}
+	if user.TipoDocumento == "" || user.NumeroDocumento == "" {
+		faltantes = append(faltantes, "identificacion")
+	}
+	if user.FechaNacimiento == nil {
+		faltantes = append(faltantes, "fecha de nacimiento")
+	}
+	if user.FotoDocumento == "" {
+		faltantes = append(faltantes, "foto del documento")
+	}
+	if len(faltantes) > 0 {
+		c.JSON(http.StatusBadRequest, gin.H{
+			"error":  "faltan datos para verificar: " + strings.Join(faltantes, ", "),
+			"faltan": faltantes,
+		})
+		return
+	}
+	if err := h.db.Model(&models.User{}).Where("id = ?", id).
+		Update("documento_verificado", true).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "no se pudo verificar el usuario"})
+		return
+	}
+	RegistrarAuditoria(h.db, c, c.GetUint("userID"), "kyc.verificar", "usuario",
+		strconv.FormatUint(id, 10), fmt.Sprintf("%s %s", user.TipoDocumento, user.NumeroDocumento))
+	c.JSON(http.StatusOK, gin.H{"id": user.ID, "tipo_documento": user.TipoDocumento, "numero_documento": user.NumeroDocumento, "documento_verificado": true})
 }
 
 type ajustarSaldoRequest struct {
@@ -55,6 +98,16 @@ func (h *AdminHandler) AjustarSaldo(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "el ajuste dejaria el saldo en negativo"})
 		return
 	}
+	// Un ajuste positivo es un deposito: aplica el limite voluntario del jugador.
+	if req.Monto > 0 {
+		if excede, disponible, motivo := EvaluarDeposito(h.db, uint(id), req.Monto); excede {
+			c.JSON(http.StatusTooManyRequests, gin.H{
+				"error":      "el jugador supera su limite " + motivo + " de deposito",
+				"disponible": disponible, "motivo": motivo,
+			})
+			return
+		}
+	}
 
 	tipo := models.MovAjuste
 	if req.Monto > 0 {
@@ -81,6 +134,9 @@ func (h *AdminHandler) AjustarSaldo(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "no se pudo aplicar el ajuste"})
 		return
 	}
+
+	RegistrarAuditoria(h.db, c, c.GetUint("userID"), "saldo.ajustar", "usuario",
+		strconv.FormatUint(id, 10), fmt.Sprintf("monto=%d tipo=%s desc=%s", req.Monto, tipo, desc))
 
 	var actualizado models.User
 	_ = h.db.First(&actualizado, id)
@@ -125,6 +181,8 @@ func (h *AdminHandler) CreateLoteria(c *gin.Context) {
 		c.JSON(http.StatusConflict, gin.H{"error": "no se pudo crear (codigo ya existente?)"})
 		return
 	}
+	RegistrarAuditoria(h.db, c, c.GetUint("userID"), "loteria.crear", "loteria",
+		strconv.FormatUint(uint64(l.ID), 10), fmt.Sprintf("%s (%s)", l.Nombre, l.Codigo))
 	c.JSON(http.StatusCreated, l)
 }
 
@@ -159,6 +217,9 @@ func (h *AdminHandler) UpdateLoteria(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "no se pudo actualizar"})
 		return
 	}
+	detalle, _ := json.Marshal(updates)
+	RegistrarAuditoria(h.db, c, c.GetUint("userID"), "loteria.actualizar", "loteria",
+		strconv.FormatUint(id, 10), string(detalle))
 	var l models.Loteria
 	_ = h.db.First(&l, id)
 	c.JSON(http.StatusOK, l)
@@ -199,6 +260,9 @@ func (h *AdminHandler) CreateSorteo(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "no se pudo crear el sorteo"})
 		return
 	}
+	RegistrarAuditoria(h.db, c, c.GetUint("userID"), "sorteo.crear", "sorteo",
+		strconv.FormatUint(uint64(s.ID), 10),
+		fmt.Sprintf("%s loteria=%d fecha=%s", s.Titulo, s.LoteriaID, s.Fecha.Format(time.RFC3339)))
 	c.JSON(http.StatusCreated, s)
 }
 
@@ -289,6 +353,9 @@ func (h *AdminHandler) CerrarSorteo(c *gin.Context) {
 		return
 	}
 
+	RegistrarAuditoria(h.db, c, c.GetUint("userID"), "sorteo.cerrar", "sorteo",
+		strconv.FormatUint(id, 10), fmt.Sprintf("numeros=%v", req.NumerosGanadores))
+
 	var actualizado models.Sorteo
 	_ = h.db.Preload("Loteria").First(&actualizado, id)
 	c.JSON(http.StatusOK, actualizado)
@@ -320,4 +387,74 @@ func orDefaultInt(v, def int) int {
 		return def
 	}
 	return v
+}
+
+// VerDocumento sirve la foto del documento del jugador (solo admin).
+func (h *AdminHandler) VerDocumento(c *gin.Context) {
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "id invalido"})
+		return
+	}
+	var user models.User
+	if err := h.db.First(&user, id).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "usuario no encontrado"})
+		return
+	}
+	if user.FotoDocumento == "" {
+		c.JSON(http.StatusNotFound, gin.H{"error": "el usuario no ha subido un documento"})
+		return
+	}
+	if _, err := os.Stat(user.FotoDocumento); err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "el archivo ya no existe en el servidor"})
+		return
+	}
+	c.File(user.FotoDocumento)
+}
+
+// AnonimizarUsuario elimina los datos personales del jugador (Ley 8968) sin
+// romper el detalle financiero: apuestas y movimientos se conservan con el
+// mismo user_id, pero la persona deja de ser identificable.
+func (h *AdminHandler) AnonimizarUsuario(c *gin.Context) {
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "id invalido"})
+		return
+	}
+	var user models.User
+	if err := h.db.First(&user, id).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "usuario no encontrado"})
+		return
+	}
+	if user.Rol == models.RolAdmin {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "no se puede anonimizar a un administrador"})
+		return
+	}
+
+	err = h.db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Model(&models.User{}).Where("id = ?", id).Updates(map[string]any{
+			"nombre":               fmt.Sprintf("Jugador %d", user.ID),
+			"email":                fmt.Sprintf("anon%d@anon.invalid", user.ID),
+			"telefono":             "",
+			"password_hash":        "",
+			"tipo_documento":       "",
+			"numero_documento":     "",
+			"documento_verificado": false,
+			"autoexcluido_hasta":   nil,
+		}).Error; err != nil {
+			return err
+		}
+		if user.FotoDocumento != "" {
+			_ = os.Remove(user.FotoDocumento)
+		}
+		return nil
+	})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "no se pudo anonimizar el usuario"})
+		return
+	}
+
+	RegistrarAuditoria(h.db, c, c.GetUint("userID"), "usuario.anonimizar", "usuario",
+		strconv.FormatUint(id, 10), "datos personales eliminados (Ley 8968)")
+	c.JSON(http.StatusOK, gin.H{"id": user.ID, "anonimizado": true})
 }

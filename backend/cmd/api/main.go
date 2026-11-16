@@ -16,10 +16,10 @@ import (
 
 func cors() gin.HandlerFunc {
 	origenes := map[string]bool{
-		"http://localhost:5173":  true,
-		"http://127.0.0.1:5173":  true,
-		"http://localhost:4173":  true,
-		"http://localhost:8080":  true,
+		"http://localhost:5173": true,
+		"http://127.0.0.1:5173": true,
+		"http://localhost:4173": true,
+		"http://localhost:8080": true,
 	}
 
 	return func(c *gin.Context) {
@@ -65,10 +65,14 @@ func main() {
 
 	authH := handlers.NewAuthHandler(db, cfg)
 	juegosH := handlers.NewJuegosHandler(db)
-	apuestasH := handlers.NewApuestasHandler(db)
+	apuestasH := handlers.NewApuestasHandler(db, cfg)
 	reportesH := handlers.NewReportesHandler(db)
 	adminH := handlers.NewAdminHandler(db)
-	casinoH := handlers.NewCasinoHandler(db)
+	casinoH := handlers.NewCasinoHandler(db, cfg)
+	cuentaH := handlers.NewCuentaHandler(db, cfg)
+	auditoriaH := handlers.NewAuditoriaHandler(db)
+	exportH := handlers.NewExportacionesHandler(db)
+	limitesH := handlers.NewLimitesHandler(db)
 
 	api.POST("/auth/register", authH.Register)
 	api.POST("/auth/login", authH.Login)
@@ -87,16 +91,48 @@ func main() {
 	authed.GET("/resultados", reportesH.Resultados)
 	authed.GET("/reportes/resumen", reportesH.Resumen)
 
-	authed.POST("/apuestas", apuestasH.Crear)
+	authed.POST("/apuestas", middleware.GeoBlock(cfg), apuestasH.Crear)
 	authed.GET("/apuestas/mias", apuestasH.Mias)
+
+	// Juego responsable e identificacion (KYC basico).
+	authed.GET("/cuenta/autoexclusion", cuentaH.AutoexclusionEstado)
+	authed.POST("/cuenta/autoexclusion", cuentaH.AutoexclusionActivar)
+	authed.PUT("/cuenta/identificacion", cuentaH.IdentificacionGuardar)
+	authed.POST("/cuenta/identificacion/foto", cuentaH.SubirFotoDocumento)
+	authed.GET("/cuenta/limites", limitesH.Obtener)
+	authed.PUT("/cuenta/limites", limitesH.Actualizar)
 
 	admin := authed.Group("/admin")
 	admin.Use(middleware.RoleRequired(models.RolAdmin))
 	admin.GET("/usuarios", adminH.ListUsers)
+	admin.POST("/usuarios/:id/verificar", adminH.VerificarUsuario)
+	admin.GET("/usuarios/:id/documento", adminH.VerDocumento)
+	admin.POST("/usuarios/:id/anonimizar", adminH.AnonimizarUsuario)
 	admin.POST("/usuarios/:id/saldo", adminH.AjustarSaldo)
 	admin.POST("/loterias", adminH.CreateLoteria)
 	admin.PUT("/loterias/:id", adminH.UpdateLoteria)
 	admin.POST("/sorteos", adminH.CreateSorteo)
+	admin.GET("/auditoria", auditoriaH.Listar)
+	admin.GET("/reportes/csv/:tipo", func(c *gin.Context) {
+		switch c.Param("tipo") {
+		case "apuestas":
+			exportH.Apuestas(c)
+		case "sorteos":
+			exportH.Sorteos(c)
+		case "rondas":
+			exportH.RondasCasino(c)
+		case "blackjack":
+			exportH.BlackjackManos(c)
+		case "movimientos":
+			exportH.Movimientos(c)
+		case "usuarios":
+			exportH.Usuarios(c)
+		case "auditoria":
+			exportH.Auditoria(c)
+		default:
+			c.JSON(http.StatusNotFound, gin.H{"error": "reporte no disponible"})
+		}
+	})
 
 	// Cargar resultados es tarea del agente o del administrador.
 	adminAgente := authed.Group("/admin")
@@ -107,19 +143,21 @@ func main() {
 	authed.GET("/casino/games", casinoH.Games)
 	authed.GET("/casino/seed", casinoH.Seed)
 	authed.POST("/casino/seed/rotate", casinoH.RotarSemilla)
-	authed.POST("/casino/play", casinoH.Play)
+	authed.POST("/casino/play", middleware.GeoBlock(cfg), casinoH.Play)
 	authed.GET("/casino/rounds", casinoH.Rounds)
 	authed.GET("/casino/rounds/:id/verify", casinoH.Verify)
 	admin.GET("/casino/stats", casinoH.Stats)
 	admin.PATCH("/casino/games/:codigo", casinoH.ActualizarJuego)
 
-	// Blackjack: una mano de varios turnos.
-	authed.POST("/casino/blackjack", casinoH.BlackjackStart)
-	authed.POST("/casino/blackjack/:id/hit", casinoH.BlackjackHit)
-	authed.POST("/casino/blackjack/:id/stand", casinoH.BlackjackStand)
-	authed.POST("/casino/blackjack/:id/double", casinoH.BlackjackDouble)
-	authed.POST("/casino/blackjack/:id/surrender", casinoH.BlackjackSurrender)
-	authed.POST("/casino/blackjack/:id/insurance", casinoH.BlackjackInsurance)
+	// Blackjack: una mano de varios turnos (con bloqueo geografico).
+	bj := authed.Group("")
+	bj.Use(middleware.GeoBlock(cfg))
+	bj.POST("/casino/blackjack", casinoH.BlackjackStart)
+	bj.POST("/casino/blackjack/:id/hit", casinoH.BlackjackHit)
+	bj.POST("/casino/blackjack/:id/stand", casinoH.BlackjackStand)
+	bj.POST("/casino/blackjack/:id/double", casinoH.BlackjackDouble)
+	bj.POST("/casino/blackjack/:id/surrender", casinoH.BlackjackSurrender)
+	bj.POST("/casino/blackjack/:id/insurance", casinoH.BlackjackInsurance)
 
 	if cfg.DatabaseURL != "" {
 		log.Printf("Loteria CR API escuchando en :%s (postgres dbname=%s)", cfg.Port, cfg.DatabaseName())

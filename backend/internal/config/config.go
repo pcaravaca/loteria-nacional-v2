@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net/url"
 	"os"
+	"strconv"
 	"strings"
 
 	"github.com/joho/godotenv"
@@ -15,6 +16,11 @@ type Config struct {
 	DatabasePath string // SQLite (fallback cuando no hay PostgreSQL)
 	DatabaseURL  string // PostgreSQL (tiene prioridad sobre DatabasePath)
 	Seed         bool
+	// Cumplimiento (el operador con licencia define sus politicas):
+	GeoBlockEnabled bool            // bloquea el juego desde paises no permitidos
+	GeoAllowed      map[string]bool // ISO 3166-1 alpha-2, en mayusculas
+	KYCRequired     bool            // exige documento verificado para jugar
+	UploadDir       string          // directorio de documentos KYC subidos
 }
 
 func Load() *Config {
@@ -35,13 +41,58 @@ func Load() *Config {
 		dbPath = "./data/loteria.db"
 	}
 
-	return &Config{
-		Port:         port,
-		JWTSecret:    secret,
-		DatabasePath: dbPath,
-		DatabaseURL:  DatabaseURL(),
-		Seed:         os.Getenv("SEED") != "false",
+	uploadDir := os.Getenv("UPLOAD_DIR")
+	if uploadDir == "" {
+		uploadDir = "./data/uploads"
 	}
+
+	return &Config{
+		Port:            port,
+		JWTSecret:       secret,
+		DatabasePath:    dbPath,
+		DatabaseURL:     DatabaseURL(),
+		Seed:            os.Getenv("SEED") != "false",
+		GeoBlockEnabled: envBool("GEO_BLOCK_ENABLED", false),
+		GeoAllowed:      envCountries(os.Getenv("GEO_ALLOWED_COUNTRIES")),
+		KYCRequired:     envBool("KYC_REQUIRED", false),
+		UploadDir:       uploadDir,
+	}
+}
+
+// GeoPermite indica si un pais (ISO alpha-2) puede jugar.
+func (c *Config) GeoPermite(pais string) bool {
+	p := strings.ToUpper(strings.TrimSpace(pais))
+	if p == "" {
+		return false
+	}
+	return c.GeoAllowed[p]
+}
+
+func envBool(nombre string, defecto bool) bool {
+	v := strings.ToLower(strings.TrimSpace(os.Getenv(nombre)))
+	if v == "" {
+		return defecto
+	}
+	b, err := strconv.ParseBool(v)
+	if err != nil {
+		return defecto
+	}
+	return b
+}
+
+// envCountries convierte "CR,SV,GT" en un mapa. Sin valor se asume solo CR.
+func envCountries(s string) map[string]bool {
+	out := map[string]bool{}
+	for _, p := range strings.Split(s, ",") {
+		p = strings.ToUpper(strings.TrimSpace(p))
+		if len(p) == 2 {
+			out[p] = true
+		}
+	}
+	if len(out) == 0 {
+		out["CR"] = true
+	}
+	return out
 }
 
 // DatabaseURL arma el DSN de PostgreSQL. Acepta un DATABASE_URL completo o las

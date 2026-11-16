@@ -12,11 +12,15 @@ import (
 
 	"loteria-backend/internal/config"
 	"loteria-backend/internal/models"
+	"loteria-backend/internal/tiempo"
 )
 
 // Open abre la base y aplica AutoMigrate. Usa PostgreSQL si cfg.DatabaseURL
 // esta definido; si no, crea/usa el archivo SQLite de cfg.DatabasePath.
 func Open(cfg *config.Config) (*gorm.DB, error) {
+	// Los topes y reportes se calculan en hora CR: fijar la zona antes de
+	// cualquier consulta evita que el resultado dependa del TZ del host.
+	tiempo.Fijar()
 	gormCfg := &gorm.Config{Logger: logger.Default.LogMode(logger.Warn)}
 
 	var (
@@ -49,6 +53,8 @@ func Open(cfg *config.Config) (*gorm.DB, error) {
 		&models.CasinoGame{},
 		&models.CasinoRound{},
 		&models.BlackjackMano{},
+		&models.AuditLog{},
+		&models.LimitesJugador{},
 	); err != nil {
 		return nil, fmt.Errorf("automigrate: %w", err)
 	}

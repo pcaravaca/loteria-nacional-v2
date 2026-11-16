@@ -157,3 +157,45 @@ POST /api/admin/sorteos           POST /api/admin/sorteos/:id/cerrar
   porque los mtimes del mount no son fiables y puede servir módulos cacheados.
 - Los binarios Linux no deben ejecutarse directamente desde el mount NTFS:
   copiarlos a una ruta ext4 (p. ej. `~/`) antes de ejecutarlos.
+- El Go de este WSL es el toolchain de Windows con `GOOS=linux` forzado en
+  `C:\Users\Peter\AppData\Roaming\go\env`. Para correr la API y los tests:
+  Git Bash con `GOENV=off go test ./...`.
+
+## Cumplimiento y juego responsable
+
+La plataforma incluye las herramientas que un operador licenciado exige. Todas
+son configuración del cliente (variables de entorno) y no cambian el código.
+
+- **KYC básico:** el jugador carga tipo y número de documento, fecha de
+  nacimiento (se exige mayoría de edad) y una foto (JPG/PNG hasta 5 MB) en
+  `/perfil`. El admin revisa la imagen y recién ahí marca el documento como
+  verificado. `KYC_REQUIRED=true` bloquea las jugadas sin verificación.
+- **Autoexclusión voluntaria:** mínimo 6 meses e irreversible; se registra en la
+  auditoría y bloquea lotería y casino.
+- **Límites de depósito y gasto:** el jugador configura topes diarios, semanales
+  y mensuales para depósitos y gasto de juego (0 = sin límite). Se aplican en
+  cada apuesta, cada jugada de casino (incluido doblar) y cada recarga; si se
+  superan responde `429` con el disponible y el periodo que lo impide.
+- **Geobloqueo:** `GEO_BLOCK_ENABLED` + `GEO_ALLOWED_COUNTRIES` rechazan el
+  acceso a lotería y casino por `CF-IPCountry` (Cloudflare) o `X-Country`.
+- **Auditoría inmutable:** ajustes de saldo, verificaciones KYC, cambios de
+  límites, autoexclusiones, alta/edición de loterías y sorteos, cierres de
+  sorteo y cambios de juegos quedan en `auditoria` con actor, IP y detalle.
+- **Reportes exportables (CSV con BOM):** apuestas, sorteos, rondas de casino,
+  blackjack, movimientos, usuarios y auditoría, con filtros por usuario, estado
+  y rango de fechas (hora de Costa Rica).
+- **Anonimización (Ley 8968):** el admin puede eliminar los datos personales de
+  un jugador conservando el detalle financiero referencial.
+
+Rutas nuevas:
+
+```
+GET  /api/cuenta/limites            PUT /api/cuenta/limites
+POST /api/cuenta/identificacion/foto
+GET  /api/admin/auditoria           GET /api/admin/reportes/csv/:tipo
+GET  /api/admin/usuarios/:id/documento
+POST /api/admin/usuarios/:id/anonimizar
+```
+
+El reporte `:tipo` acepta `apuestas`, `sorteos`, `rondas`, `blackjack`,
+`movimientos`, `usuarios` y `auditoria`.

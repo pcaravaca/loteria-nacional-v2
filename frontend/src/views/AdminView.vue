@@ -1,18 +1,19 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue'
 import { api } from '@/api/client'
-import type { CasinoGame, CasinoStats, Loteria, Sorteo, User } from '@/types'
+import type { AuditEntry, CasinoGame, CasinoStats, Loteria, Sorteo, User } from '@/types'
 import { colones, estadoSorteo, fechaHora, tipoLabel } from '@/utils/formato'
 import Modal from '@/components/Modal.vue'
 import EmptyState from '@/components/EmptyState.vue'
 
-type Tab = 'usuarios' | 'loterias' | 'sorteos' | 'casino'
+type Tab = 'usuarios' | 'loterias' | 'sorteas' | 'casino' | 'reportes'
 
 const tabs: { id: Tab; label: string; ico: string }[] = [
   { id: 'usuarios', label: 'Usuarios', ico: '👥' },
   { id: 'loterias', label: 'Loterías', ico: '🎰' },
-  { id: 'sorteos', label: 'Sorteos', ico: '📅' },
+  { id: 'sorteas', label: 'Sorteos', ico: '📅' },
   { id: 'casino', label: 'Casino', ico: '🎲' },
+  { id: 'reportes', label: 'Reportes', ico: '📊' },
 ]
 const tab = ref<Tab>('usuarios')
 
@@ -23,6 +24,19 @@ const loterias = ref<Loteria[]>([])
 const sorteos = ref<Sorteo[]>([])
 const juegos = ref<CasinoGame[]>([])
 const stats = ref<CasinoStats[]>([])
+const auditoria = ref<AuditEntry[]>([])
+const filtrosAuditoria = reactive({ actor: '', accion: '', desde: '', hasta: '' })
+const cargandoAuditoria = ref(false)
+
+const reportesDisponibles = [
+  { tipo: 'apuestas', etiqueta: 'Apuestas' },
+  { tipo: 'sorteos', etiqueta: 'Sorteos' },
+  { tipo: 'rondas', etiqueta: 'Rondas de casino' },
+  { tipo: 'blackjack', etiqueta: 'Blackjack' },
+  { tipo: 'movimientos', etiqueta: 'Movimientos' },
+  { tipo: 'usuarios', etiqueta: 'Usuarios' },
+  { tipo: 'auditoria', etiqueta: 'Auditoría' },
+]
 
 async function cargar() {
   cargando.value = true
@@ -64,6 +78,7 @@ async function guardarJuego(j: CasinoGame) {
       activo: j.activo,
       min_apuesta: j.min_apuesta,
       max_apuesta: j.max_apuesta,
+      rtp: j.rtp,
       limite_diario: j.limite_diario,
       max_premio: j.max_premio,
     })
@@ -87,6 +102,69 @@ function abrirAjuste(u: User) {
   ajuste.descripcion = ''
 }
 
+function filtrosQuery() {
+  const p = new URLSearchParams()
+  if (filtrosAuditoria.desde) p.set('desde', filtrosAuditoria.desde)
+  if (filtrosAuditoria.hasta) p.set('hasta', filtrosAuditoria.hasta)
+  return p.toString() ? '?' + p.toString() : ''
+}
+
+async function descargarCSV(tipo: string) {
+  mensaje.value = ''
+  try {
+    const { data } = await api.get(`/admin/reportes/csv/${tipo}${filtrosQuery()}`, { responseType: 'blob' })
+    const url = URL.createObjectURL(new Blob([data], { type: 'text/csv;charset=utf-8' }))
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${tipo}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+    mensaje.value = `${tipo}.csv descargado`
+  } catch (e: any) {
+    mensaje.value = e.message
+  }
+}
+
+async function cargarAuditoria() {
+  cargandoAuditoria.value = true
+  try {
+    const params: Record<string, string> = {}
+    if (filtrosAuditoria.actor) params.actor = filtrosAuditoria.actor
+    if (filtrosAuditoria.accion) params.accion = filtrosAuditoria.accion
+    if (filtrosAuditoria.desde) params.desde = filtrosAuditoria.desde
+    if (filtrosAuditoria.hasta) params.hasta = filtrosAuditoria.hasta
+    const { data } = await api.get<{ total: number; entradas: AuditEntry[] }>('/admin/auditoria', { params })
+    auditoria.value = data.entradas
+  } catch (e: any) {
+    mensaje.value = e.message
+  } finally {
+    cargandoAuditoria.value = false
+  }
+}
+
+async function verDocumento(u: User) {
+  mensaje.value = ''
+  try {
+    const { data } = await api.get(`/admin/usuarios/${u.id}/documento`, { responseType: 'blob' })
+    const url = URL.createObjectURL(data)
+    window.open(url, '_blank')
+  } catch (e: any) {
+    mensaje.value = e.message
+  }
+}
+
+async function anonimizar(u: User) {
+  if (!confirm(`¿Anonimizar a ${u.nombre}? Se eliminarán sus datos personales (Ley 8968). No se puede deshacer.`)) return
+  mensaje.value = ''
+  try {
+    await api.post(`/admin/usuarios/${u.id}/anonimizar`)
+    mensaje.value = `${u.nombre} anonimizado`
+    await cargar()
+  } catch (e: any) {
+    mensaje.value = e.message
+  }
+}
+
 async function aplicarAjuste() {
   guardando.value = true
   try {
@@ -101,6 +179,15 @@ async function aplicarAjuste() {
     error.value = e.message
   } finally {
     guardando.value = false
+  }
+}
+
+const verificar = async (u: User) => {
+  try {
+    await api.post(`/admin/usuarios/${u.id}/verificar`)
+    await cargar()
+  } catch (e:any) {
+    alert(e.message)
   }
 }
 
@@ -244,7 +331,7 @@ async function cerrarSorteo() {
       <div v-if="usuarios.length" class="table-wrap">
         <table class="table">
           <thead>
-            <tr><th>Nombre</th><th>Email</th><th>Rol</th><th>Teléfono</th><th>Saldo</th><th>Bono</th><th></th></tr>
+            <tr><th>Nombre</th><th>Email</th><th>Rol</th><th>Teléfono</th><th>Saldo</th><th>Bono</th><th>Identificación</th><th></th></tr>
           </thead>
           <tbody>
             <tr v-for="u in usuarios" :key="u.id">
@@ -254,7 +341,23 @@ async function cerrarSorteo() {
               <td>{{ u.telefono || '—' }}</td>
               <td class="mono">{{ colones(u.saldo) }}</td>
               <td class="mono texto-gold">{{ colones(u.bono) }}</td>
-              <td><button class="btn btn-ghost btn-sm" @click="abrirAjuste(u)">Ajustar saldo</button></td>
+              <td>
+                <template v-if="u.tipo_documento">
+                  <span class="hint" style="font-size: 12px">{{ u.tipo_documento }} {{ u.numero_documento }}</span>
+                  <span v-if="u.documento_verificado" class="badge badge-ok" style="margin-left: 6px">Verificado</span>
+                  <span v-if="!u.fecha_nacimiento" class="badge badge-gold" style="margin-left: 4px">Sin fecha</span>
+                  <span v-if="!u.tiene_foto" class="badge badge-gold" style="margin-left: 4px">Sin foto</span>
+                </template>
+                <span v-else class="hint">Sin cargar</span>
+              </td>
+              <td style="display: flex; gap: 6px; flex-wrap: wrap">
+                <button v-if="u.tipo_documento && !u.documento_verificado" class="btn btn-ghost btn-sm" @click="verificar(u)">
+                  Verificar
+                </button>
+                <button class="btn btn-ghost btn-sm" title="Ver foto del documento" @click="verDocumento(u)">Doc.</button>
+                <button class="btn btn-ghost btn-sm" title="Eliminar datos personales (Ley 8968)" @click="anonimizar(u)">Anonimizar</button>
+                <button class="btn btn-ghost btn-sm" @click="abrirAjuste(u)">Ajustar saldo</button>
+              </td>
             </tr>
           </tbody>
         </table>
@@ -287,7 +390,7 @@ async function cerrarSorteo() {
       <EmptyState v-else-if="!cargando" icono="🎰" titulo="Sin loterías" texto="Crea tu primer juego para empezar." />
     </div>
 
-    <div v-show="tab === 'sorteos'">
+    <div v-show="tab === 'sorteas'">
       <div class="acciones-fila">
         <button class="btn btn-primary btn-sm" @click="nuevoSorteo">+ Nuevo sorteo</button>
       </div>
@@ -318,7 +421,7 @@ async function cerrarSorteo() {
         <table class="table">
           <thead>
             <tr>
-              <th>Juego</th><th>Activo</th><th>Mín</th><th>Máx</th>
+              <th>Juego</th><th>Activo</th><th>Mín</th><th>Máx</th><th>RTP %</th>
               <th>Tope premio</th><th>Tope diario</th><th>Jugadas</th><th>Beneficio</th><th></th>
             </tr>
           </thead>
@@ -334,6 +437,9 @@ async function cerrarSorteo() {
               </td>
               <td><input v-model.number="j.min_apuesta" type="number" class="input input-sm" /></td>
               <td><input v-model.number="j.max_apuesta" type="number" class="input input-sm" /></td>
+              <td title="Retorno teórico al jugador (%).">
+                <input v-model.number="j.rtp" type="number" step="0.1" min="1" max="100" class="input input-sm" />
+              </td>
               <td title="Premio máximo por jugada. 0 = sin techo.">
                 <input v-model.number="j.max_premio" type="number" class="input input-sm" />
               </td>
@@ -352,6 +458,58 @@ async function cerrarSorteo() {
         </table>
       </div>
       <EmptyState v-else-if="!cargando" icono="🎲" titulo="Sin juegos" />
+    </div>
+
+    <div v-show="tab === 'reportes'">
+      <p v-if="mensaje" class="hint" style="color: var(--prim-2)">{{ mensaje }}</p>
+      <div class="card">
+        <h3 style="font-size: 16px; margin-bottom: 6px">Exportaciones (CSV)</h3>
+        <p class="hint" style="margin-bottom: 12px">
+          Los archivos salen con BOM UTF-8 para abrirse directo en Excel. Si definís un rango
+          de fechas en el panel de auditoría, ese mismo rango se aplica a todos los reportes.
+        </p>
+        <div style="display: flex; gap: 8px; flex-wrap: wrap">
+          <button
+            v-for="r in reportesDisponibles"
+            :key="r.tipo"
+            class="btn btn-ghost btn-sm"
+            @click="descargarCSV(r.tipo)"
+          >
+            {{ r.etiqueta }}
+          </button>
+        </div>
+      </div>
+
+      <div class="card" style="margin-top: 16px">
+        <h3 style="font-size: 16px; margin-bottom: 12px">Auditoría de acciones</h3>
+        <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 12px">
+          <input v-model="filtrosAuditoria.actor" class="input input-sm" placeholder="ID del actor" style="width: 120px" />
+          <input v-model="filtrosAuditoria.accion" class="input input-sm" placeholder="acción" style="width: 190px" />
+          <input v-model="filtrosAuditoria.desde" type="date" class="input input-sm" style="width: 150px" />
+          <input v-model="filtrosAuditoria.hasta" type="date" class="input input-sm" style="width: 150px" />
+          <button class="btn btn-primary btn-sm" @click="cargarAuditoria">Filtrar</button>
+          <button class="btn btn-ghost btn-sm" @click="descargarCSV('auditoria')">Descargar CSV</button>
+        </div>
+        <div v-if="cargandoAuditoria" class="cargando"><span class="spinner"></span></div>
+        <div v-else-if="auditoria.length" class="table-wrap">
+          <table class="table">
+            <thead>
+              <tr><th>Fecha</th><th>Actor</th><th>Acción</th><th>Entidad</th><th>Detalle</th><th>IP</th></tr>
+            </thead>
+            <tbody>
+              <tr v-for="e in auditoria" :key="e.id">
+                <td class="mono">{{ fechaHora(e.created_at) }}</td>
+                <td>{{ e.actor_nombre || '—' }}</td>
+                <td><span class="badge badge-info">{{ e.accion }}</span></td>
+                <td class="mono">{{ e.entidad }} {{ e.entidad_id }}</td>
+                <td class="hint" style="font-size: 12px">{{ e.detalle }}</td>
+                <td class="mono">{{ e.ip }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p v-else class="hint">Sin movimientos en el registro con esos filtros.</p>
+      </div>
     </div>
 
     <Modal v-if="ajuste.abierto" titulo="Ajustar saldo" :sub="ajuste.nombre" @cerrar="ajuste.abierto = false">

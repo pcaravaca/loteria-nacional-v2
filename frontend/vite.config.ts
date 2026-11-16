@@ -13,7 +13,8 @@ export default defineConfig({
     // polling, Vite puede servir modulos cacheados despues de una edicion.
     watch: { usePolling: true, interval: 300 },
     proxy: {
-      '/api': { target: 'http://localhost:8080', changeOrigin: true },
+      // VITE_API_PROXY permite apuntar el frontend a otro puerto de API.
+      '/api': { target: process.env.VITE_API_PROXY || 'http://localhost:8080', changeOrigin: true },
     },
   },
 })

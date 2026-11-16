@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
@@ -11,17 +12,20 @@ import (
 	"gorm.io/gorm"
 
 	"loteria-backend/internal/casino"
+	"loteria-backend/internal/config"
 	"loteria-backend/internal/models"
+	"loteria-backend/internal/tiempo"
 )
 
 // CasinoHandler expone el mini casino. El resultado y el pago se calculan aqui;
 // el cliente solo anima lo que recibe.
 type CasinoHandler struct {
-	db *gorm.DB
+	db  *gorm.DB
+	cfg *config.Config
 }
 
-func NewCasinoHandler(db *gorm.DB) *CasinoHandler {
-	return &CasinoHandler{db: db}
+func NewCasinoHandler(db *gorm.DB, cfg *config.Config) *CasinoHandler {
+	return &CasinoHandler{db: db, cfg: cfg}
 }
 
 // Games devuelve el catalogo de juegos activos.
@@ -50,9 +54,9 @@ func (h *CasinoHandler) Games(c *gin.Context) {
 }
 
 type semillaResponse struct {
-	Hash        string `json:"hash"`
-	Nonce       int64  `json:"nonce"`
-	ClientSeed  string `json:"client_seed"`
+	Hash       string `json:"hash"`
+	Nonce      int64  `json:"nonce"`
+	ClientSeed string `json:"client_seed"`
 }
 
 // Seed devuelve el hash de la semilla del servidor (para comprometer el
@@ -115,10 +119,10 @@ func (h *CasinoHandler) RotarSemilla(c *gin.Context) {
 }
 
 type playRequest struct {
-	Juego       string         `json:"game" binding:"required"`
-	Monto       int64          `json:"monto" binding:"required,min=1"`
-	ClientSeed  string         `json:"client_seed"`
-	Params      casino.Params  `json:"params"`
+	Juego      string        `json:"game" binding:"required"`
+	Monto      int64         `json:"monto" binding:"required,min=1"`
+	ClientSeed string        `json:"client_seed"`
+	Params     casino.Params `json:"params"`
 }
 
 // Play resuelve una jugada: descuenta la apuesta, paga el premio y registra la
@@ -162,11 +166,23 @@ func (h *CasinoHandler) Play(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "usuario no encontrado"})
 		return
 	}
+	if !GuardJugada(c, h.cfg, user) {
+		return
+	}
 	if user.Saldo < req.Monto {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "saldo insuficiente", "saldo": user.Saldo, "monto": req.Monto})
 		return
 	}
 	if !h.verificarLimite(c, user, juego.Codigo, req.Monto) {
+		return
+	}
+
+	// Limites voluntarios de gasto del jugador (juego responsable).
+	if excede, disponible, motivo := EvaluarGasto(h.db, user.ID, req.Monto); excede {
+		c.JSON(http.StatusTooManyRequests, gin.H{
+			"error":      "tu limite " + motivo + " de gasto se excederia con esta jugada",
+			"disponible": disponible, "motivo": motivo,
+		})
 		return
 	}
 
@@ -206,7 +222,7 @@ func (h *CasinoHandler) Play(c *gin.Context) {
 			return err
 		}
 		if err := tx.Model(&models.User{}).Where("id = ?", userID).Updates(map[string]any{
-			"saldo":       gorm.Expr("saldo - ?", req.Monto),
+			"saldo":        gorm.Expr("saldo - ?", req.Monto),
 			"casino_nonce": user.CasinoNonce + 1,
 			"casino_seed":  user.CasinoSeed,
 		}).Error; err != nil {
@@ -247,13 +263,13 @@ func (h *CasinoHandler) Play(c *gin.Context) {
 	_ = h.db.First(&actualizado, userID)
 
 	c.JSON(http.StatusOK, gin.H{
-		"saldo":          actualizado.Saldo,
-		"premio":         premio,
-		"multiplicador":  out.Multiplicador,
-		"resultado":      out.Data,
+		"saldo":            actualizado.Saldo,
+		"premio":           premio,
+		"multiplicador":    out.Multiplicador,
+		"resultado":        out.Data,
 		"server_seed_hash": ronda.ServerSeedHash,
-		"nonce":          ronda.Nonce,
-		"ronda_id":       ronda.ID,
+		"nonce":            ronda.Nonce,
+		"ronda_id":         ronda.ID,
 	})
 }
 
@@ -308,11 +324,11 @@ func (h *CasinoHandler) Verify(c *gin.Context) {
 // Stats devuelve totales por juego (solo admin).
 func (h *CasinoHandler) Stats(c *gin.Context) {
 	type fila struct {
-		Juego    string `json:"juego"`
-		Jugadas  int64  `json:"jugadas"`
-		Apostado int64  `json:"apostado"`
-		Premios  int64  `json:"premios"`
-		Beneficio int64 `json:"beneficio"`
+		Juego     string `json:"juego"`
+		Jugadas   int64  `json:"jugadas"`
+		Apostado  int64  `json:"apostado"`
+		Premios   int64  `json:"premios"`
+		Beneficio int64  `json:"beneficio"`
 	}
 	var filas []fila
 	if err := h.db.Model(&models.CasinoRound{}).
@@ -360,11 +376,13 @@ func (h *CasinoHandler) ActualizarJuego(c *gin.Context) {
 		return
 	}
 	var req struct {
-		Activo       *bool  `json:"activo"`
-		MinApuesta   *int64 `json:"min_apuesta"`
-		MaxApuesta   *int64 `json:"max_apuesta"`
-		LimiteDiario *int64 `json:"limite_diario"`
-		MaxPremio    *int64 `json:"max_premio"`
+		Activo       *bool    `json:"activo"`
+		MinApuesta   *int64   `json:"min_apuesta"`
+		MaxApuesta   *int64   `json:"max_apuesta"`
+		RTP          *float64 `json:"rtp"`
+		MaxMultipl   *int64   `json:"max_multiplicador"`
+		LimiteDiario *int64   `json:"limite_diario"`
+		MaxPremio    *int64   `json:"max_premio"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "datos invalidos: " + err.Error()})
@@ -386,6 +404,12 @@ func (h *CasinoHandler) ActualizarJuego(c *gin.Context) {
 	if req.MaxPremio != nil && *req.MaxPremio >= 0 {
 		campos["max_premio"] = *req.MaxPremio
 	}
+	if req.RTP != nil && *req.RTP > 0 && *req.RTP <= 100 {
+		campos["rtp"] = *req.RTP
+	}
+	if req.MaxMultipl != nil && *req.MaxMultipl >= 0 {
+		campos["max_multipl"] = *req.MaxMultipl
+	}
 
 	// Se revisa sobre los valores que quedarian guardados, no solo sobre lo
 	// que viene en el request.
@@ -406,6 +430,9 @@ func (h *CasinoHandler) ActualizarJuego(c *gin.Context) {
 		return
 	}
 	mult := casino.MultiplicadorMaximo(codigo, existente.MaxMultipl)
+	if v, ok := campos["max_multipl"]; ok {
+		mult = casino.MultiplicadorMaximo(codigo, v.(int64))
+	}
 	if premio > 0 && mult > 0 && premio/mult < min {
 		c.JSON(http.StatusBadRequest, gin.H{
 			"error": fmt.Sprintf("con un techo de premio de %d y multiplicador %d no se podria pagar ni el minimo (%d): subi el techo o baja el minimo", premio, mult, min),
@@ -422,6 +449,10 @@ func (h *CasinoHandler) ActualizarJuego(c *gin.Context) {
 	}
 	var actualizado models.CasinoGame
 	_ = h.db.Where("codigo = ?", codigo).First(&actualizado)
+
+	detalle, _ := json.Marshal(campos)
+	RegistrarAuditoria(h.db, c, c.GetUint("userID"), "casino.juego.actualizar", "juego", codigo, string(detalle))
+
 	c.JSON(http.StatusOK, actualizado)
 }
 
@@ -461,14 +492,6 @@ func (h *CasinoHandler) semillaCliente(c *gin.Context, clientSeed string) string
 	return "cli-" + strconv.FormatUint(uint64(user.ID), 10) + "-" + strconv.FormatInt(user.CasinoNonce, 10)
 }
 
-// zonaCR es la hora de Costa Rica (UTC-6), que es la que usa el tope diario.
-var zonaCR = time.FixedZone("CR", -6*60*60)
-
-func inicioDiaCR() time.Time {
-	ahora := time.Now().In(zonaCR)
-	return time.Date(ahora.Year(), ahora.Month(), ahora.Day(), 0, 0, 0, 0, zonaCR)
-}
-
 // apostadoHoy suma lo que el usuario ya aposto hoy en un juego.
 func (h *CasinoHandler) apostadoHoy(userID uint, codigo string, desde time.Time) int64 {
 	var total int64
@@ -500,17 +523,17 @@ func (h *CasinoHandler) verificarLimite(c *gin.Context, user models.User, codigo
 	if juego.LimiteDiario <= 0 {
 		return true
 	}
-	usado := h.apostadoHoy(user.ID, codigo, inicioDiaCR())
+	usado := h.apostadoHoy(user.ID, codigo, tiempo.InicioDia())
 	if usado < 0 {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "no se pudo verificar el limite diario"})
 		return false
 	}
 	if usado+monto > juego.LimiteDiario {
 		c.JSON(http.StatusTooManyRequests, gin.H{
-			"error":        fmt.Sprintf("limite diario alcanzado: llevas %d de %d", usado, juego.LimiteDiario),
-			"limite":       juego.LimiteDiario,
-			"usado":        usado,
-			"disponible":   juego.LimiteDiario - usado,
+			"error":      fmt.Sprintf("limite diario alcanzado: llevas %d de %d", usado, juego.LimiteDiario),
+			"limite":     juego.LimiteDiario,
+			"usado":      usado,
+			"disponible": juego.LimiteDiario - usado,
 		})
 		return false
 	}
@@ -526,6 +549,9 @@ func (h *CasinoHandler) BlackjackStart(c *gin.Context) {
 	}
 	user, ok := h.usuarioCasino(c)
 	if !ok {
+		return
+	}
+	if !GuardJugada(c, h.cfg, user) {
 		return
 	}
 	var bjJuego models.CasinoGame
@@ -547,6 +573,13 @@ func (h *CasinoHandler) BlackjackStart(c *gin.Context) {
 		return
 	}
 	if !h.verificarLimite(c, user, models.CasinoBlackjack, req.Monto) {
+		return
+	}
+	if excede, disponible, motivo := EvaluarGasto(h.db, user.ID, req.Monto); excede {
+		c.JSON(http.StatusTooManyRequests, gin.H{
+			"error":      "tu limite " + motivo + " de gasto se excederia con esta mano",
+			"disponible": disponible, "motivo": motivo,
+		})
 		return
 	}
 
@@ -604,14 +637,14 @@ func (h *CasinoHandler) BlackjackStart(c *gin.Context) {
 	var actualizado models.User
 	_ = h.db.First(&actualizado, user.ID)
 	c.JSON(http.StatusCreated, gin.H{
-		"mano_id":           bj.ID,
-		"mano":              bj.Mano,
-		"crupier":           bj.Crupier,
-		"estado":            bj.Estado,
-		"premio":            bj.Premio,
-		"saldo":             actualizado.Saldo,
-		"server_seed_hash":  bj.ServerSeedHash,
-		"nonce":             bj.Nonce,
+		"mano_id":          bj.ID,
+		"mano":             bj.Mano,
+		"crupier":          bj.Crupier,
+		"estado":           bj.Estado,
+		"premio":           bj.Premio,
+		"saldo":            actualizado.Saldo,
+		"server_seed_hash": bj.ServerSeedHash,
+		"nonce":            bj.Nonce,
 	})
 }
 
@@ -649,6 +682,13 @@ func (h *CasinoHandler) blackjackTurno(c *gin.Context, accion string) {
 			return
 		}
 		if !h.verificarLimite(c, user, models.CasinoBlackjack, bj.Monto) {
+			return
+		}
+		if excede, disponible, motivo := EvaluarGasto(h.db, user.ID, bj.Monto); excede {
+			c.JSON(http.StatusTooManyRequests, gin.H{
+				"error":      "tu limite " + motivo + " de gasto se excederia al doblar",
+				"disponible": disponible, "motivo": motivo,
+			})
 			return
 		}
 		mano = append(mano, mazo[2*len(mano)])
@@ -777,12 +817,12 @@ func (h *CasinoHandler) BlackjackSurrender(c *gin.Context) {
 	var actualizado models.User
 	_ = h.db.First(&actualizado, userID)
 	c.JSON(http.StatusOK, gin.H{
-		"mano_id":  bj.ID,
-		"mano":     bj.Mano,
-		"crupier":  bj.Crupier,
-		"estado":   bj.Estado,
-		"premio":   bj.Premio,
-		"saldo":    actualizado.Saldo,
+		"mano_id": bj.ID,
+		"mano":    bj.Mano,
+		"crupier": bj.Crupier,
+		"estado":  bj.Estado,
+		"premio":  bj.Premio,
+		"saldo":   actualizado.Saldo,
 	})
 }
 
@@ -861,12 +901,12 @@ func (h *CasinoHandler) BlackjackInsurance(c *gin.Context) {
 	var actualizado models.User
 	_ = h.db.First(&actualizado, userID)
 	c.JSON(http.StatusOK, gin.H{
-		"mano_id":  bj.ID,
-		"mano":     bj.Mano,
-		"crupier":  bj.Crupier,
-		"estado":   bj.Estado,
-		"premio":   bj.Premio,
-		"seguro":   bj.Seguro,
-		"saldo":    actualizado.Saldo,
+		"mano_id": bj.ID,
+		"mano":    bj.Mano,
+		"crupier": bj.Crupier,
+		"estado":  bj.Estado,
+		"premio":  bj.Premio,
+		"seguro":  bj.Seguro,
+		"saldo":   actualizado.Saldo,
 	})
 }

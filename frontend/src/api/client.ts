@@ -25,6 +25,9 @@ api.interceptors.response.use(
       }
     }
     const message = error.response?.data?.error || error.message || 'Error de conexion'
+    if (error.response?.status === 451) {
+      return Promise.reject(new Error(message + ' (tu ubicacion no esta permitida para jugar)'))
+    }
     return Promise.reject(new Error(message))
   },
 )
