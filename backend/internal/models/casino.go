@@ -84,6 +84,42 @@ type BlackjackMano struct {
 
 func (BlackjackMano) TableName() string { return "casino_blackjack" }
 
+// PokerMano es una mano de video poker. La apuesta se descuenta al repartir y
+// la mano queda abierta hasta que el jugador elige que cartas sostiene y cobra;
+// si la abandona, el servidor la cierra solo con el reparto automatico.
+type PokerMano struct {
+	ID             uint      `gorm:"primaryKey" json:"id"`
+	UserID         uint      `gorm:"not null;index" json:"user_id"`
+	RondaID        uint      `gorm:"not null;index" json:"ronda_id"` // fila de casino_rondas
+	Juego          string    `gorm:"not null;index;size:32" json:"juego"`
+	Monto          int64     `gorm:"not null" json:"monto"`
+	InicialesRaw   string    `gorm:"column:iniciales_raw" json:"-"`
+	Iniciales      []string  `gorm:"-" json:"iniciales"`
+	Estado         string    `gorm:"not null;default:abierta" json:"estado"` // abierta | pagada | caducada
+	ClientSeed     string    `gorm:"size:64" json:"client_seed"`
+	ServerSeedHash string    `gorm:"size:64" json:"server_seed_hash"`
+	Nonce          int64     `json:"nonce"`
+	CreatedAt      time.Time `json:"created_at"`
+}
+
+func (PokerMano) TableName() string { return "casino_poker_manos" }
+
+func (p *PokerMano) BeforeSave(tx *gorm.DB) error {
+	b, err := json.Marshal(p.Iniciales)
+	if err != nil {
+		return err
+	}
+	p.InicialesRaw = string(b)
+	return nil
+}
+
+func (p *PokerMano) AfterFind(tx *gorm.DB) error {
+	if p.InicialesRaw == "" {
+		return nil
+	}
+	return json.Unmarshal([]byte(p.InicialesRaw), &p.Iniciales)
+}
+
 func (b *BlackjackMano) BeforeSave(tx *gorm.DB) error {
 	mb, err := json.Marshal(b.Mano)
 	if err != nil {

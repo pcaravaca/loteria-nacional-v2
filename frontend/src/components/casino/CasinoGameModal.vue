@@ -176,8 +176,8 @@ const guiaAstSlot: Guia = {
 const guiaAstPoker: Guia = {
   pasos: [
     { t: 'Definí el monto', d: 'Corresponde a cinco fichas: la tabla paga como apuesta maxima.' },
-    { t: 'Reparto automático', d: 'El sistema sostiene la mejor jugada y completa las cartas que no se quedan.' },
-    { t: 'Cobrar', d: 'Se paga la tabla según la mano final.' },
+    { t: 'Repartí', d: 'La apuesta se descuenta al repartir; las cinco cartas quedan committed con el hash de la semilla.' },
+    { t: 'Elegí y cobrá', d: 'Tocá las cartas que querés sostener y cobrá; lo demás se reemplaza. Si no tocás nada, el sistema sostiene la mejor jugada.' },
   ],
   premios: [],
 }
@@ -361,11 +361,9 @@ function repetir() {
       />
       <PokerGame
         v-else-if="esPokerAst"
-        :resultado="respuesta?.resultado ?? null"
-        :premio="respuesta?.premio ?? 0"
-        :cargando="cargando"
-        :ronda-key="rondaKey"
-        @jugar="jugar"
+        :codigo="juego.codigo"
+        :monto="monto"
+        :client-seed="clientSeed"
       />
 
       <div v-if="respuesta" class="acciones-resultado">

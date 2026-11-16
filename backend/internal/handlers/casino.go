@@ -105,6 +105,13 @@ func (h *CasinoHandler) RotarSemilla(c *gin.Context) {
 		return
 	}
 
+	var abiertas int64
+	if err := h.db.Model(&models.PokerMano{}).
+		Where("user_id = ? AND estado = ?", userID, "abierta").Count(&abiertas).Error; err == nil && abiertas > 0 {
+		c.JSON(http.StatusConflict, gin.H{"error": "tenes una mano de video poker abierta: cobrala antes de rotar la semilla"})
+		return
+	}
+
 	semilla, hash, err := casino.NuevaSemilla()
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "no se pudo generar la semilla"})

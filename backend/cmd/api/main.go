@@ -172,6 +172,12 @@ func main() {
 	bj.POST("/casino/blackjack/:id/surrender", casinoH.BlackjackSurrender)
 	bj.POST("/casino/blackjack/:id/insurance", casinoH.BlackjackInsurance)
 
+	// Video poker: se apostó al repartir y el jugador elige qué cartas sostiene.
+	pk := authed.Group("")
+	pk.Use(middleware.GeoBlock(cfg))
+	pk.POST("/casino/poker", casinoH.PokerRepartir)
+	pk.POST("/casino/poker/:id/cobrar", casinoH.PokerCobrar)
+
 	if cfg.DatabaseURL != "" {
 		log.Printf("Loteria CR API escuchando en :%s (postgres dbname=%s)", cfg.Port, cfg.DatabaseName())
 	} else {
