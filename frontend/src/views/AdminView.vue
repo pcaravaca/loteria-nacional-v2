@@ -7,13 +7,14 @@ import { colones, estadoSorteo, fechaHora, tipoLabel } from '@/utils/formato'
 import Modal from '@/components/Modal.vue'
 import EmptyState from '@/components/EmptyState.vue'
 
-type Tab = 'usuarios' | 'loterias' | 'sorteas' | 'casino' | 'reportes'
+type Tab = 'usuarios' | 'loterias' | 'sorteas' | 'casino' | 'rifas' | 'reportes'
 
 const tabs: { id: Tab; label: string; ico: string }[] = [
   { id: 'usuarios', label: 'Usuarios', ico: '👥' },
   { id: 'loterias', label: 'Loterías', ico: '🎰' },
   { id: 'sorteas', label: 'Sorteos', ico: '📅' },
   { id: 'casino', label: 'Casino', ico: '🎲' },
+  { id: 'rifas', label: 'Rifas', ico: '🎁' },
   { id: 'reportes', label: 'Reportes', ico: '📊' },
 ]
 const route = useRoute()
@@ -27,6 +28,12 @@ const sorteos = ref<Sorteo[]>([])
 const juegos = ref<CasinoGame[]>([])
 const stats = ref<CasinoStats[]>([])
 const auditoria = ref<AuditEntry[]>([])
+const rifas = ref<any[]>([])
+const rifaForm = reactive({
+  titulo: '', descripcion: '', premio: '', precio_numero: 5000,
+  desde_numero: 0, hasta_numero: 99, fecha_sorteo: '', tipo_sorteo: 'azar', premio_monto: 0,
+})
+const guardandoRifa = ref(false)
 const filtrosAuditoria = reactive({ actor: '', accion: '', desde: '', hasta: '' })
 const cargandoAuditoria = ref(false)
 
@@ -44,18 +51,20 @@ async function cargar() {
   cargando.value = true
   error.value = ''
   try {
-    const [u, l, s, j, st] = await Promise.all([
+    const [u, l, s, j, st, rf] = await Promise.all([
       api.get<User[]>('/admin/usuarios'),
       api.get<Loteria[]>('/loterias', { params: { todas: 1 } }),
       api.get<Sorteo[]>('/sorteos'),
       api.get<CasinoGame[]>('/casino/games'),
       api.get<CasinoStats[]>('/admin/casino/stats'),
+      api.get<any[]>('/admin/rifas'),
     ])
     usuarios.value = u.data
     loterias.value = l.data
     sorteos.value = s.data
     juegos.value = j.data
     stats.value = st.data ?? []
+    rifas.value = rf.data ?? []
   } catch (e: any) {
     error.value = e.message
   } finally {
@@ -70,6 +79,48 @@ const mensaje = ref('')
 
 function statsDe(codigo: string) {
   return (stats.value ?? []).find((s) => s.juego === codigo)
+}
+
+async function crearRifa() {
+  guardandoRifa.value = true
+  error.value = ''
+  try {
+    const { data } = await api.post('/admin/rifas', {
+      ...rifaForm,
+      fecha_sorteo: new Date(rifaForm.fecha_sorteo).toISOString(),
+    })
+    mensaje.value = 'Rifa creada #' + data.id
+    rifaForm.titulo = ''
+    rifaForm.premio = ''
+    rifaForm.descripcion = ''
+    await cargar()
+  } catch (e: any) {
+    error.value = e.response?.data?.error ?? e.message
+  } finally {
+    guardandoRifa.value = false
+  }
+}
+
+async function sortearRifa(id: number) {
+  if (!confirm('¿Sortear esta rifa al azar entre los vendidos?')) return
+  try {
+    await api.post(`/admin/rifas/${id}/sortear`, {})
+    mensaje.value = 'Rifa sorteada'
+    await cargar()
+  } catch (e: any) {
+    error.value = e.response?.data?.error ?? e.message
+  }
+}
+
+async function cancelarRifa(id: number) {
+  if (!confirm('¿Cancelar la rifa y reembolsar todos los números?')) return
+  try {
+    await api.post(`/admin/rifas/${id}/cancelar`, {})
+    mensaje.value = 'Rifa cancelada, reembolsos aplicados'
+    await cargar()
+  } catch (e: any) {
+    error.value = e.response?.data?.error ?? e.message
+  }
 }
 
 async function guardarJuego(j: CasinoGame) {
@@ -465,6 +516,65 @@ async function cerrarSorteo() {
       <EmptyState v-else-if="!cargando" icono="🎲" titulo="Sin juegos" />
     </div>
 
+    <div v-show="tab === 'rifas'">
+      <p v-if="mensaje" class="hint" style="color: var(--prim-2)">{{ mensaje }}</p>
+      <div class="card" style="margin-bottom: 16px">
+        <h3 style="font-size: 16px; margin-bottom: 10px">Nueva rifa</h3>
+        <div class="rifa-form">
+          <input v-model="rifaForm.titulo" class="input" placeholder="Título" />
+          <input v-model="rifaForm.premio" class="input" placeholder="Premio (ej.: Moto Pulsar 200)" />
+          <input v-model="rifaForm.descripcion" class="input" placeholder="Descripción" />
+          <label>Precio por número
+            <input v-model.number="rifaForm.precio_numero" type="number" class="input" min="1" />
+          </label>
+          <label>Desde
+            <input v-model.number="rifaForm.desde_numero" type="number" class="input" />
+          </label>
+          <label>Hasta
+            <input v-model.number="rifaForm.hasta_numero" type="number" class="input" />
+          </label>
+          <label>Fecha de sorteo
+            <input v-model="rifaForm.fecha_sorteo" type="datetime-local" class="input" />
+          </label>
+          <label>Tipo de sorteo
+            <select v-model="rifaForm.tipo_sorteo" class="input">
+              <option value="azar">Azar entre vendidos</option>
+              <option value="manual">Manual</option>
+            </select>
+          </label>
+          <label>Premio en efectivo (opcional)
+            <input v-model.number="rifaForm.premio_monto" type="number" class="input" min="0" />
+          </label>
+        </div>
+        <button class="btn btn-primary" :disabled="guardandoRifa" @click="crearRifa">
+          {{ guardandoRifa ? 'Creando…' : 'Crear rifa' }}
+        </button>
+      </div>
+      <div v-if="rifas.length" class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr><th>Título</th><th>Premio</th><th>Precio</th><th>Vendidos</th><th>Recaudado</th><th>Sorteo</th><th>Estado</th><th></th></tr>
+          </thead>
+          <tbody>
+            <tr v-for="r in rifas" :key="r.id">
+              <td class="fuerte">{{ r.titulo }}</td>
+              <td>{{ r.premio }}</td>
+              <td class="mono">{{ colones(r.precio_numero) }}</td>
+              <td class="mono">{{ r.vendidos }}/{{ r.total }}</td>
+              <td class="mono">{{ colones(r.recaudado) }}</td>
+              <td>{{ fechaHora(r.fecha_sorteo) }}</td>
+              <td><span class="badge" :class="r.estado === 'abierta' ? 'badge-ok' : r.estado === 'sorteada' ? 'badge-gold' : 'badge-bad'">{{ r.estado }}</span></td>
+              <td>
+                <button v-if="r.estado === 'abierta'" class="btn btn-ghost btn-sm" @click="sortearRifa(r.id)">Sortear</button>
+                <button v-if="r.estado === 'abierta'" class="btn btn-danger btn-sm" @click="cancelarRifa(r.id)">Cancelar</button>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <EmptyState v-else-if="!cargando" icono="🎁" titulo="Sin rifas" />
+    </div>
+
     <div v-show="tab === 'reportes'">
       <p v-if="mensaje" class="hint" style="color: var(--prim-2)">{{ mensaje }}</p>
       <div class="card">
@@ -588,3 +698,19 @@ async function cerrarSorteo() {
     </Modal>
   </div>
 </template>
+
+<style scoped>
+.rifa-form {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.rifa-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--muted);
+}
+</style>

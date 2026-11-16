@@ -44,6 +44,9 @@ const (
 	MovAjuste        = "ajuste"
 	MovCasinoApuesta = "casino_apuesta"
 	MovCasinoPremio  = "casino_premio"
+	MovRifaCompra    = "rifa_compra"
+	MovRifaPremio    = "rifa_premio"
+	MovRifaReembolso = "rifa_reembolso"
 )
 
 // Tipos de documento aceptados para la identificacion (KYC basico).

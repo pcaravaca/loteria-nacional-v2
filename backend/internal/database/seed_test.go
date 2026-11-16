@@ -6,8 +6,8 @@ import (
 	"loteria-backend/internal/config"
 )
 
-// TestSeedCasino verifica que los juegos se creen con su estado correcto: los
-// seis quedan activos, con sus limites y techo de premio.
+// TestSeedCasino verifica que los juegos se creen con su estado correcto:
+// todos quedan activos, con sus limites y techo de premio.
 func TestSeedCasino(t *testing.T) {
 	db, err := Open(&config.Config{DatabasePath: ":memory:"})
 	if err != nil {
@@ -21,16 +21,16 @@ func TestSeedCasino(t *testing.T) {
 	if err := db.Table("casino_juegos").Count(&total).Error; err != nil {
 		t.Fatalf("contar: %v", err)
 	}
-	if total != 6 {
-		t.Fatalf("se esperaban 6 juegos, hay %d", total)
+	if total != 10 {
+		t.Fatalf("se esperaban 10 juegos, hay %d", total)
 	}
 
 	var activos int64
 	if err := db.Table("casino_juegos").Where("activo = ?", true).Count(&activos).Error; err != nil {
 		t.Fatalf("contar activos: %v", err)
 	}
-	if activos != 6 {
-		t.Fatalf("los seis juegos deberian quedar activos, hay %d", activos)
+	if activos != 10 {
+		t.Fatalf("los diez juegos deberian quedar activos, hay %d", activos)
 	}
 
 	var techo int64

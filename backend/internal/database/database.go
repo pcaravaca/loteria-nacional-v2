@@ -55,6 +55,8 @@ func Open(cfg *config.Config) (*gorm.DB, error) {
 		&models.BlackjackMano{},
 		&models.AuditLog{},
 		&models.LimitesJugador{},
+		&models.Rifa{},
+		&models.RifaNumero{},
 	); err != nil {
 		return nil, fmt.Errorf("automigrate: %w", err)
 	}

@@ -53,6 +53,9 @@ func main() {
 		if err := database.SeedCasino(db); err != nil {
 			log.Fatalf("seed casino: %v", err)
 		}
+		if err := database.SeedRifas(db); err != nil {
+			log.Fatalf("seed rifas: %v", err)
+		}
 	}
 
 	r := gin.Default()
@@ -73,6 +76,8 @@ func main() {
 	auditoriaH := handlers.NewAuditoriaHandler(db)
 	exportH := handlers.NewExportacionesHandler(db)
 	limitesH := handlers.NewLimitesHandler(db)
+	rifasH := handlers.NewRifasHandler(db)
+	adminRifasH := handlers.NewAdminRifasHandler(db)
 
 	api.POST("/auth/register", authH.Register)
 	api.POST("/auth/login", authH.Login)
@@ -81,6 +86,8 @@ func main() {
 	api.GET("/loterias/:id", juegosH.GetLoteria)
 	api.GET("/sorteos", juegosH.ListSorteos)
 	api.GET("/sorteos/proximos", juegosH.ProximosSorteos)
+	api.GET("/rifas", rifasH.Listar)
+	api.GET("/rifas/:id", rifasH.Detalle)
 
 	authed := api.Group("")
 	authed.Use(middleware.AuthRequired(cfg))
@@ -93,6 +100,8 @@ func main() {
 
 	authed.POST("/apuestas", middleware.GeoBlock(cfg), apuestasH.Crear)
 	authed.GET("/apuestas/mias", apuestasH.Mias)
+	authed.POST("/rifas/:id/comprar", middleware.GeoBlock(cfg), rifasH.Comprar)
+	authed.GET("/rifas/mias", rifasH.Mias)
 
 	// Juego responsable e identificacion (KYC basico).
 	authed.GET("/cuenta/autoexclusion", cuentaH.AutoexclusionEstado)
@@ -113,6 +122,10 @@ func main() {
 	admin.PUT("/loterias/:id", adminH.UpdateLoteria)
 	admin.POST("/sorteos", adminH.CreateSorteo)
 	admin.GET("/auditoria", auditoriaH.Listar)
+	admin.GET("/rifas", adminRifasH.Listar)
+	admin.POST("/rifas", adminRifasH.Crear)
+	admin.POST("/rifas/:id/sortear", adminRifasH.Sortear)
+	admin.POST("/rifas/:id/cancelar", adminRifasH.Cancelar)
 	admin.GET("/reportes/csv/:tipo", func(c *gin.Context) {
 		switch c.Param("tipo") {
 		case "apuestas":

@@ -124,6 +124,8 @@ func SeedCasino(db *gorm.DB) error {
 		{Codigo: models.CasinoBlackjack, Nombre: "21 Blackjack", Descripcion: "Pedir, plantarse o doblar contra la casa.", MinApuesta: 500, MaxApuesta: 50000, RTP: 99.4, MaxMultipl: 3, MaxPremio: 1000000, Orden: 6, LimiteDiario: 200000, Activo: true},
 	{Codigo: models.CasinoCascada, Nombre: "Cascada Fortuna", Descripcion: "La bola rebota por los pinchos hasta una casilla con premio.", MinApuesta: 200, MaxApuesta: 50000, RTP: 96.5, MaxMultipl: 10, MaxPremio: 1000000, Orden: 7, LimiteDiario: 200000, Activo: true},
 	{Codigo: models.CasinoHilo, Nombre: "Mayor o Menor", Descripcion: "Adivina si la proxima carta es mas alta o mas baja. Si empata, perdes.", MinApuesta: 200, MaxApuesta: 50000, RTP: 92.3, MaxMultipl: 2, MaxPremio: 1000000, Orden: 8, LimiteDiario: 200000, Activo: true},
+	{Codigo: models.CasinoAlto, Nombre: "Bajo o Sobre", Descripcion: "Elegi el tope y acerta si el dado del 1 al 100 cae abajo o arriba.", MinApuesta: 200, MaxApuesta: 50000, RTP: 95.0, MaxMultipl: 48, MaxPremio: 1000000, Orden: 9, LimiteDiario: 200000, Activo: true},
+	{Codigo: models.CasinoFortuna, Nombre: "Fortuna Rápida", Descripcion: "La aguja gira hasta detenerse en un multiplicador.", MinApuesta: 200, MaxApuesta: 50000, RTP: 95.0, MaxMultipl: 5, MaxPremio: 1000000, Orden: 10, LimiteDiario: 200000, Activo: true},
 	}
 	for i := range juegos {
 		var existente models.CasinoGame
@@ -143,4 +145,34 @@ func SeedCasino(db *gorm.DB) error {
 		}
 	}
 	return nil
+}
+
+// SeedRifas crea una rifa de demostracion si no hay ninguna.
+func SeedRifas(db *gorm.DB) error {
+	var count int64
+	if err := db.Model(&models.Rifa{}).Count(&count).Error; err != nil {
+		return err
+	}
+	if count > 0 {
+		return nil
+	}
+	rifa := models.Rifa{
+		Titulo:       "Rifa Navideña · Moto Pulsar 200",
+		Descripcion:  "Rifa de demostración: 100 números del 00 al 99 y sorteo en vivo.",
+		Premio:       "Moto Pulsar 200NS 0km",
+		PrecioNumero: 5000,
+		DesdeNumero:  0,
+		HastaNumero:  99,
+		FechaSorteo:  time.Now().Add(168 * time.Hour),
+		Estado:       models.RifaAbierta,
+		TipoSorteo:   models.RifaSorteoAzar,
+	}
+	if err := db.Create(&rifa).Error; err != nil {
+		return err
+	}
+	numeros := make([]models.RifaNumero, 0, 100)
+	for n := rifa.DesdeNumero; n <= rifa.HastaNumero; n++ {
+		numeros = append(numeros, models.RifaNumero{RifaID: rifa.ID, Numero: n})
+	}
+	return db.CreateInBatches(numeros, 100).Error
 }

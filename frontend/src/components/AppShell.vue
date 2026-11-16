@@ -31,6 +31,7 @@ const nav = computed(() => {
     { to: '/quinielas', label: 'Quinelas', ico: '⚽' },
     { to: '/mis-apuestas', label: 'Mis apuestas', ico: '🎟' },
     { to: '/resultados', label: 'Resultados', ico: '🏆' },
+    { to: '/rifas', label: 'Rifas', ico: '🎁' },
     { to: '/reportes', label: 'Reportes', ico: '📊' },
   ]
   // El admin administra el casino desde su panel; los demas juegan en el lobby.
