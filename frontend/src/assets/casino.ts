@@ -7,6 +7,8 @@ import raspaCard from './casino/cards/raspa.webp'
 import kenoCard from './casino/cards/keno.webp'
 import cascadaCard from './casino/cards/cascada.webp'
 import hiloCard from './casino/cards/hilo.webp'
+import altoCard from './casino/cards/alto.webp'
+import fortunaCard from './casino/cards/fortuna.webp'
 
 import dadosHero from './casino/hero/dados.webp'
 import slotsHero from './casino/hero/slots.webp'
@@ -16,6 +18,8 @@ import raspaHero from './casino/hero/raspa.webp'
 import kenoHero from './casino/hero/keno.webp'
 import cascadaHero from './casino/hero/cascada.webp'
 import hiloHero from './casino/hero/hilo.webp'
+import altoHero from './casino/hero/alto.webp'
+import fortunaHero from './casino/hero/fortuna.webp'
 
 import cereza from './casino/symbols/cereza.webp'
 import campana from './casino/symbols/campana.webp'
@@ -33,6 +37,8 @@ export type CodigoJuego =
   | 'blackjack'
   | 'cascada'
   | 'hilo'
+  | 'alto'
+  | 'fortuna'
 
 export const cartas: Record<CodigoJuego, string> = {
   dados: dadosCard,
@@ -43,6 +49,8 @@ export const cartas: Record<CodigoJuego, string> = {
   keno: kenoCard,
   cascada: cascadaCard,
   hilo: hiloCard,
+  alto: altoCard,
+  fortuna: fortunaCard,
 }
 
 export const heroes: Record<CodigoJuego, string> = {
@@ -54,6 +62,8 @@ export const heroes: Record<CodigoJuego, string> = {
   keno: kenoHero,
   cascada: cascadaHero,
   hilo: hiloHero,
+  alto: altoHero,
+  fortuna: fortunaHero,
 }
 
 export const simbolos: Record<string, string> = {

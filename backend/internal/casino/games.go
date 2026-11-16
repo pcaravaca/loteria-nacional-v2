@@ -393,6 +393,77 @@ func jugarHilo(monto int64, draws []int, p Params) (Outcome, error) {
 	}, nil
 }
 
+// ---------------------------------------------------------------- bajo o sobre (dado 100)
+
+// altoTopes mapea el tope elegido (porcentaje 1-100) con su multiplicador.
+// El RTP depende del riesgo elegido (~96% en los extremos, menor en el medio).
+var altoTopes = map[int]int64{2: 48, 5: 19, 10: 9, 25: 3, 48: 2, 75: 1, 90: 1, 95: 1}
+
+func jugarAlto(monto int64, draws []int, p Params) (Outcome, error) {
+	if len(draws) < 1 {
+		return Outcome{}, fmt.Errorf("sorteo incompleto")
+	}
+	tope, err := p.Int("tope")
+	if err != nil {
+		return Outcome{}, err
+	}
+	mult, ok := altoTopes[tope]
+	if !ok {
+		return Outcome{}, fmt.Errorf("tope invalido: elegi uno de la lista")
+	}
+	direccion, _ := p.String("direccion")
+	if direccion == "" {
+		direccion = "bajo"
+	}
+	if direccion != "bajo" && direccion != "sobre" {
+		return Outcome{}, fmt.Errorf("la direccion debe ser bajo o sobre")
+	}
+	tirada := draws[0]%100 + 1
+	var gano bool
+	if direccion == "bajo" {
+		gano = tirada <= tope
+	} else {
+		gano = tirada > 100-tope
+	}
+	if !gano {
+		mult = 0
+	}
+	return Outcome{
+		Multiplicador: mult,
+		Data: map[string]any{
+			"tirada":     tirada,
+			"tope":       tope,
+			"direccion":  direccion,
+			"tabla":      altoTopes,
+		},
+	}, nil
+}
+
+// ---------------------------------------------------------------- fortuna rapida (ruletta de premios)
+
+var fortunaTabla = []int64{
+	0, 0, 0, 0, 0, 0, 0, 0, 0,
+	1, 1, 1, 1, 1, 1, 1,
+	2, 2,
+	3,
+	5,
+}
+
+func jugarFortuna(monto int64, draws []int, p Params) (Outcome, error) {
+	if len(draws) < 1 {
+		return Outcome{}, fmt.Errorf("sorteo incompleto")
+	}
+	pos := draws[0] % len(fortunaTabla)
+	return Outcome{
+		Multiplicador: fortunaTabla[pos],
+		Data: map[string]any{
+			"posicion": pos,
+			"tabla":    fortunaTabla,
+			"casillas": len(fortunaTabla),
+		},
+	}, nil
+}
+
 // ---------------------------------------------------------------- despacho
 
 // Jugar resuelve una jugada. El resultado depende unicamente de los draws y
@@ -416,6 +487,10 @@ func Jugar(codigo string, monto int64, draws []int, p Params) (Outcome, error) {
 		return jugarCascada(monto, draws, p)
 	case "hilo":
 		return jugarHilo(monto, draws, p)
+	case "alto":
+		return jugarAlto(monto, draws, p)
+	case "fortuna":
+		return jugarFortuna(monto, draws, p)
 	default:
 		return Outcome{}, fmt.Errorf("juego no soportado: %s", codigo)
 	}
@@ -466,6 +541,8 @@ func Draws(codigo string) int {
 		return cascadaFilas
 	case "hilo":
 		return 2
+	case "alto", "fortuna":
+		return 1
 	default:
 		return 1
 	}
@@ -492,6 +569,10 @@ func RTP(codigo string, iteraciones int) float64 {
 			p = Params{}
 		case "hilo":
 			p = Params{"direccion": "mayor"}
+		case "alto":
+			p = Params{"tope": 48, "direccion": "bajo"}
+		case "fortuna":
+			p = Params{}
 		}
 		out, err := Jugar(codigo, 1000, draws, p)
 		if err != nil {

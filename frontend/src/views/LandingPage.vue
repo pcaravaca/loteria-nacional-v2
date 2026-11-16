@@ -35,6 +35,8 @@ const casinoJuegos = [
   { nombre: '21 Blackjack', img: cartas.blackjack },
   { nombre: 'Cascada Fortuna', img: cartas.cascada },
   { nombre: 'Mayor o Menor', img: cartas.hilo },
+  { nombre: 'Bajo o Sobre', img: cartas.alto },
+  { nombre: 'Fortuna Rápida', img: cartas.fortuna },
 ]
 </script>
 
@@ -138,7 +140,7 @@ const casinoJuegos = [
     <section class="wrap" style="padding-top: 20px; padding-bottom: 24px">
       <div class="page-head">
         <div class="eyebrow">Mini casino</div>
-        <h1 style="font-size: 30px">Ocho juegos, un solo saldo</h1>
+        <h1 style="font-size: 30px">Diez juegos, un solo saldo</h1>
         <p>Provably fair: podés verificar cada ronda con la semilla del servidor.</p>
       </div>
       <div class="landing-strip">

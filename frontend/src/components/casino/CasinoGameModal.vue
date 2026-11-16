@@ -15,6 +15,8 @@ import KenoGame from './juegos/KenoGame.vue'
 import BlackjackGame from './juegos/BlackjackGame.vue'
 import CascadaGame from './juegos/CascadaGame.vue'
 import HiloGame from './juegos/HiloGame.vue'
+import AltoGame from './juegos/AltoGame.vue'
+import FortunaGame from './juegos/FortunaGame.vue'
 
 const props = defineProps<{ juego: CasinoGame; clientSeed: string }>()
 const emit = defineEmits<{ cerrar: [] }>()
@@ -138,6 +140,20 @@ function repetir() {
       />
       <HiloGame
         v-else-if="juego.codigo === 'hilo'"
+        :resultado="respuesta?.resultado ?? null"
+        :premio="respuesta?.premio ?? 0"
+        :cargando="cargando"
+        @jugar="jugar"
+      />
+      <AltoGame
+        v-else-if="juego.codigo === 'alto'"
+        :resultado="respuesta?.resultado ?? null"
+        :premio="respuesta?.premio ?? 0"
+        :cargando="cargando"
+        @jugar="jugar"
+      />
+      <FortunaGame
+        v-else-if="juego.codigo === 'fortuna'"
         :resultado="respuesta?.resultado ?? null"
         :premio="respuesta?.premio ?? 0"
         :cargando="cargando"
