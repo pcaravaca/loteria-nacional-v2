@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onMounted, reactive, ref } from 'vue'
+import { useRoute } from 'vue-router'
 import { api } from '@/api/client'
 import type { AuditEntry, CasinoGame, CasinoStats, Loteria, Sorteo, User } from '@/types'
 import { colones, estadoSorteo, fechaHora, tipoLabel } from '@/utils/formato'
@@ -15,7 +16,8 @@ const tabs: { id: Tab; label: string; ico: string }[] = [
   { id: 'casino', label: 'Casino', ico: '🎲' },
   { id: 'reportes', label: 'Reportes', ico: '📊' },
 ]
-const tab = ref<Tab>('usuarios')
+const route = useRoute()
+const tab = ref<Tab>((route.query.tab as Tab) || 'usuarios')
 
 const cargando = ref(true)
 const error = ref('')
@@ -53,7 +55,7 @@ async function cargar() {
     loterias.value = l.data
     sorteos.value = s.data
     juegos.value = j.data
-    stats.value = st.data
+    stats.value = st.data ?? []
   } catch (e: any) {
     error.value = e.message
   } finally {
@@ -67,7 +69,7 @@ const guardandoJuego = ref('')
 const mensaje = ref('')
 
 function statsDe(codigo: string) {
-  return stats.value.find((s) => s.juego === codigo)
+  return (stats.value ?? []).find((s) => s.juego === codigo)
 }
 
 async function guardarJuego(j: CasinoGame) {
@@ -416,6 +418,9 @@ async function cerrarSorteo() {
     </div>
 
     <div v-show="tab === 'casino'">
+      <div style="display:flex; justify-content:flex-end; margin-bottom:10px">
+        <router-link to="/casino" class="btn btn-ghost btn-sm">Abrir lobby del casino</router-link>
+      </div>
       <p v-if="mensaje" class="hint" style="color: var(--prim-2)">{{ mensaje }}</p>
       <div v-if="juegos.length" class="table-wrap">
         <table class="table">

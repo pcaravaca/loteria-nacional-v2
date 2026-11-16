@@ -122,6 +122,8 @@ func SeedCasino(db *gorm.DB) error {
 		{Codigo: models.CasinoRaspa, Nombre: "Raspa y Gana", Descripcion: "Tres casillas: si coinciden, ganaste.", MinApuesta: 200, MaxApuesta: 50000, RTP: 92.1, MaxMultipl: 18, MaxPremio: 1000000, Orden: 4, LimiteDiario: 200000, Activo: true},
 		{Codigo: models.CasinoKeno, Nombre: "Keno CR", Descripcion: "Elegi 5 numeros y salen 15.", MinApuesta: 500, MaxApuesta: 50000, RTP: 92.5, MaxMultipl: 65, MaxPremio: 1000000, Orden: 5, LimiteDiario: 200000, Activo: true},
 		{Codigo: models.CasinoBlackjack, Nombre: "21 Blackjack", Descripcion: "Pedir, plantarse o doblar contra la casa.", MinApuesta: 500, MaxApuesta: 50000, RTP: 99.4, MaxMultipl: 3, MaxPremio: 1000000, Orden: 6, LimiteDiario: 200000, Activo: true},
+	{Codigo: models.CasinoCascada, Nombre: "Cascada Fortuna", Descripcion: "La bola rebota por los pinchos hasta una casilla con premio.", MinApuesta: 200, MaxApuesta: 50000, RTP: 96.5, MaxMultipl: 10, MaxPremio: 1000000, Orden: 7, LimiteDiario: 200000, Activo: true},
+	{Codigo: models.CasinoHilo, Nombre: "Mayor o Menor", Descripcion: "Adivina si la proxima carta es mas alta o mas baja. Si empata, perdes.", MinApuesta: 200, MaxApuesta: 50000, RTP: 92.3, MaxMultipl: 2, MaxPremio: 1000000, Orden: 8, LimiteDiario: 200000, Activo: true},
 	}
 	for i := range juegos {
 		var existente models.CasinoGame

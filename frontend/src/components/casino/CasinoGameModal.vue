@@ -13,6 +13,8 @@ import RuletaGame from './juegos/RuletaGame.vue'
 import RaspaGame from './juegos/RaspaGame.vue'
 import KenoGame from './juegos/KenoGame.vue'
 import BlackjackGame from './juegos/BlackjackGame.vue'
+import CascadaGame from './juegos/CascadaGame.vue'
+import HiloGame from './juegos/HiloGame.vue'
 
 const props = defineProps<{ juego: CasinoGame; clientSeed: string }>()
 const emit = defineEmits<{ cerrar: [] }>()
@@ -122,6 +124,20 @@ function repetir() {
       />
       <KenoGame
         v-else-if="juego.codigo === 'keno'"
+        :resultado="respuesta?.resultado ?? null"
+        :premio="respuesta?.premio ?? 0"
+        :cargando="cargando"
+        @jugar="jugar"
+      />
+      <CascadaGame
+        v-else-if="juego.codigo === 'cascada'"
+        :resultado="respuesta?.resultado ?? null"
+        :premio="respuesta?.premio ?? 0"
+        :cargando="cargando"
+        @jugar="jugar"
+      />
+      <HiloGame
+        v-else-if="juego.codigo === 'hilo'"
         :resultado="respuesta?.resultado ?? null"
         :premio="respuesta?.premio ?? 0"
         :cargando="cargando"

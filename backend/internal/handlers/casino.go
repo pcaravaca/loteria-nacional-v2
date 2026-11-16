@@ -330,7 +330,7 @@ func (h *CasinoHandler) Stats(c *gin.Context) {
 		Premios   int64  `json:"premios"`
 		Beneficio int64  `json:"beneficio"`
 	}
-	var filas []fila
+	filas := []fila{}
 	if err := h.db.Model(&models.CasinoRound{}).
 		Select("game_codigo as juego, count(*) as jugadas, sum(monto) as apostado, sum(premio) as premios, sum(monto - premio) as beneficio").
 		Group("game_codigo").Scan(&filas).Error; err != nil {

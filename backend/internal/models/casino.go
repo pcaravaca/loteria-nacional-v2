@@ -16,6 +16,8 @@ const (
 	CasinoRaspa     = "raspa"
 	CasinoKeno      = "keno"
 	CasinoBlackjack = "blackjack"
+	CasinoCascada   = "cascada"
+	CasinoHilo      = "hilo"
 )
 
 // CasinoGame es un juego del mini casino con sus limites y su RTP declarado.

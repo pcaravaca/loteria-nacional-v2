@@ -25,15 +25,20 @@ const titulos: Record<string, string> = {
 const titulo = computed(() => titulos[route.name as string] ?? 'Lotería Nacional CR')
 
 const nav = computed(() => {
-  const items = [
+  const items: { to: any; label: string; ico: string; query?: Record<string, unknown> }[] = [
     { to: '/dashboard', label: 'Panel', ico: '▤' },
     { to: '/loterias', label: 'Loterías', ico: '▦' },
     { to: '/quinielas', label: 'Quinelas', ico: '⚽' },
     { to: '/mis-apuestas', label: 'Mis apuestas', ico: '🎟' },
     { to: '/resultados', label: 'Resultados', ico: '🏆' },
     { to: '/reportes', label: 'Reportes', ico: '📊' },
-    { to: '/casino', label: 'Casino', ico: '🎰' },
   ]
+  // El admin administra el casino desde su panel; los demas juegan en el lobby.
+  if (auth.esAdmin) {
+    items.push({ to: { path: '/admin', query: { tab: 'casino' } }, label: 'Casino', ico: '🎲' })
+  } else {
+    items.push({ to: '/casino', label: 'Casino', ico: '🎰' })
+  }
   if (auth.esAgente) {
     items.push({ to: '/agente', label: 'Agente', ico: '🧾' })
   }

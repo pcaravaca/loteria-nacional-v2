@@ -4,6 +4,8 @@ import { api } from '@/api/client'
 import type { Loteria, Sorteo } from '@/types'
 import { colones } from '@/utils/formato'
 import SorteoCard from '@/components/SorteoCard.vue'
+import heroArt from '@/assets/hero-landing.webp'
+import { cartas } from '@/assets/casino'
 
 const loterias = ref<Loteria[]>([])
 const sorteos = ref<Sorteo[]>([])
@@ -23,6 +25,17 @@ onMounted(async () => {
     cargando.value = false
   }
 })
+
+const casinoJuegos = [
+  { nombre: 'Dados del Sur', img: cartas.dados },
+  { nombre: 'Fortuna CR', img: cartas.slots },
+  { nombre: 'Rueda Fortuna', img: cartas.ruleta },
+  { nombre: 'Raspa y Gana', img: cartas.raspa },
+  { nombre: 'Keno CR', img: cartas.keno },
+  { nombre: '21 Blackjack', img: cartas.blackjack },
+  { nombre: 'Cascada Fortuna', img: cartas.cascada },
+  { nombre: 'Mayor o Menor', img: cartas.hilo },
+]
 </script>
 
 <template>
@@ -42,38 +55,40 @@ onMounted(async () => {
     </nav>
 
     <section class="hero">
-      <div class="wrap">
-        <span class="badge badge-ok" style="margin-bottom: 18px">+ Juego responsable 18+</span>
-        <h1>
-          La suerte está<br />
-          <span class="acento">a un número de distancia.</span>
-        </h1>
-        <p>
-          Juega Lotería Nacional, Quinielas y más desde cualquier dispositivo.
-          Apuestas desde {{ colones(500) }}, resultados en tiempo real y premios automáticos.
-        </p>
-        <div class="hero-cta">
-          <router-link to="/registro" class="btn btn-primary" style="padding: 13px 24px">
-            Empezar a jugar
-          </router-link>
-          <router-link to="/login" class="btn btn-ghost" style="padding: 13px 24px">
-            Ya tengo cuenta
-          </router-link>
+      <div class="wrap landing-grid">
+        <div>
+          <span class="badge badge-ok" style="margin-bottom: 18px">+ Juego responsable 18+</span>
+          <h1>La suerte está<br /><span class="acento">a un número de distancia.</span></h1>
+          <p>
+            Juega Lotería Nacional, Nuevos Tiempos, Quinielas, Chaves y el mini casino desde
+            cualquier dispositivo. Apuestas desde {{ colones(500) }}, resultados en tiempo real
+            y premios automáticos.
+          </p>
+          <div class="hero-cta" style="justify-content: flex-start">
+            <router-link to="/registro" class="btn btn-primary" style="padding: 13px 24px">
+              Empezar a jugar
+            </router-link>
+            <router-link to="/login" class="btn btn-ghost" style="padding: 13px 24px">
+              Ya tengo cuenta
+            </router-link>
+          </div>
+          <div class="hero-stats" style="justify-content: flex-start">
+            <div class="item">
+              <div class="n">{{ loterias.length + casinoJuegos.length || 8 }}</div>
+              <div class="l">Juegos activos</div>
+            </div>
+            <div class="item">
+              <div class="n">x75</div>
+              <div class="l">Premio por número</div>
+            </div>
+            <div class="item">
+              <div class="n">100%</div>
+              <div class="l">Pago automático</div>
+            </div>
+          </div>
         </div>
-
-        <div class="hero-stats">
-          <div class="item">
-            <div class="n">{{ loterias.length || 5 }}</div>
-            <div class="l">Juegos activos</div>
-          </div>
-          <div class="item">
-            <div class="n">x50</div>
-            <div class="l">Premio máximo</div>
-          </div>
-          <div class="item">
-            <div class="n">100%</div>
-            <div class="l">Pago automático</div>
-          </div>
+        <div class="landing-art">
+          <img :src="heroArt" alt="Bolas de lotería en tonos esmeralda y dorado" />
         </div>
       </div>
     </section>
@@ -96,10 +111,14 @@ onMounted(async () => {
       </div>
     </section>
 
-    <section class="wrap" style="padding-top: 40px; padding-bottom: 20px">
+    <section class="wrap" style="padding-top: 40px">
       <div class="page-head">
         <div class="eyebrow">Catálogo</div>
         <h1 style="font-size: 30px">Nuestros juegos</h1>
+        <p>
+          Los clásicos costarricenses. Cada juego define su apuesta mínima, multiplicador y
+          cantidad de números.
+        </p>
       </div>
       <div class="grid grid-3">
         <div v-for="l in loterias" :key="l.id" class="card card-hover">
@@ -116,6 +135,26 @@ onMounted(async () => {
       </div>
     </section>
 
+    <section class="wrap" style="padding-top: 20px; padding-bottom: 24px">
+      <div class="page-head">
+        <div class="eyebrow">Mini casino</div>
+        <h1 style="font-size: 30px">Ocho juegos, un solo saldo</h1>
+        <p>Provably fair: podés verificar cada ronda con la semilla del servidor.</p>
+      </div>
+      <div class="landing-strip">
+        <router-link
+          v-for="j in casinoJuegos"
+          :key="j.nombre"
+          to="/casino"
+          class="landing-mini card"
+          :title="j.nombre"
+        >
+          <img :src="j.img" :alt="j.nombre" loading="lazy" />
+          <div class="t">{{ j.nombre }}</div>
+        </router-link>
+      </div>
+    </section>
+
     <footer class="footer">
       <div class="brand" style="justify-content: center; margin-bottom: 10px">
         <div class="brand-mark">LN</div>
@@ -126,3 +165,80 @@ onMounted(async () => {
     </footer>
   </div>
 </template>
+
+<style scoped>
+/* Hero a dos columnas: texto a la izquierda, arte generado a la derecha. */
+.hero {
+  text-align: left;
+  padding: 0;
+}
+.landing-grid {
+  display: grid;
+  grid-template-columns: 1.05fr 0.95fr;
+  gap: 44px;
+  align-items: center;
+  padding: 64px 26px 56px;
+}
+.landing-art {
+  position: relative;
+}
+.landing-art img {
+  width: 100%;
+  height: 430px;
+  object-fit: cover;
+  border-radius: 18px;
+  border: 1px solid var(--border);
+  box-shadow: 0 34px 90px rgba(0, 0, 0, 0.6), 0 0 70px rgba(16, 185, 129, 0.14);
+}
+.landing-art::after {
+  content: '';
+  position: absolute;
+  inset: auto 0 0 0;
+  height: 110px;
+  border-radius: 0 0 18px 18px;
+  background: linear-gradient(180deg, transparent, rgba(8, 11, 16, 0.55));
+  pointer-events: none;
+}
+
+/* Tira del mini casino. */
+.landing-strip {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+}
+.landing-mini {
+  overflow: hidden;
+  padding: 0;
+  transition: transform 0.16s, border-color 0.16s, box-shadow 0.16s;
+}
+.landing-mini:hover {
+  transform: translateY(-3px);
+  border-color: var(--border);
+  box-shadow: var(--shadow);
+}
+.landing-mini img {
+  width: 100%;
+  height: 96px;
+  object-fit: cover;
+  display: block;
+}
+.landing-mini .t {
+  padding: 10px 12px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+@media (max-width: 980px) {
+  .landing-grid {
+    grid-template-columns: 1fr;
+    gap: 28px;
+    padding: 44px 26px 40px;
+  }
+  .landing-art img {
+    height: 320px;
+  }
+  .landing-strip {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+</style>

@@ -324,6 +324,75 @@ func jugarKeno(monto int64, draws []int, p Params) (Outcome, error) {
 	}, nil
 }
 
+// ---------------------------------------------------------------- cascada (plinko)
+
+// cascadaFilas es la cantidad de filas de pinchos; la bola termina en una de
+// cascadaFilas+1 casillas. La tabla paga poco en el centro y mucho en los
+// bordes, como el plinko clasico (RTP ~96.5%).
+const cascadaFilas = 9
+
+var cascadaTabla = []int64{10, 5, 3, 1, 0, 0, 1, 3, 5, 10}
+
+func jugarCascada(monto int64, draws []int, p Params) (Outcome, error) {
+	if len(draws) < cascadaFilas {
+		return Outcome{}, fmt.Errorf("sorteo incompleto")
+	}
+	camino := make([]int, 0, cascadaFilas)
+	pos := 0
+	for i := 0; i < cascadaFilas; i++ {
+		d := draws[i] % 2
+		camino = append(camino, d)
+		pos += d
+	}
+	return Outcome{
+		Multiplicador: cascadaTabla[pos],
+		Data: map[string]any{
+			"camino":   camino,
+			"posicion": pos,
+			"tabla":    cascadaTabla,
+			"filas":    cascadaFilas,
+		},
+	}, nil
+}
+
+// ---------------------------------------------------------------- mayor o menor
+
+var hiloFiguras = []string{"", "A", "2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K"}
+
+func hiloCarta(draw int) int { return draw%13 + 1 }
+
+func jugarHilo(monto int64, draws []int, p Params) (Outcome, error) {
+	if len(draws) < 2 {
+		return Outcome{}, fmt.Errorf("sorteo incompleto")
+	}
+	dir, err := p.String("direccion")
+	if err != nil {
+		return Outcome{}, err
+	}
+	if dir != "mayor" && dir != "menor" {
+		return Outcome{}, fmt.Errorf("la direccion debe ser mayor o menor")
+	}
+	base := hiloCarta(draws[0])
+	siguiente := hiloCarta(draws[1])
+	var mult int64
+	switch {
+	case dir == "mayor" && siguiente > base:
+		mult = 2
+	case dir == "menor" && siguiente < base:
+		mult = 2
+	}
+	return Outcome{
+		Multiplicador: mult,
+		Data: map[string]any{
+			"base":             base,
+			"siguiente":        siguiente,
+			"figura_base":      hiloFiguras[base],
+			"figura_siguiente": hiloFiguras[siguiente],
+			"direccion":        dir,
+		},
+	}, nil
+}
+
 // ---------------------------------------------------------------- despacho
 
 // Jugar resuelve una jugada. El resultado depende unicamente de los draws y
@@ -343,6 +412,10 @@ func Jugar(codigo string, monto int64, draws []int, p Params) (Outcome, error) {
 		return jugarRaspa(monto, draws, p)
 	case "keno":
 		return jugarKeno(monto, draws, p)
+	case "cascada":
+		return jugarCascada(monto, draws, p)
+	case "hilo":
+		return jugarHilo(monto, draws, p)
 	default:
 		return Outcome{}, fmt.Errorf("juego no soportado: %s", codigo)
 	}
@@ -389,6 +462,10 @@ func Draws(codigo string) int {
 		return 1
 	case "keno":
 		return 24
+	case "cascada":
+		return cascadaFilas
+	case "hilo":
+		return 2
 	default:
 		return 1
 	}
@@ -411,6 +488,10 @@ func RTP(codigo string, iteraciones int) float64 {
 			p = Params{"tipo": "pleno", "numero": 17}
 		case "keno":
 			p = Params{"numeros": []int{1, 2, 3, 4, 5}}
+		case "cascada":
+			p = Params{}
+		case "hilo":
+			p = Params{"direccion": "mayor"}
 		}
 		out, err := Jugar(codigo, 1000, draws, p)
 		if err != nil {
