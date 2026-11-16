@@ -47,7 +47,7 @@ func Seed(db *gorm.DB) error {
 		{Codigo: "LP", Nombre: "Lotería Popular", Tipo: models.TipoLoteria, Descripcion: "Sorteos diarios de Lotería Popular.", CostoNumero: 500, LongitudNum: 2, MaxNumeros: 3, Multiplicador: 40, Activa: true},
 		{Codigo: "QN", Nombre: "Quiniela Nacional", Tipo: models.TipoQuiniela, Descripcion: "Acierta el número ganador de la quiniela.", CostoNumero: 1000, LongitudNum: 2, MaxNumeros: 2, Multiplicador: 35, Activa: true},
 		{Codigo: "QD", Nombre: "Quiniela Deportiva", Tipo: models.TipoQuiniela, Descripcion: "Pronostica los resultados de la jornada.", CostoNumero: 2000, LongitudNum: 3, MaxNumeros: 3, Multiplicador: 60, Activa: true},
-		{Codigo: "CH", Nombre: "Chaves", Tipo: models.TipoLoteria, Descripcion: "El juego de los 5 de la suerte.", CostoNumero: 800, LongitudNum: 2, MaxNumeros: 5, Multiplicador: 45, Activa: true},
+		{Codigo: "CA", Nombre: "Chances", Tipo: models.TipoLoteria, Descripcion: "El popular sorteo de Chances.", CostoNumero: 800, LongitudNum: 2, MaxNumeros: 5, Multiplicador: 45, Activa: true},
 		// Nuevos Tiempos (JPS): número del 00 al 99, tres sorteos diarios. El
 		// multiplicador reproduce el pago clasico de 75 veces lo apostado.
 		{Codigo: "NT", Nombre: "Nuevos Tiempos", Tipo: models.TipoLoteria, Descripcion: "Elegí un número del 00 al 99. Tres sorteos diarios.", CostoNumero: 500, LongitudNum: 2, MaxNumeros: 1, Multiplicador: 75, Activa: true},

@@ -13,7 +13,7 @@ const proximos = ref<Sorteo[]>([])
 const cargando = ref(true)
 const sorteoParaJugar = ref<Sorteo | null>(null)
 
-onMounted(async () => {
+async function cargarDatos() {
   try {
     const [d, s] = await Promise.all([
       api.get<Dashboard>('/dashboard'),
@@ -23,10 +23,19 @@ onMounted(async () => {
     proximos.value = s.data
   } catch {
     /* el shell ya redirige si la sesión expira */
-  } finally {
-    cargando.value = false
   }
+}
+
+onMounted(async () => {
+  await cargarDatos()
+  cargando.value = false
 })
+
+// Tras comprar un tiquete el panel se refresca solo (saldo y ultimas apuestas).
+async function onComprada() {
+  sorteoParaJugar.value = null
+  await cargarDatos()
+}
 </script>
 
 <template>
@@ -127,7 +136,7 @@ onMounted(async () => {
       v-if="sorteoParaJugar"
       :sorteo="sorteoParaJugar"
       @cerrar="sorteoParaJugar = null"
-      @ok="sorteoParaJugar = null"
+      @ok="onComprada"
     />
   </div>
 </template>

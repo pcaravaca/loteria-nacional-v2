@@ -62,7 +62,7 @@ const casinoJuegos = [
           <span class="badge badge-ok" style="margin-bottom: 18px">+ Juego responsable 18+</span>
           <h1>La suerte está<br /><span class="acento">a un número de distancia.</span></h1>
           <p>
-            Juega Lotería Nacional, Nuevos Tiempos, Quinielas, Chaves y el mini casino desde
+            Juega Lotería Nacional, Nuevos Tiempos, Quinielas, Chances y el mini casino desde
             cualquier dispositivo. Apuestas desde {{ colones(500) }}, resultados en tiempo real
             y premios automáticos.
           </p>
