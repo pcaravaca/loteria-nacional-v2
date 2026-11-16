@@ -287,6 +287,16 @@ table.table { width: 100%; border-collapse: collapse; font-size: 14px; }
 .modal h3 { font-size: 19px; margin-bottom: 4px; }
 .modal .modal-sub { color: var(--muted); font-size: 13px; margin-bottom: 16px; }
 .modal-acciones { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; }
+/* Variante ancha para los juegos del casino (aprobada por Peter). */
+.modal.modal-lg { max-width: 720px; padding: 24px 26px; }
+.modal-x {
+  position: absolute; top: 14px; right: 14px; width: 34px; height: 34px;
+  border-radius: 10px; border: 1px solid var(--border);
+  background: var(--surface-2); color: var(--muted); font-size: 18px; line-height: 1;
+  cursor: pointer; transition: all .12s;
+}
+.modal-x:hover { border-color: var(--prim); color: var(--prim-2); }
+.modal { position: relative; }
 
 /* ---------- selector de numeros ---------- */
 .numpad { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin: 14px 0; }

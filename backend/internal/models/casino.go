@@ -20,6 +20,10 @@ const (
 	CasinoHilo      = "hilo"
 	CasinoAlto      = "alto"
 	CasinoFortuna   = "fortuna"
+	CasinoMoneda    = "moneda"
+	CasinoSuertudo  = "suertudo"
+	CasinoParley    = "parley"
+	CasinoBaccarat  = "baccarat"
 )
 
 // CasinoGame es un juego del mini casino con sus limites y su RTP declarado.

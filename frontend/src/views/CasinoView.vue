@@ -57,7 +57,7 @@ async function verificar(ronda: CasinoRound) {
       <div class="eyebrow">Mini casino</div>
       <h1>La suerte, en miniatura</h1>
       <p>
-        Diez juegos rapidos con resultado generado en el servidor y pago inmediato al mismo saldo.
+        Catorce juegos rapidos con resultado generado en el servidor y pago inmediato al mismo saldo.
         Cada jugada queda comprometida por un hash y puedes auditarla.
       </p>
       <p class="hash-line">

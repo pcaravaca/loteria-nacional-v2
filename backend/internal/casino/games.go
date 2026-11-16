@@ -2,6 +2,7 @@ package casino
 
 import (
 	"fmt"
+	"sort"
 )
 
 // Params son los parametros de la jugada que envia el cliente (su eleccion).
@@ -63,6 +64,23 @@ func (p Params) Ints(key string) ([]int, error) {
 type Outcome struct {
 	Multiplicador int64         `json:"multiplicador"`
 	Data          map[string]any `json:"data"`
+}
+
+// Premio devuelve lo que se paga por una jugada. El multiplicador es lo que
+// audita el jugador (monto * multiplicador); algun juego puede ademas cobrar
+// una comision sobre la ganancia, que el motor indica en Data["comision"]
+// (el baccarat a la banca, que paga 0.95 por peso).
+func Premio(monto int64, out Outcome) int64 {
+	premio := monto * out.Multiplicador
+	if out.Data != nil {
+		if com, ok := out.Data["comision"].(int64); ok && com > 0 {
+			premio -= com
+		}
+	}
+	if premio < 0 {
+		return 0
+	}
+	return premio
 }
 
 // ---------------------------------------------------------------- dados
@@ -464,6 +482,231 @@ func jugarFortuna(monto int64, draws []int, p Params) (Outcome, error) {
 	}, nil
 }
 
+// ---------------------------------------------------------------- cara o sello
+
+func jugarMoneda(monto int64, draws []int, p Params) (Outcome, error) {
+	if len(draws) < 1 {
+		return Outcome{}, fmt.Errorf("sorteo incompleto")
+	}
+	lado, err := p.String("lado")
+	if err != nil {
+		return Outcome{}, err
+	}
+	if lado != "cara" && lado != "sello" {
+		return Outcome{}, fmt.Errorf("el lado debe ser cara o sello")
+	}
+	salida := "cara"
+	if draws[0]%2 == 1 {
+		salida = "sello"
+	}
+	var mult int64
+	if salida == lado {
+		mult = 2
+	}
+	return Outcome{
+		Multiplicador: mult,
+		Data:          map[string]any{"salida": salida, "elegido": lado},
+	}, nil
+}
+
+// ---------------------------------------------------------------- numero de la suerte (00-99)
+
+func jugarSuertudo(monto int64, draws []int, p Params) (Outcome, error) {
+	if len(draws) < 1 {
+		return Outcome{}, fmt.Errorf("sorteo incompleto")
+	}
+	n, err := p.Int("numero")
+	if err != nil {
+		return Outcome{}, err
+	}
+	if n < 0 || n > 99 {
+		return Outcome{}, fmt.Errorf("el numero debe estar entre 0 y 99")
+	}
+	salida := draws[0] % 100
+	var mult int64
+	if salida == n {
+		mult = 75
+	}
+	return Outcome{
+		Multiplicador: mult,
+		Data:          map[string]any{"salida": salida, "elegido": n},
+	}, nil
+}
+
+// ---------------------------------------------------------------- parley de 2 (2 de 20)
+
+func jugarParley(monto int64, draws []int, p Params) (Outcome, error) {
+	tuyos, err := p.Ints("numeros")
+	if err != nil {
+		return Outcome{}, err
+	}
+	if len(tuyos) != 2 {
+		return Outcome{}, fmt.Errorf("debemos elegir exactamente 2 numeros")
+	}
+	vistos := map[int]bool{}
+	for _, n := range tuyos {
+		if n < 1 || n > 20 {
+			return Outcome{}, fmt.Errorf("los numeros deben estar entre 1 y 20")
+		}
+		if vistos[n] {
+			return Outcome{}, fmt.Errorf("los numeros no pueden repetirse")
+		}
+		vistos[n] = true
+	}
+	if len(draws) < 4 {
+		return Outcome{}, fmt.Errorf("sorteo incompleto")
+	}
+	bolillaSet := map[int]bool{}
+	for _, d := range draws {
+		n := (d % 20) + 1
+		for bolillaSet[n] {
+			n = n%20 + 1
+		}
+		bolillaSet[n] = true
+	}
+	bolillas := make([]int, 0, len(bolillaSet))
+	for n := range bolillaSet {
+		bolillas = append(bolillas, n)
+	}
+	sort.Ints(bolillas)
+	aciertos := 0
+	for _, b := range bolillas {
+		if vistos[b] {
+			aciertos++
+		}
+	}
+	var mult int64
+	switch aciertos {
+	case 2:
+		mult = 18
+	case 1:
+		mult = 1
+	}
+	return Outcome{
+		Multiplicador: mult,
+		Data: map[string]any{
+			"bolillas": bolillas,
+			"tus_numeros": tuyos,
+			"aciertos":  aciertos,
+		},
+	}, nil
+}
+
+// ---------------------------------------------------------------- baccarat
+
+// baccaratCarta devuelve el valor de una carta para el baccarat: las figuras y
+// los diez valen 0, el as vale 1 y el resto su numero.
+func baccaratCarta(draw int) int { return draw % 10 }
+
+func baccaratTotal(cartas []int) int {
+	t := 0
+	for _, c := range cartas {
+		t += c
+	}
+	return t % 10
+}
+
+// jugarBaccarat reparte dos cartas por mano y aplica la regla de la tercera
+// carta (el jugador pide con 0-5 y se planta con 6-7; la banca sigue la tabla
+// oficial segun la tercera carta del jugador). El empate paga x8 y las apuestas
+// a jugador o banca quedan en empate (se devuelve la apuesta).
+func jugarBaccarat(monto int64, draws []int, p Params) (Outcome, error) {
+	tipo, err := p.String("tipo")
+	if err != nil {
+		return Outcome{}, err
+	}
+	if tipo != "jugador" && tipo != "banca" && tipo != "empate" {
+		return Outcome{}, fmt.Errorf("tipo de apuesta invalido: elegir jugador, banca o empate")
+	}
+	if len(draws) < 4 {
+		return Outcome{}, fmt.Errorf("sorteo incompleto")
+	}
+
+	jugador := []int{baccaratCarta(draws[0]), baccaratCarta(draws[1])}
+	banca := []int{baccaratCarta(draws[2]), baccaratCarta(draws[3])}
+	tj := baccaratTotal(jugador)
+	tb := baccaratTotal(banca)
+
+	// Con 8 o 9 natural no hay tercera carta.
+	if tj < 8 && tb < 8 {
+		if tj <= 5 {
+			if len(draws) < 5 {
+				return Outcome{}, fmt.Errorf("sorteo incompleto")
+			}
+			tercera := baccaratCarta(draws[4])
+			jugador = append(jugador, tercera)
+			tj = baccaratTotal(jugador)
+			pide := false
+			switch {
+			case tb <= 2:
+				pide = true
+			case tb == 3:
+				pide = tercera != 8
+			case tb == 4:
+				pide = tercera >= 2 && tercera <= 7
+			case tb == 5:
+				pide = tercera >= 4 && tercera <= 7
+			case tb == 6:
+				pide = tercera == 6 || tercera == 7
+			}
+			if pide {
+				if len(draws) < 6 {
+					return Outcome{}, fmt.Errorf("sorteo incompleto")
+				}
+				banca = append(banca, baccaratCarta(draws[5]))
+				tb = baccaratTotal(banca)
+			}
+		} else if tb <= 5 {
+			// El jugador se planta con 6 o 7: la banca pide con 0-5.
+			if len(draws) < 6 {
+				return Outcome{}, fmt.Errorf("sorteo incompleto")
+			}
+			banca = append(banca, baccaratCarta(draws[5]))
+			tb = baccaratTotal(banca)
+		}
+	}
+
+	var mult int64
+	comision := int64(0)
+	switch {
+	case tj > tb && tipo == "jugador":
+		mult = 2
+	case tb > tj && tipo == "banca":
+		mult = 2
+		// La banca paga 0.95 por cada peso: la comision del 5% se descuenta
+		// de la ganancia al momento de pagar (ver casino.Premio).
+		comision = monto / 20
+	case tj == tb && tipo == "empate":
+		mult = 8
+	case tj == tb:
+		mult = 1 // las manos en empate devuelven la apuesta
+	}
+
+	return Outcome{
+		Multiplicador: mult,
+		Data: map[string]any{
+			"cartas_jugador": jugador,
+			"cartas_banca":   banca,
+			"total_jugador":  tj,
+			"total_banca":    tb,
+			"tipo":           tipo,
+			"resultado":      resultadoBaccarat(tj, tb),
+			"comision":       comision,
+		},
+	}, nil
+}
+
+func resultadoBaccarat(tj, tb int) string {
+	switch {
+	case tj > tb:
+		return "jugador"
+	case tb > tj:
+		return "banca"
+	default:
+		return "empate"
+	}
+}
+
 // ---------------------------------------------------------------- despacho
 
 // Jugar resuelve una jugada. El resultado depende unicamente de los draws y
@@ -491,6 +734,14 @@ func Jugar(codigo string, monto int64, draws []int, p Params) (Outcome, error) {
 		return jugarAlto(monto, draws, p)
 	case "fortuna":
 		return jugarFortuna(monto, draws, p)
+	case "moneda":
+		return jugarMoneda(monto, draws, p)
+	case "suertudo":
+		return jugarSuertudo(monto, draws, p)
+	case "parley":
+		return jugarParley(monto, draws, p)
+	case "baccarat":
+		return jugarBaccarat(monto, draws, p)
 	default:
 		return Outcome{}, fmt.Errorf("juego no soportado: %s", codigo)
 	}
@@ -541,8 +792,12 @@ func Draws(codigo string) int {
 		return cascadaFilas
 	case "hilo":
 		return 2
-	case "alto", "fortuna":
+	case "alto", "fortuna", "moneda", "suertudo":
 		return 1
+	case "parley":
+		return 4
+	case "baccarat":
+		return 6
 	default:
 		return 1
 	}
@@ -573,12 +828,14 @@ func RTP(codigo string, iteraciones int) float64 {
 			p = Params{"tope": 48, "direccion": "bajo"}
 		case "fortuna":
 			p = Params{}
+		case "baccarat":
+			p = Params{"tipo": "banca"}
 		}
 		out, err := Jugar(codigo, 1000, draws, p)
 		if err != nil {
 			continue
 		}
-		suma += float64(out.Multiplicador)
+		suma += float64(Premio(1000, out)) / 1000
 	}
 	return suma / float64(iteraciones) * 100
 }

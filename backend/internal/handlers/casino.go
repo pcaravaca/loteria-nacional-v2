@@ -203,7 +203,7 @@ func (h *CasinoHandler) Play(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
-	premio := req.Monto * out.Multiplicador
+	premio := casino.Premio(req.Monto, out)
 
 	ronda := models.CasinoRound{
 		UserID:         userID,

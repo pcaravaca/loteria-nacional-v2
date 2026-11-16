@@ -126,6 +126,10 @@ func SeedCasino(db *gorm.DB) error {
 	{Codigo: models.CasinoHilo, Nombre: "Mayor o Menor", Descripcion: "Adivina si la proxima carta es mas alta o mas baja. Si empata, perdes.", MinApuesta: 200, MaxApuesta: 50000, RTP: 92.3, MaxMultipl: 2, MaxPremio: 1000000, Orden: 8, LimiteDiario: 200000, Activo: true},
 	{Codigo: models.CasinoAlto, Nombre: "Bajo o Sobre", Descripcion: "Elegi el tope y acerta si el dado del 1 al 100 cae abajo o arriba.", MinApuesta: 200, MaxApuesta: 50000, RTP: 95.0, MaxMultipl: 48, MaxPremio: 1000000, Orden: 9, LimiteDiario: 200000, Activo: true},
 	{Codigo: models.CasinoFortuna, Nombre: "Fortuna Rápida", Descripcion: "La aguja gira hasta detenerse en un multiplicador.", MinApuesta: 200, MaxApuesta: 50000, RTP: 95.0, MaxMultipl: 5, MaxPremio: 1000000, Orden: 10, LimiteDiario: 200000, Activo: true},
+	{Codigo: models.CasinoMoneda, Nombre: "Cara o Sello", Descripcion: "Elegí el lado de la moneda: acertarte duplica.", MinApuesta: 200, MaxApuesta: 50000, RTP: 99.0, MaxMultipl: 2, MaxPremio: 1000000, Orden: 11, LimiteDiario: 200000, Activo: true},
+	{Codigo: models.CasinoSuertudo, Nombre: "Número de la Suerte", Descripcion: "Elegí un número del 00 al 99: si sale, pagás x75.", MinApuesta: 200, MaxApuesta: 50000, RTP: 75.0, MaxMultipl: 75, MaxPremio: 1000000, Orden: 12, LimiteDiario: 200000, Activo: true},
+	{Codigo: models.CasinoParley, Nombre: "Parley de 2", Descripcion: "Marcá 2 números de 20 y ganá si salen en las 4 bolillas.", MinApuesta: 200, MaxApuesta: 50000, RTP: 91.0, MaxMultipl: 18, MaxPremio: 1000000, Orden: 13, LimiteDiario: 200000, Activo: true},
+	{Codigo: models.CasinoBaccarat, Nombre: "Baccarat", Descripcion: "Jugador, banca o empate: el empate paga x8 y la banca cobra 5% de comisión.", MinApuesta: 500, MaxApuesta: 50000, RTP: 98.7, MaxMultipl: 8, MaxPremio: 1000000, Orden: 14, LimiteDiario: 200000, Activo: true},
 	}
 	for i := range juegos {
 		var existente models.CasinoGame

@@ -9,6 +9,10 @@ import cascadaCard from './casino/cards/cascada.webp'
 import hiloCard from './casino/cards/hilo.webp'
 import altoCard from './casino/cards/alto.webp'
 import fortunaCard from './casino/cards/fortuna.webp'
+import monedaCard from './casino/cards/moneda.webp'
+import suertudoCard from './casino/cards/suertudo.webp'
+import parleyCard from './casino/cards/parley.webp'
+import baccaratCard from './casino/cards/baccarat.webp'
 
 import dadosHero from './casino/hero/dados.webp'
 import slotsHero from './casino/hero/slots.webp'
@@ -20,6 +24,10 @@ import cascadaHero from './casino/hero/cascada.webp'
 import hiloHero from './casino/hero/hilo.webp'
 import altoHero from './casino/hero/alto.webp'
 import fortunaHero from './casino/hero/fortuna.webp'
+import monedaHero from './casino/hero/moneda.webp'
+import suertudoHero from './casino/hero/suertudo.webp'
+import parleyHero from './casino/hero/parley.webp'
+import baccaratHero from './casino/hero/baccarat.webp'
 
 import cereza from './casino/symbols/cereza.webp'
 import campana from './casino/symbols/campana.webp'
@@ -39,6 +47,10 @@ export type CodigoJuego =
   | 'hilo'
   | 'alto'
   | 'fortuna'
+  | 'moneda'
+  | 'suertudo'
+  | 'parley'
+  | 'baccarat'
 
 export const cartas: Record<CodigoJuego, string> = {
   dados: dadosCard,
@@ -51,6 +63,10 @@ export const cartas: Record<CodigoJuego, string> = {
   hilo: hiloCard,
   alto: altoCard,
   fortuna: fortunaCard,
+  moneda: monedaCard,
+  suertudo: suertudoCard,
+  parley: parleyCard,
+  baccarat: baccaratCard,
 }
 
 export const heroes: Record<CodigoJuego, string> = {
@@ -64,6 +80,10 @@ export const heroes: Record<CodigoJuego, string> = {
   hilo: hiloHero,
   alto: altoHero,
   fortuna: fortunaHero,
+  moneda: monedaHero,
+  suertudo: suertudoHero,
+  parley: parleyHero,
+  baccarat: baccaratHero,
 }
 
 export const simbolos: Record<string, string> = {
