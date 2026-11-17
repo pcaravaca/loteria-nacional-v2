@@ -5,6 +5,8 @@ const routes = [
   { path: '/', name: 'inicio', component: () => import('@/views/LandingPage.vue'), meta: { publica: true } },
   { path: '/login', name: 'login', component: () => import('@/views/LoginView.vue'), meta: { publica: true } },
   { path: '/registro', name: 'registro', component: () => import('@/views/RegisterView.vue'), meta: { publica: true } },
+  // App Android nativa: el APK y version.json son estáticos en /descargar/.
+  { path: '/descargar', name: 'descargar', component: () => import('@/views/DescargarView.vue'), meta: { publica: true } },
   { path: '/dashboard', name: 'dashboard', component: () => import('@/views/DashboardView.vue') },
   { path: '/loterias', name: 'loterias', component: () => import('@/views/LoteriasView.vue') },
   { path: '/quinielas', name: 'quinielas', component: () => import('@/views/QuinelasView.vue') },
