@@ -1,5 +1,4 @@
 // Assets del mini casino (generados, paleta oscura + esmeralda + dorado).
-import { astSlots, astPokers, astTile } from './ast'
 import dadosCard from './casino/cards/dados.webp'
 import slotsCard from './casino/cards/slots.webp'
 import ruletaCard from './casino/cards/ruleta.webp'
@@ -29,6 +28,51 @@ import monedaHero from './casino/hero/moneda.webp'
 import suertudoHero from './casino/hero/suertudo.webp'
 import parleyHero from './casino/hero/parley.webp'
 import baccaratHero from './casino/hero/baccarat.webp'
+
+// Arte del catalogo AST Casino (ilustraciones generadas con la misma paleta).
+import astTuttifruti from './casino/ast/tuttifruti.webp'
+import astVenice from './casino/ast/venice.webp'
+import astSpy from './casino/ast/spy.webp'
+import astViking from './casino/ast/viking.webp'
+import astWinplaceshow from './casino/ast/winplaceshow.webp'
+import astWinterfest from './casino/ast/winterfest.webp'
+import astWitchhouse from './casino/ast/witchhouse.webp'
+import astWonderland from './casino/ast/wonderland.webp'
+import astWorldcup from './casino/ast/worldcup.webp'
+import astXmas from './casino/ast/xmas.webp'
+import astXmasmobile from './casino/ast/xmasmobile.webp'
+import astZoomerzang from './casino/ast/zoomerzang.webp'
+import astAcesandfaces from './casino/ast/acesandfaces.webp'
+import astAllamerican from './casino/ast/allamerican.webp'
+import astDeucewild from './casino/ast/deucewild.webp'
+import astEightsandaces from './casino/ast/eightsandaces.webp'
+import astJacksorbetter from './casino/ast/jacksorbetter.webp'
+import astJokerpoker from './casino/ast/jokerpoker.webp'
+import astTensorbetter from './casino/ast/tensorbetter.webp'
+import astTwowaysroyal from './casino/ast/twowaysroyal.webp'
+
+const astArte: Record<string, string> = {
+  spy: astSpy,
+  tuttifruti: astTuttifruti,
+  venice: astVenice,
+  viking: astViking,
+  winplaceshow: astWinplaceshow,
+  winterfest: astWinterfest,
+  witchhouse: astWitchhouse,
+  wonderland: astWonderland,
+  worldcup: astWorldcup,
+  xmas: astXmas,
+  xmasmobile: astXmasmobile,
+  zoomerzang: astZoomerzang,
+  acesandfaces: astAcesandfaces,
+  allamerican: astAllamerican,
+  deucewild: astDeucewild,
+  eightsandaces: astEightsandaces,
+  jacksorbetter: astJacksorbetter,
+  jokerpoker: astJokerpoker,
+  tensorbetter: astTensorbetter,
+  twowaysroyal: astTwowaysroyal,
+}
 
 import cereza from './casino/symbols/cereza.webp'
 import campana from './casino/symbols/campana.webp'
@@ -74,18 +118,6 @@ export type CodigoJuego =
   | 'tensorbetter'
   | 'twowaysroyal'
 
-// Arte de los juegos del catalogo AST: se genera como SVG (no hay imagenes).
-const astArte: Record<string, string> = {}
-const astArteHeroe: Record<string, string> = {}
-for (const s of astSlots) {
-  astArte[s.codigo] = astTile(s.codigo, s.nombre)
-  astArteHeroe[s.codigo] = astTile(s.codigo, s.nombre, 1024, 512)
-}
-for (const p of astPokers) {
-  astArte[p.codigo] = astTile(p.codigo, p.nombre)
-  astArteHeroe[p.codigo] = astTile(p.codigo, p.nombre, 1024, 512)
-}
-
 export const cartas: Record<CodigoJuego, string> = {
   dados: dadosCard,
   slots: slotsCard,
@@ -119,7 +151,7 @@ export const heroes: Record<CodigoJuego, string> = {
   suertudo: suertudoHero,
   parley: parleyHero,
   baccarat: baccaratHero,
-  ...astArteHeroe,
+  ...astArte,
 } as Record<CodigoJuego, string>
 
 export const simbolos: Record<string, string> = {
