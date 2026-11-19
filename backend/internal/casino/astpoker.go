@@ -488,3 +488,35 @@ func MaxMultiplPoker(codigo string) int64 {
 	}
 	return maximo
 }
+
+// PokerIniciales devuelve las cinco cartas iniciales de una mesa del catalogo,
+// en el mismo orden en que el cliente las muestra.
+func PokerIniciales(codigo string, draws []int) ([]string, error) {
+	cfg, ok := BuscarPoker(codigo)
+	if !ok {
+		return nil, fmt.Errorf("juego no soportado: %s", codigo)
+	}
+	cartas, err := repartirPoker(cfg, draws)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]string, 5)
+	for i, c := range cartas {
+		out[i] = c.Clave()
+	}
+	return out, nil
+}
+
+// PokerRetener convierte los indices que el jugador quiere sostener en el
+// formato que espera jugarAstPoker.
+func PokerRetener(indices []int) Params {
+	return Params{"retener": indices}
+}
+
+// PokerReparte resuelve una jugada completa con los holds indicados.
+func PokerReparte(codigo string, draws []int, indices []int) (Outcome, error) {
+	if len(indices) == 0 {
+		return jugarAstPoker(codigo, 1000, draws, nil)
+	}
+	return jugarAstPoker(codigo, 1000, draws, PokerRetener(indices))
+}
