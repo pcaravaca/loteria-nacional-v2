@@ -36,6 +36,9 @@ type Rifa struct {
 	CreadoPor          uint      `json:"creado_por"`
 	NumerosGanadoresRaw string    `gorm:"column:numeros_ganadores_raw" json:"-"`
 	NumerosGanadores    []int     `gorm:"-" json:"numeros_ganadores"`
+	// Sorteo provably fair: la semilla se compromete con su hash y se revela al cerrar.
+	SemillaHash         string    `gorm:"column:semilla_hash" json:"semilla_hash"`
+	Semilla             string    `gorm:"column:semilla" json:"-"`
 }
 
 func (Rifa) TableName() string { return "rifas" }

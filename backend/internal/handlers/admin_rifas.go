@@ -1,9 +1,7 @@
 package handlers
 
 import (
-	"crypto/rand"
 	"fmt"
-	"math/big"
 	"net/http"
 	"strconv"
 	"time"
@@ -11,6 +9,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 
+	"loteria-backend/internal/casino"
 	"loteria-backend/internal/models"
 )
 
@@ -65,12 +64,20 @@ func (h *AdminRifasHandler) Crear(c *gin.Context) {
 		tipo = models.RifaSorteoAzar
 	}
 
+	// Sorteo provably fair: se compromete el hash de la semilla antes de vender.
+	semilla, hashSemilla, err := casino.NuevaSemilla()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "no se pudo crear la semilla del sorteo"})
+		return
+	}
+
 	rifa := models.Rifa{
 		Titulo: req.Titulo, Descripcion: req.Descripcion, Premio: req.Premio,
 		PremioMonto: req.PremioMonto, PrecioNumero: req.PrecioNumero,
 		DesdeNumero: req.DesdeNumero, HastaNumero: req.HastaNumero,
 		FechaSorteo: fecha, Estado: models.RifaAbierta, TipoSorteo: tipo,
 		CreadoPor: c.GetUint("userID"),
+		Semilla: semilla, SemillaHash: hashSemilla,
 	}
 	err = h.db.Transaction(func(tx *gorm.DB) error {
 		if err := tx.Create(&rifa).Error; err != nil {
@@ -101,6 +108,31 @@ func (h *AdminRifasHandler) Crear(c *gin.Context) {
 		fmt.Sprintf("%d numeros, precio %d, sorteo %s", total, rifa.PrecioNumero, rifa.FechaSorteo.Format(time.RFC3339)))
 
 	c.JSON(http.StatusOK, rifa)
+}
+
+// Verificar revela la semilla de una rifa ya sorteada, para que cualquier jugador
+// pueda reproducir el sorteo (el hash se publicaba antes de vender).
+func (h *AdminRifasHandler) Verificar(c *gin.Context) {
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "id invalido"})
+		return
+	}
+	var rifa models.Rifa
+	if err := h.db.First(&rifa, id).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "rifa no encontrada"})
+		return
+	}
+	salida := gin.H{
+		"semilla_hash":      rifa.SemillaHash,
+		"numeros_ganadores": rifa.NumerosGanadores,
+	}
+	if rifa.Estado == models.RifaSorteada || rifa.Estado == models.RifaCancelada {
+		salida["semilla"] = rifa.Semilla
+	} else {
+		salida["semilla"] = nil
+	}
+	c.JSON(http.StatusOK, salida)
 }
 
 // Listar devuelve las rifas con totales de venta y recaudo (vista admin).
@@ -187,13 +219,13 @@ func (h *AdminRifasHandler) Sortear(c *gin.Context) {
 			ganadores = append(ganadores, n)
 		}
 	} else {
-		// Azar provably razonable: crypto/rand sobre los vendidos.
-		idx, err := rand.Int(rand.Reader, big.NewInt(int64(len(vendidos))))
-		if err != nil {
-			c.JSON(http.StatusInternalServerError, gin.H{"error": "no se pudo elegir el numero"})
-			return
-		}
-		ganadores = []int{vendidos[idx.Int64()].Numero}
+			// Azar provably fair: sale de la semilla revelable comprometida en semilla_hash.
+			if rifa.Semilla == "" || len(vendidos) == 0 {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "la rifa no tiene semilla de sorteo"})
+				return
+			}
+			idx := casino.Sortear(rifa.Semilla, "", 0, 1, len(vendidos))[0]
+			ganadores = []int{vendidos[idx].Numero}
 	}
 
 	err = h.db.Transaction(func(tx *gorm.DB) error {

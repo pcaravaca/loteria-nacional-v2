@@ -152,6 +152,7 @@ type loteriaRequest struct {
 	LongitudNum   int    `json:"longitud_num"`
 	MaxNumeros    int    `json:"max_numeros"`
 	Multiplicador int64  `json:"multiplicador"`
+	TablaPremios  string `json:"tabla_premios"` // JSON {"1":3,"2":10,...} multiplicador por aciertos
 	Activa        *bool  `json:"activa"`
 }
 
@@ -208,6 +209,14 @@ func (h *AdminHandler) UpdateLoteria(c *gin.Context) {
 		"longitud_num":  req.LongitudNum,
 		"max_numeros":   req.MaxNumeros,
 		"multiplicador": req.Multiplicador,
+	}
+	if req.TablaPremios != "" {
+		var tabla map[string]int64
+		if err := json.Unmarshal([]byte(req.TablaPremios), &tabla); err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "tabla_premios invalido (JSON de aciertos->multiplicador)"})
+			return
+		}
+		updates["tabla_premios"] = req.TablaPremios
 	}
 	if req.Activa != nil {
 		updates["activa"] = *req.Activa
@@ -299,6 +308,19 @@ func (h *AdminHandler) CerrarSorteo(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "los numeros ganadores no pueden repetirse"})
 		return
 	}
+	// El grado tiene que ser alcanzable: cada ganador dentro del rango de la loteria.
+	maxNum := 1
+	for i := 0; i < sorteo.Loteria.LongitudNum; i++ {
+		maxNum *= 10
+	}
+	for _, n := range req.NumerosGanadores {
+		if n < 0 || n >= maxNum {
+			c.JSON(http.StatusBadRequest, gin.H{
+				"error": "cada numero ganador debe tener a lo sumo " + strconv.Itoa(sorteo.Loteria.LongitudNum) + " digitos",
+			})
+			return
+		}
+	}
 
 	err = h.db.Transaction(func(tx *gorm.DB) error {
 		sorteo.NumerosGanadores = req.NumerosGanadores
@@ -315,16 +337,13 @@ func (h *AdminHandler) CerrarSorteo(c *gin.Context) {
 
 		for _, a := range apuestas {
 			aciertos := intersect(a.Numeros, req.NumerosGanadores)
+			premio := sorteo.Loteria.Premio(a.Monto, aciertos, len(a.Numeros))
 			estado := models.ApuestaPerdedora
-			var premio int64
-
 			switch {
-			case aciertos == len(a.Numeros) && aciertos > 0:
+			case aciertos >= len(a.Numeros) && aciertos > 0:
 				estado = models.ApuestaPagada
-				premio = a.Monto * sorteo.Loteria.Multiplicador
-			case aciertos > 0:
+			case premio > 0:
 				estado = models.ApuestaGanadora
-				premio = a.Monto * 2
 			}
 
 			if err := tx.Model(&models.Apuesta{}).Where("id = ?", a.ID).Updates(map[string]any{

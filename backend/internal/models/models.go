@@ -24,6 +24,8 @@ const (
 	SorteoAbierto = "abierto"
 	SorteoCerrado = "cerrado"
 	SorteoPagado  = "pagado"
+	// SorteoVencido: paso la fecha con CIERRE_AUTOMATICO activo; se reembolsan las apuestas.
+	SorteoVencido = "vencido"
 )
 
 // Estado de una apuesta.
@@ -47,6 +49,7 @@ const (
 	MovRifaCompra    = "rifa_compra"
 	MovRifaPremio    = "rifa_premio"
 	MovRifaReembolso = "rifa_reembolso"
+	MovSorteoReembolso = "sorteo_reembolso"
 )
 
 // Tipos de documento aceptados para la identificacion (KYC basico).
@@ -115,6 +118,9 @@ type Loteria struct {
 	LongitudNum   int       `gorm:"not null;default:2" json:"longitud_num"`
 	MaxNumeros    int       `gorm:"not null;default:1" json:"max_numeros"`
 	Multiplicador int64     `gorm:"not null;default:50" json:"multiplicador"`
+	// TablaPremios es JSON {"1":3,"2":10,...}: multiplicador por aciertos parciales.
+	// Sin entrada para un acierto cae al 2x historico.
+	TablaPremios  string    `gorm:"column:tabla_premios" json:"tabla_premios"`
 	Activa        bool      `gorm:"not null;default:true" json:"activa"`
 	CreatedAt     time.Time `json:"created_at"`
 }

@@ -88,6 +88,8 @@ func main() {
 	api.GET("/sorteos/proximos", juegosH.ProximosSorteos)
 	api.GET("/rifas", rifasH.Listar)
 	api.GET("/rifas/:id", rifasH.Detalle)
+	// Auditoria publica del sorteo: hash siempre, semilla recien cuando ya se sorteo.
+	api.GET("/rifas/:id/verificar", adminRifasH.Verificar)
 
 	authed := api.Group("")
 	authed.Use(middleware.AuthRequired(cfg))
@@ -177,6 +179,11 @@ func main() {
 	pk.Use(middleware.GeoBlock(cfg))
 	pk.POST("/casino/poker", casinoH.PokerRepartir)
 	pk.POST("/casino/poker/:id/cobrar", casinoH.PokerCobrar)
+
+	if cfg.SorteosCierreAuto {
+		handlers.IniciarSweepSorteos(db, true, time.Duration(cfg.SorteosSweepMin)*time.Minute, 15*time.Minute)
+		log.Printf("cierre automatico de sorteos vencidos activado (cada %d min, gracia 15 min)", cfg.SorteosSweepMin)
+	}
 
 	if cfg.DatabaseURL != "" {
 		log.Printf("Loteria CR API escuchando en :%s (postgres dbname=%s)", cfg.Port, cfg.DatabaseName())

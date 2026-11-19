@@ -16,6 +16,9 @@ type Config struct {
 	DatabasePath string // SQLite (fallback cuando no hay PostgreSQL)
 	DatabaseURL  string // PostgreSQL (tiene prioridad sobre DatabasePath)
 	Seed         bool
+	// Cierre automatico de sorteos vencidos (reembolsa las apuestas pendientes).
+	SorteosCierreAuto bool
+	SorteosSweepMin   int // cada cuantos minutos corre el barrido
 	// Cumplimiento (el operador con licencia define sus politicas):
 	GeoBlockEnabled bool            // bloquea el juego desde paises no permitidos
 	GeoAllowed      map[string]bool // ISO 3166-1 alpha-2, en mayusculas
@@ -52,6 +55,8 @@ func Load() *Config {
 		DatabasePath:    dbPath,
 		DatabaseURL:     DatabaseURL(),
 		Seed:            os.Getenv("SEED") != "false",
+		SorteosCierreAuto: envBool("SORTEOS_CIERRE_AUTO", false),
+		SorteosSweepMin:   envInt("SORTEOS_SWEEP_MIN", 60),
 		GeoBlockEnabled: envBool("GEO_BLOCK_ENABLED", false),
 		GeoAllowed:      envCountries(os.Getenv("GEO_ALLOWED_COUNTRIES")),
 		KYCRequired:     envBool("KYC_REQUIRED", false),
@@ -66,6 +71,19 @@ func (c *Config) GeoPermite(pais string) bool {
 		return false
 	}
 	return c.GeoAllowed[p]
+}
+
+// envInt lee un entero; si falta o es invalido usa el defecto.
+func envInt(nombre string, defecto int) int {
+	v := strings.TrimSpace(os.Getenv(nombre))
+	if v == "" {
+		return defecto
+	}
+	n, err := strconv.Atoi(v)
+	if err != nil || n <= 0 {
+		return defecto
+	}
+	return n
 }
 
 func envBool(nombre string, defecto bool) bool {
