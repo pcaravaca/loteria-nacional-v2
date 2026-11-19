@@ -253,6 +253,7 @@ const loteriaForm = reactive({
   longitud_num: 2,
   max_numeros: 1,
   multiplicador: 50,
+  tabla_premios: '',
   activa: true,
 })
 const loteriaEditando = ref<number | null>(null)
@@ -262,7 +263,7 @@ function nuevaLoteria() {
   loteriaEditando.value = null
   Object.assign(loteriaForm, {
     codigo: '', nombre: '', tipo: 'loteria', descripcion: '',
-    costo_numero: 1000, longitud_num: 2, max_numeros: 1, multiplicador: 50, activa: true,
+    costo_numero: 1000, longitud_num: 2, max_numeros: 1, multiplicador: 50, tabla_premios: '', activa: true,
   })
   loteriaModal.value = true
 }
@@ -272,7 +273,7 @@ function editarLoteria(l: Loteria) {
   Object.assign(loteriaForm, {
     codigo: l.codigo, nombre: l.nombre, tipo: l.tipo, descripcion: l.descripcion,
     costo_numero: l.costo_numero, longitud_num: l.longitud_num,
-    max_numeros: l.max_numeros, multiplicador: l.multiplicador, activa: l.activa,
+    max_numeros: l.max_numeros, multiplicador: l.multiplicador, tabla_premios: l.tabla_premios || '', activa: l.activa,
   })
   loteriaModal.value = true
 }
@@ -281,6 +282,15 @@ async function guardarLoteria() {
   guardando.value = true
   try {
     const payload = { ...loteriaForm }
+    // La tabla de premios es JSON ({"1":3,"2":10}); se valida acá y el backend.
+    if (payload.tabla_premios) {
+      try {
+        JSON.parse(payload.tabla_premios)
+      } catch {
+        error.value = 'La tabla de premios debe ser JSON válido, por ejemplo {"1":3,"2":10}'
+        return
+      }
+    }
     if (loteriaEditando.value) {
       const { data } = await api.put<Loteria>(`/admin/loterias/${loteriaEditando.value}`, payload)
       const i = loterias.value.findIndex((l) => l.id === data.id)
@@ -425,7 +435,7 @@ async function cerrarSorteo() {
       <div v-if="loterias.length" class="table-wrap">
         <table class="table">
           <thead>
-            <tr><th>Código</th><th>Nombre</th><th>Tipo</th><th>Costo</th><th>Premio x</th><th>Estado</th><th></th></tr>
+            <tr><th>Código</th><th>Nombre</th><th>Tipo</th><th>Costo</th><th>Premio x</th><th>Premios por aciertos</th><th>Estado</th><th></th></tr>
           </thead>
           <tbody>
             <tr v-for="l in loterias" :key="l.id">
@@ -434,6 +444,7 @@ async function cerrarSorteo() {
               <td><span class="badge" :class="l.tipo === 'quiniela' ? 'badge-violet' : 'badge-ok'">{{ tipoLabel(l.tipo) }}</span></td>
               <td class="mono">{{ colones(l.costo_numero) }}</td>
               <td class="mono">{{ l.multiplicador }}x</td>
+              <td class="mono tabla-premios">{{ l.tabla_premios || '—' }}</td>
               <td><span class="badge" :class="l.activa ? 'badge-ok' : 'badge-bad'">{{ l.activa ? 'Activa' : 'Inactiva' }}</span></td>
               <td><button class="btn btn-ghost btn-sm" @click="editarLoteria(l)">Editar</button></td>
             </tr>
@@ -660,6 +671,11 @@ async function cerrarSorteo() {
         <label class="campo"><span>Multiplicador</span><input v-model.number="loteriaForm.multiplicador" type="number" class="input" /></label>
         <label class="campo"><span>Dígitos por número</span><input v-model.number="loteriaForm.longitud_num" type="number" class="input" /></label>
         <label class="campo"><span>Máx. números por apuesta</span><input v-model.number="loteriaForm.max_numeros" type="number" class="input" /></label>
+        <label class="campo campo-wide">
+          <span>Tabla de premios por aciertos (JSON)</span>
+          <input v-model="loteriaForm.tabla_premios" class="input mono" placeholder='{"1":3,"2":10}' />
+          <small class="ayuda">Multiplicador por cantidad de aciertos. Sin entrada vale el 2x histórico.</small>
+        </label>
         <label class="campo campo-check"><input v-model="loteriaForm.activa" type="checkbox" /> <span>Activa</span></label>
       </div>
       <template #acciones>
@@ -700,6 +716,16 @@ async function cerrarSorteo() {
 </template>
 
 <style scoped>
+.tabla-premios {
+  font-size: 11px;
+  color: var(--muted);
+  max-width: 220px;
+  word-break: break-all;
+}
+.ayuda {
+  font-size: 11px;
+  color: var(--muted);
+}
 .rifa-form {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));

@@ -63,6 +63,7 @@ export interface Loteria {
   longitud_num: number
   max_numeros: number
   multiplicador: number
+  tabla_premios?: string
   activa: boolean
 }
 
