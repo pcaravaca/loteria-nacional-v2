@@ -28,6 +28,15 @@ function emojiAlAzar() {
   return String(Math.floor(Math.random() * 10))
 }
 
+// Que se vean simbolos desde que se abre el juego, sin tener que girar.
+function pintarInicial() {
+  const [rodillos, filas] = dimensiones()
+  visibles.value = Array.from({ length: rodillos }, () =>
+    Array.from({ length: filas }, () => emojiAlAzar()),
+  )
+}
+onMounted(pintarInicial)
+
 function girar() {
   const [rodillos, filas] = dimensiones()
   girando.value = true
