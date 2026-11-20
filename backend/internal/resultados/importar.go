@@ -31,7 +31,7 @@ func NuevoImportador(db *gorm.DB, proveedores []Proveedor, logger *log.Logger) *
 	if err != nil {
 		zona = time.FixedZone("CR", -6*3600)
 	}
-	return &Importador{db: db, proveedores: proveedores, logger: logger, zona: zona, ventanaDias: 7}
+	return &Importador{db: db, proveedores: proveedores, logger: logger, zona: zona, ventanaDias: 15}
 }
 
 type Resumen struct {
@@ -71,12 +71,31 @@ func (i *Importador) ImportarLoteria(ctx context.Context, loteria models.Loteria
 		return res
 	}
 
+	type cacheEntrada struct {
+		rs  []Resultado
+		err error
+	}
+	cache := map[string]cacheEntrada{}
+	erroresFecha := map[string]bool{}
+
 	for _, s := range sorteos {
-		rs, err := p.Obtener(ctx, loteria.Codigo, s.Fecha.In(i.zona))
-		if err != nil {
-			res.Errores = append(res.Errores, err.Error())
+		fecha := s.Fecha.In(i.zona)
+		clave := fecha.Format("2006-01-02")
+		// Los sorteos de un mismo día (los tres turnos de NT, por ejemplo)
+		// comparten el resultado de la fuente: se pide una vez por fecha.
+		e, ok := cache[clave]
+		if !ok {
+			e.rs, e.err = p.Obtener(ctx, loteria.Codigo, fecha)
+			cache[clave] = e
+		}
+		if e.err != nil {
+			if !erroresFecha[clave] {
+				res.Errores = append(res.Errores, e.err.Error())
+				erroresFecha[clave] = true
+			}
 			continue
 		}
+		rs := e.rs
 		res.Encontrados += len(rs)
 		for _, r := range rs {
 			if !mismoTurno(s.Titulo, r.Turno) {
@@ -93,6 +112,17 @@ func (i *Importador) ImportarLoteria(ctx context.Context, loteria models.Loteria
 		}
 	}
 	return res
+}
+
+// ImportarPendientesConCalendario asegura que existan los sorteos de la ventana
+// (pasado y futuro) y después importa los resultados. El importador solo puede
+// graduar sorteos que existen: si un día quedó sin sorteo, hay que crearlo antes
+// de pedirle el resultado a la fuente.
+func (i *Importador) ImportarPendientesConCalendario(ctx context.Context, diasAtras int) []Resumen {
+	if _, err := GenerarSorteosVentana(i.db, i.zona, diasAtras, 0); err != nil {
+		i.logger.Printf("calendario de sorteos: %v", err)
+	}
+	return i.ImportarPendientes(ctx)
 }
 
 // ImportarPendientes recorre las loterías activas que alguna fuente cubre.

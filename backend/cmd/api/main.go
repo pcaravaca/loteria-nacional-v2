@@ -10,9 +10,9 @@ import (
 	"loteria-backend/internal/config"
 	"loteria-backend/internal/database"
 	"loteria-backend/internal/handlers"
-	"loteria-backend/internal/resultados"
 	"loteria-backend/internal/middleware"
 	"loteria-backend/internal/models"
+	"loteria-backend/internal/resultados"
 )
 
 func cors() gin.HandlerFunc {
@@ -183,6 +183,13 @@ func main() {
 	bj.POST("/casino/blackjack/:id/surrender", casinoH.BlackjackSurrender)
 	bj.POST("/casino/blackjack/:id/insurance", casinoH.BlackjackInsurance)
 
+	// Bingo 75: se apuesta al abrir la jugada y las bolillas se cantan de a una.
+	bg := authed.Group("")
+	bg.Use(middleware.GeoBlock(cfg))
+	bg.POST("/casino/bingo/start", casinoH.BingoStart)
+	bg.POST("/casino/bingo/:id/hit", casinoH.BingoHit)
+	bg.POST("/casino/bingo/:id/close", casinoH.BingoClose)
+
 	// Video poker: se apostó al repartir y el jugador elige qué cartas sostiene.
 	pk := authed.Group("")
 	pk.Use(middleware.GeoBlock(cfg))
@@ -202,12 +209,12 @@ func main() {
 
 	impResultados := resultados.NuevoImportador(db,
 		[]resultados.Proveedor{resultados.NuevoNacionAlloteria(nil)}, nil)
-	if n, err := resultados.GenerarSorteos(db, nil, 21); err != nil {
+	if n, err := resultados.GenerarSorteosVentana(db, nil, 14, 21); err != nil {
 		log.Printf("calendario de sorteos: %v", err)
 	} else if n > 0 {
-		log.Printf("calendario de sorteos: se crearon %d sorteos futuros", n)
+		log.Printf("calendario de sorteos: se crearon %d sorteos", n)
 	}
-	handlers.IniciarImportador(impResultados, cfg.ResultadosAuto, time.Duration(cfg.ResultadosMin)*time.Minute)
+	handlers.IniciarImportador(impResultados, cfg.ResultadosAuto, time.Duration(cfg.ResultadosMin)*time.Minute, 14)
 
 	if cfg.DatabaseURL != "" {
 		log.Printf("Loteria CR API escuchando en :%s (postgres dbname=%s)", cfg.Port, cfg.DatabaseName())

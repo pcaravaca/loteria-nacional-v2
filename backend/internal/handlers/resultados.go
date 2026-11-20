@@ -14,24 +14,31 @@ import (
 )
 
 // IniciarImportador corre el importador de resultados cada intervalo mientras
-// la API viva. Con auto=false no hace nada (el admin puede forzarlo a mano).
-func IniciarImportador(imp *resultados.Importador, auto bool, intervalo time.Duration) {
+// la API viva, y una primera pasada al arrancar. Antes de cada pasada
+// regenera el calendario (incluyendo los días hacia atrás) para que los
+// sorteos que hayan quedado sin crear puedan recibir su resultado. Con
+// auto=false no hace nada (el admin puede forzarlo a mano).
+func IniciarImportador(imp *resultados.Importador, auto bool, intervalo time.Duration, diasAtras int) {
 	if !auto || imp == nil || intervalo <= 0 {
 		return
 	}
+	correr := func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
+		resumen := imp.ImportarPendientesConCalendario(ctx, diasAtras)
+		cancel()
+		for _, r := range resumen {
+			if r.Aplicados > 0 || len(r.Errores) > 0 {
+				log.Printf("importacion %s: aplicados=%d omitidos=%d errores=%v",
+					r.Loteria, r.Aplicados, r.Omitidos, r.Errores)
+			}
+		}
+	}
 	go func() {
+		correr()
 		ticker := time.NewTicker(intervalo)
 		defer ticker.Stop()
 		for range ticker.C {
-			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Minute)
-			resumen := imp.ImportarPendientes(ctx)
-			cancel()
-			for _, r := range resumen {
-				if r.Aplicados > 0 || len(r.Errores) > 0 {
-					log.Printf("importacion %s: aplicados=%d omitidos=%d errores=%v",
-						r.Loteria, r.Aplicados, r.Omitidos, r.Errores)
-				}
-			}
+			correr()
 		}
 	}()
 }
@@ -49,7 +56,7 @@ func (h *AdminHandler) ImportarResultados(c *gin.Context) {
 
 // GenerarCalendarioHandler crea los sorteos futuros que falten.
 func (h *AdminHandler) GenerarCalendario(c *gin.Context) {
-	n, err := resultados.GenerarSorteos(h.db, nil, 30)
+	n, err := resultados.GenerarSorteosVentana(h.db, nil, 14, 30)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "no se pudo generar el calendario"})
 		return

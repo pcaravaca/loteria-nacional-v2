@@ -110,6 +110,8 @@ func (h *ReportesHandler) Resultados(c *gin.Context) {
 	for _, s := range sorteos {
 		a, ok := aciertosPorSorteo[s.ID]
 		if !ok {
+			// Sorteo sin apuesta del usuario: se lista igual, con cero aciertos.
+			filas = append(filas, fila{Sorteo: s})
 			continue
 		}
 		filas = append(filas, fila{Sorteo: s, Aciertos: a.Aciertos, Premio: a.Premio, Estado: a.Estado})

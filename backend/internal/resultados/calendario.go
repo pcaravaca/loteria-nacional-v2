@@ -40,6 +40,19 @@ var calendario = map[string]struct {
 // GenerarSorteos crea los sorteos futuros según el calendario, sin duplicar los
 // que ya existen. Devuelve cuántos creó.
 func GenerarSorteos(db *gorm.DB, zona *time.Location, diasAvantel int) (int, error) {
+	return GenerarSorteosVentana(db, zona, 0, diasAvantel)
+}
+
+// GenerarSorteosVentana crea los sorteos que faltan en una ventana de diasAtras
+// días anteriores y diasAvantel días siguientes, sin duplicar los que ya
+// existen. Incluir el pasado es lo que permite recuperar los sorteos que
+// quedaron sin crear (si el importador se cayó varios días, o si el calendario
+// se generó por primera vez a mitad de mes) y por tanto importar sus
+// resultados. Devuelve cuántos creó.
+func GenerarSorteosVentana(db *gorm.DB, zona *time.Location, diasAtras, diasAvantel int) (int, error) {
+	if diasAtras < 0 {
+		diasAtras = 0
+	}
 	if diasAvantel <= 0 {
 		diasAvantel = 21
 	}
@@ -55,14 +68,18 @@ func GenerarSorteos(db *gorm.DB, zona *time.Location, diasAvantel int) (int, err
 		porCodigo[l.Codigo] = l
 	}
 
-	hoy := time.Now().In(zona).Truncate(24 * time.Hour)
+	hoy := time.Now().In(zona)
+	// Medianoche local, no Truncate(24h): Truncate alinea con la medianoche
+	// UTC y en Costa Rica deja el día 6 horas antes, lo que corría el sorteo al
+	// día siguiente (LN quedaba en lunes en vez de domingo, Chances en sábado).
+	hoy = time.Date(hoy.Year(), hoy.Month(), hoy.Day(), 0, 0, 0, 0, zona)
 	creados := 0
 	for codigo, plan := range calendario {
 		l, ok := porCodigo[codigo]
 		if !ok {
 			continue
 		}
-		for d := 0; d <= diasAvantel; d++ {
+		for d := -diasAtras; d <= diasAvantel; d++ {
 			fecha := hoy.AddDate(0, 0, d)
 			if plan.dias != nil && !diaEsta(fecha, plan.dias) {
 				continue
@@ -100,10 +117,16 @@ func diaEsta(f time.Time, dias []time.Weekday) bool {
 	return false
 }
 
+// existeSorteo evita duplicar un sorteo por (lotería, título, día). Se compara
+// por día y no por hora exacta: los sorteos que ya existen en la base pueden
+// tener una hora distinta de la que generaría el calendario hoy, y lo que
+// importa es que el sorteo de ese turno y ese día esté una sola vez.
 func existeSorteo(db *gorm.DB, loteriaID uint, titulo string, fecha time.Time) (bool, error) {
 	var n int64
+	inicio := time.Date(fecha.Year(), fecha.Month(), fecha.Day(), 0, 0, 0, 0, fecha.Location())
+	fin := inicio.AddDate(0, 0, 1)
 	err := db.Model(&models.Sorteo{}).
-		Where("loteria_id = ? AND titulo = ? AND fecha = ?", loteriaID, titulo, fecha).
+		Where("loteria_id = ? AND titulo = ? AND fecha >= ? AND fecha < ?", loteriaID, titulo, inicio, fin).
 		Count(&n).Error
 	return n > 0, err
 }

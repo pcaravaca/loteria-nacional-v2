@@ -18,7 +18,11 @@ const cargando = ref(true)
 onMounted(async () => {
   try {
     const { data } = await api.get<{ resultados: Fila[] }>('/resultados')
-    filas.value = data.resultados
+    // La API ya ordena por fecha descendente; se reordena acá como rede de
+    // seguridad para que la vista nunca muestre los sorteos viejos primero.
+    filas.value = [...data.resultados].sort((a, b) =>
+      b.sorteo.fecha.localeCompare(a.sorteo.fecha),
+    )
   } finally {
     cargando.value = false
   }
@@ -46,10 +50,11 @@ onMounted(async () => {
             <p class="hint" style="margin-top: 4px">{{ fechaHora(f.sorteo.fecha) }}</p>
           </div>
           <div style="text-align: right">
-            <div class="hint">Tu resultado</div>
-            <div class="mono" :class="f.aciertos > 0 ? 'texto-prim' : 'texto-muted'">
+            <div class="hint">{{ f.estado_apuesta ? 'Tu resultado' : 'Sin tu apuesta' }}</div>
+            <div v-if="f.estado_apuesta" class="mono" :class="f.aciertos > 0 ? 'texto-prim' : 'texto-muted'">
               {{ f.aciertos }} acierto(s)
             </div>
+            <div v-else class="mono texto-muted">—</div>
             <div v-if="f.premio" class="mono texto-gold">{{ colones(f.premio) }}</div>
           </div>
         </div>
