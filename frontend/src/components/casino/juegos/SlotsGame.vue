@@ -56,10 +56,18 @@ function jugar() {
 
 <template>
   <div class="slots">
+    <div class="cabina">
+      <div class="marquesina"><span class="luces">● ● ●</span><b>Tragamonedas</b><span class="luces">● ● ●</span></div>
+      <div class="rieles-marco">
+        <div class="rieles-railes"></div>
     <div class="reels" :class="{ girando }">
       <div v-for="(s, i) in visibles" :key="i" class="reel">
         <img :src="simbolos[s]" :alt="s" draggable="false" />
       </div>
+    </div>
+        <div class="rieles-railes der"></div>
+      </div>
+      <div class="bandeja"><span class="ranura"></span><span class="monedas">◉ ◉ ◉</span></div>
     </div>
 
     <div v-if="resultado" class="estado" :class="{ gana: premio > 0 }">
@@ -85,6 +93,32 @@ function jugar() {
 </template>
 
 <style scoped>
+/* Carcasa de maquina tragamonedas: se reconoce aunque este quieta. */
+.cabina {
+  border-radius: 18px; padding: 10px; display: flex; flex-direction: column; gap: 8px;
+  background: linear-gradient(180deg, #132a21, #061510);
+  border: 2px solid var(--gold); box-shadow: inset 0 12px 24px rgba(0,0,0,.5), 0 14px 30px rgba(0,0,0,.35);
+}
+.marquesina {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  border-radius: 10px; padding: 6px 10px;
+  background: linear-gradient(180deg, #f0d98a, #c9a227); color: #2b1d05;
+  font-size: 11px; letter-spacing: .2em; text-transform: uppercase; font-weight: 900;
+}
+.marquesina .luces { color: #7a1414; letter-spacing: .1em; font-size: 9px; }
+.rieles-marco { position: relative; padding: 0 8px; }
+.rieles-railes {
+  position: absolute; top: -4px; bottom: -4px; left: 0; width: 6px; border-radius: 6px;
+  background: linear-gradient(180deg, #e8ce7a, #7a5c17);
+}
+.rieles-railes.der { left: auto; right: 0; }
+.bandeja { display: flex; align-items: center; justify-content: center; gap: 12px; padding-top: 4px; }
+.bandeja .ranura {
+  width: 64px; height: 8px; border-radius: 4px; background: #02120c;
+  border: 1px solid #2b3f35; box-shadow: inset 0 2px 4px rgba(0,0,0,.9);
+}
+.bandeja .monedas { color: #e8ce7a; font-size: 10px; letter-spacing: .3em; }
+
 .slots { display: flex; flex-direction: column; gap: 12px; }
 .reels { display: flex; gap: 10px; }
 .reel {

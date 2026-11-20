@@ -6,6 +6,7 @@ import { colones } from '@/utils/formato'
 import { useMarcaStore } from '@/stores/marca'
 import AppAndroidBanner from '@/components/AppAndroidBanner.vue'
 import { esDispositivoAndroid } from '@/utils/dispositivo'
+import AudioControl from '@/components/AudioControl.vue'
 
 const marca = useMarcaStore()
 
@@ -110,6 +111,7 @@ function salir() {
         <button class="btn btn-ghost btn-sm menu-btn" @click="abierto = !abierto">☰</button>
         <h2>{{ titulo }}</h2>
         <div class="spacer"></div>
+        <AudioControl />
         <div class="saldo-chip">
           <span class="etq">Saldo</span>
           <span class="valor">{{ colones(auth.user?.saldo ?? 0) }}</span>

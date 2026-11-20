@@ -85,6 +85,7 @@ function jugar() {
 <template>
   <div class="ast-slots">
     <div class="maquina" :class="{ girando }">
+      <div class="luces-maq">★ ★ ★ ★ ★</div>
       <div v-for="(columna, c) in visibles" :key="c" class="rodillo">
         <div
           v-for="(s, f) in columna"
@@ -129,10 +130,17 @@ function jugar() {
 <style scoped>
 .ast-slots { display: flex; flex-direction: column; gap: 12px; }
 .maquina {
-  display: flex; gap: 8px; padding: 12px; border-radius: 16px;
-  background: radial-gradient(circle at 50% 20%, #16202a, #05080c 70%);
-  border: 1px solid var(--border);
+  display: flex; gap: 8px; padding: 10px; border-radius: 16px;
+  background: linear-gradient(180deg, #122a20, #05080c 70%);
+  border: 2px solid var(--gold);
+  box-shadow: inset 0 14px 26px rgba(0,0,0,.5), 0 12px 26px rgba(0,0,0,.3);
 }
+.luces-maq {
+  position: absolute; top: -9px; left: 50%; transform: translateX(-50%);
+  background: var(--surface); border: 1px solid var(--gold); border-radius: 999px;
+  padding: 0 10px; color: var(--gold); font-size: 10px; letter-spacing: .18em; white-space: nowrap;
+}
+.maquina { position: relative; }
 .rodillo { flex: 1; display: flex; flex-direction: column; gap: 8px; }
 .celda {
   height: 74px; border-radius: 12px; display: grid; place-items: center;

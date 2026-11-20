@@ -5,6 +5,7 @@ import { useAuthStore } from '@/stores/auth'
 import type { CasinoGame, PlayResponse } from '@/types'
 import { colones } from '@/utils/formato'
 import { reproducir } from '@/utils/sfx'
+import { fijarZoom, zoomJuego } from '@/utils/zoom'
 import Modal from '@/components/Modal.vue'
 import { heroes, type CodigoJuego } from '@/assets/casino'
 import { astSlots, astPokers } from '@/assets/ast'
@@ -33,6 +34,11 @@ const error = ref('')
 const respuesta = ref<PlayResponse | null>(null)
 const rondaKey = ref(0)
 const pantallaCompleta = ref(false)
+const zoom = ref(zoomJuego())
+
+function cambiarZoom(delta: number) {
+  zoom.value = fijarZoom(zoom.value + delta)
+}
 
 // Los juegos se sienten mejor a pantalla completa: en tablets y telefonos el modal
 // con marco obliga a hacer scroll vertical sin necesidad.
@@ -259,10 +265,15 @@ function repetir() {
 
 <template>
   <Modal :titulo="juego.nombre" :sub="juego.descripcion" ancho="lg" mostrar-cerrar @cerrar="emit('cerrar')">
-    <div class="casino-modal" :data-tema="auth.temaCasino">
+    <div class="casino-modal" :data-tema="auth.temaCasino" :style="{ zoom: zoom / 100 }">
       <div class="tema-marquesina">
         <b>{{ juego.nombre }}</b>
         <span>Min {{ colones(juego.min_apuesta) }} · Max x{{ juego.max_multiplicador }}</span>
+        <span class="zoom-ctl">
+          <button type="button" title="Achicar el tablero" @click="cambiarZoom(-10)">A−</button>
+          <button type="button" class="zoom-val" title="Restablecer tamano" @click="zoom = fijarZoom(100)">{{ zoom }}%</button>
+          <button type="button" title="Agrandar el tablero" @click="cambiarZoom(10)">A+</button>
+        </span>
         <button type="button" class="btn-pantalla" :title="pantallaCompleta ? 'Salir de pantalla completa' : 'Pantalla completa'"
                 @click="alternarPantalla">
           {{ pantallaCompleta ? '⤡' : '⤢' }}
@@ -440,6 +451,13 @@ function repetir() {
 .casino-modal { display: flex; flex-direction: column; gap: 10px; min-width: 0; max-width: 100%; }
 .casino-modal > div { min-width: 0; }
 .rapidos { flex-wrap: wrap; }
+.zoom-ctl { display: flex; align-items: center; gap: 4px; margin-left: auto; }
+.zoom-ctl button {
+  border: 1px solid var(--tm-reel-border); background: rgba(255,255,255,.06);
+  color: var(--tm-marquee-text, #e8ce7a);
+  border-radius: 7px; padding: 2px 7px; font-size: 11.5px; cursor: pointer; line-height: 1.2;
+}
+.zoom-ctl .zoom-val { min-width: 44px; text-align: center; letter-spacing: 0; text-transform: none; font-weight: 700; }
 .btn-pantalla {
   margin-left: auto; flex: none; width: 30px; height: 26px; border-radius: 8px;
   border: 1px solid var(--tm-reel-border); background: color-mix(in srgb, var(--tm-shell) 40%, transparent);
