@@ -1,14 +1,13 @@
-
-.brand-img { width: 40px; height: 40px; border-radius: 12px; object-fit: cover; display: block; }<script setup lang="ts">
+<script setup lang="ts">
 import { ref, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { colones } from '@/utils/formato'
 import { useMarcaStore } from '@/stores/marca'
 import AppAndroidBanner from '@/components/AppAndroidBanner.vue'
 import { esDispositivoAndroid } from '@/utils/dispositivo'
 
 const marca = useMarcaStore()
-import { colones } from '@/utils/formato'
 
 const route = useRoute()
 const router = useRouter()
@@ -88,6 +87,7 @@ function salir() {
           {{ item.label }}
         </router-link>
       </nav>
+
       <a v-if="esAndroid" class="app-cta" href="/descargar/">
         <span class="app-cta-ico">▣</span>
         <span><b>App Android</b><small>Descargala gratis</small></span>
@@ -123,3 +123,20 @@ function salir() {
     </div>
   </div>
 </template>
+
+<style scoped>
+.brand-img { width: 36px; height: 36px; border-radius: 11px; object-fit: cover; display: block; }
+
+.app-cta {
+  display: flex; align-items: center; gap: 10px; margin-top: 14px; padding: 9px 11px;
+  border-radius: 12px; text-decoration: none;
+  background: linear-gradient(180deg, rgba(232,206,122,.16), rgba(232,206,122,.05));
+  border: 1px solid rgba(232,206,122,.3);
+}
+.app-cta-ico {
+  width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center;
+  color: #2b1d05; font-size: 15px; background: linear-gradient(180deg,#f0d98a,#c9a227);
+}
+.app-cta b { display: block; color: #eef6f1; font-size: 12.5px; }
+.app-cta small { color: #9db8ac; font-size: 11px; }
+</style>

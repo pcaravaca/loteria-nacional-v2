@@ -1,9 +1,7 @@
-
-.brand-img { width: 40px; height: 40px; border-radius: 12px; object-fit: cover; display: block; }<script setup lang="ts">
-import AppAndroidBanner from '@/components/AppAndroidBanner.vue'
+<script setup lang="ts">
 import { useMarcaStore } from '@/stores/marca'
-
 const marca = useMarcaStore()
+import AppAndroidBanner from '@/components/AppAndroidBanner.vue'
 import { ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
@@ -35,7 +33,7 @@ async function enviar() {
         <img v-if="marca.icono" class="brand-img" :src="marca.icono" alt="" />
         <div v-else class="brand-mark">LN</div>
         <div>
-          <div class="brand-name">{{ marca.nombre }}</div>
+          <div class="brand-name">Lotería Nacional</div>
           <div class="brand-sub">Costa Rica</div>
         </div>
       </div>
@@ -89,3 +87,7 @@ async function enviar() {
     </div>
   </div>
 </template>
+
+<style scoped>
+.brand-img { width: 36px; height: 36px; border-radius: 11px; object-fit: cover; display: block; }
+</style>
