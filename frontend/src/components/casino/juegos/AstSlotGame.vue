@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onUnmounted, ref, watch } from 'vue'
+import { onMounted, onUnmounted, ref, watch } from 'vue'
 import { colones } from '@/utils/formato'
 import { astSimbolo } from '@/assets/ast'
 

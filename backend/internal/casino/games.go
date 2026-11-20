@@ -62,7 +62,7 @@ func (p Params) Ints(key string) ([]int, error) {
 
 // Outcome es lo que hay que pagar y lo que hay que animar en el cliente.
 type Outcome struct {
-	Multiplicador int64         `json:"multiplicador"`
+	Multiplicador int64          `json:"multiplicador"`
 	Data          map[string]any `json:"data"`
 }
 
@@ -335,9 +335,9 @@ func jugarKeno(monto int64, draws []int, p Params) (Outcome, error) {
 	return Outcome{
 		Multiplicador: mult,
 		Data: map[string]any{
-			"bolillas":  bolillas,
+			"bolillas":    bolillas,
 			"tus_numeros": tuyos,
-			"aciertos":  aciertos,
+			"aciertos":    aciertos,
 		},
 	}, nil
 }
@@ -449,10 +449,10 @@ func jugarAlto(monto int64, draws []int, p Params) (Outcome, error) {
 	return Outcome{
 		Multiplicador: mult,
 		Data: map[string]any{
-			"tirada":     tirada,
-			"tope":       tope,
-			"direccion":  direccion,
-			"tabla":      altoTopes,
+			"tirada":    tirada,
+			"tope":      tope,
+			"direccion": direccion,
+			"tabla":     altoTopes,
 		},
 	}, nil
 }
@@ -585,9 +585,9 @@ func jugarParley(monto int64, draws []int, p Params) (Outcome, error) {
 	return Outcome{
 		Multiplicador: mult,
 		Data: map[string]any{
-			"bolillas": bolillas,
+			"bolillas":    bolillas,
 			"tus_numeros": tuyos,
-			"aciertos":  aciertos,
+			"aciertos":    aciertos,
 		},
 	}, nil
 }
@@ -759,6 +759,11 @@ func Jugar(codigo string, monto int64, draws []int, p Params) (Outcome, error) {
 func MultiplicadorMaximo(codigo string, maxMultipl int64) int64 {
 	if codigo == "blackjack" {
 		return 4
+	}
+	// El bingo paga hasta x25 por cartón y admite hasta 4 cartones: el peor
+	// caso absoluto es x100 sobre la apuesta por cartón.
+	if codigo == "bingo" {
+		return 25 * 4
 	}
 	if m := MaxMultiplSlot(codigo); m > 0 {
 		return m

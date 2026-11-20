@@ -1,0 +1,45 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="400" height="300" viewBox="0 0 400 300" role="img" aria-label="Cartón de Bingo 75">
+  <defs>
+    <linearGradient id="fondo" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#07120d"/>
+      <stop offset="1" stop-color="#0d4a35"/>
+    </linearGradient>
+    <linearGradient id="oro" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#f6e2a4"/>
+      <stop offset="1" stop-color="#c9a227"/>
+    </linearGradient>
+    <linearGradient id="carta" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#fbf7ea"/>
+      <stop offset="1" stop-color="#e6dfc8"/>
+    </linearGradient>
+  </defs>
+  <rect width="400" height="300" rx="18" fill="url(#fondo)"/>
+  <circle cx="352" cy="46" r="26" fill="url(#oro)" opacity="0.9"/>
+  <text x="352" y="55" font-family="Georgia, serif" font-size="24" font-weight="700" fill="#3a2a05" text-anchor="middle">75</text>
+  <circle cx="38" cy="252" r="20" fill="#0a3a29" stroke="#c9a227" stroke-width="2"/>
+  <text x="38" y="259" font-family="Georgia, serif" font-size="18" font-weight="700" fill="#f5dd9a" text-anchor="middle">B</text>
+
+  <g transform="translate(96,42)">
+    <rect x="0" y="0" width="220" height="220" rx="12" fill="url(#carta)" stroke="#c9a227" stroke-width="2"/>
+    <g font-family="Georgia, serif" font-size="15" font-weight="700" fill="#0d4a35" text-anchor="middle">
+      <text x="22" y="26">B</text>
+      <text x="66" y="26">I</text>
+      <text x="110" y="26">N</text>
+      <text x="154" y="26">G</text>
+      <text x="198" y="26">O</text>
+    </g>
+    <line x1="8" y1="34" x2="212" y2="34" stroke="#c9a227" stroke-width="2"/>
+    <g font-family="Georgia, serif" font-size="14" fill="#152018" text-anchor="middle">
+      <text x="22" y="62">3</text><text x="66" y="62">18</text><text x="110" y="62">31</text><text x="154" y="62">47</text><text x="198" y="62">62</text>
+      <text x="22" y="98">11</text><text x="66" y="98">27</text><text x="110" y="98">44</text><text x="154" y="98">59</text><text x="198" y="98">70</text>
+      <text x="22" y="134">7</text><text x="66" y="134">22</text><text x="154" y="134">52</text><text x="198" y="134">66</text>
+      <text x="22" y="170">14</text><text x="66" y="170">29</text><text x="110" y="170">35</text><text x="154" y="170">56</text><text x="198" y="170">74</text>
+      <text x="22" y="206">9</text><text x="66" y="206">16</text><text x="110" y="206">42</text><text x="154" y="206">58</text><text x="198" y="206">71</text>
+    </g>
+    <rect x="88" y="112" width="44" height="44" rx="8" fill="#0d4a35"/>
+    <text x="110" y="143" font-family="Georgia, serif" font-size="26" fill="#f5dd9a" text-anchor="middle">★</text>
+    <rect x="8" y="40" width="44" height="44" rx="8" fill="none" stroke="#c9a227" stroke-width="2"/>
+    <rect x="8" y="148" width="44" height="44" rx="8" fill="none" stroke="#c9a227" stroke-width="2"/>
+    <rect x="168" y="76" width="44" height="44" rx="8" fill="none" stroke="#c9a227" stroke-width="2"/>
+  </g>
+</svg>

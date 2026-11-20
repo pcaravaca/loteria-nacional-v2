@@ -12,6 +12,12 @@ export interface GrupoCasino {
 // clásicos, los rápidos y al final el catálogo AST (slots y video póker).
 export const GRUPOS_CASINO: GrupoCasino[] = [
   {
+    id: 'bingo',
+    titulo: 'Bingo',
+    descripcion: 'Cantá bolillas, armá línea y buscá el cartón lleno.',
+    codigos: ['bingo'],
+  },
+  {
     id: 'mesa',
     titulo: 'Mesas',
     descripcion: 'Blackjack, ruleta y baccará contra la casa.',

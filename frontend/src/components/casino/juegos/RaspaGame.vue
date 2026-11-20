@@ -1,12 +1,4 @@
 <script setup lang="ts">
-// Que casilleros pagaron: tres iguales marcan todos; un par marca las dos iguales.
-const pagaRaspa = computed(() => {
-  const s = props.resultado?.simbolos ?? []
-  if (!s.length || props.premio <= 0) return [false, false, false]
-  // Si dos o mas casilleros son iguales, esos son los que pagaron.
-  return s.map((v, i) => s.some((o, j) => j !== i && o === v))
-})
-
 import { computed, ref, watch } from 'vue'
 import { colones } from '@/utils/formato'
 import { simbolos } from '@/assets/casino'
@@ -17,6 +9,14 @@ const props = defineProps<{
   cargando: boolean
 }>()
 const emit = defineEmits<{ jugar: [Record<string, unknown>] }>()
+
+// Que casilleros pagaron: tres iguales marcan todos; un par marca las dos iguales.
+const pagaRaspa = computed(() => {
+  const s = props.resultado?.simbolos ?? []
+  if (!s.length || props.premio <= 0) return [false, false, false]
+  // Si dos o mas casilleros son iguales, esos son los que pagaron.
+  return s.map((v: any, i: number) => s.some((o: any, j: number) => j !== i && o === v))
+})
 
 const reveladas = ref<boolean[]>([false, false, false])
 

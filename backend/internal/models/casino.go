@@ -24,21 +24,22 @@ const (
 	CasinoSuertudo  = "suertudo"
 	CasinoParley    = "parley"
 	CasinoBaccarat  = "baccarat"
+	CasinoBingo     = "bingo"
 )
 
 // CasinoGame es un juego del mini casino con sus limites y su RTP declarado.
 type CasinoGame struct {
-	Codigo      string  `gorm:"primaryKey;size:32" json:"codigo"`
-	Nombre      string  `gorm:"not null" json:"nombre"`
-	Descripcion string  `json:"descripcion"`
-	MinApuesta  int64   `gorm:"not null;default:200" json:"min_apuesta"`
-	MaxApuesta  int64   `gorm:"not null;default:50000" json:"max_apuesta"`
-	RTP         float64 `gorm:"not null;default:96" json:"rtp"`
-	MaxMultipl  int64   `gorm:"not null;default:10" json:"max_multiplicador"`
-	MaxPremio   int64   `gorm:"not null;default:0" json:"max_premio"` // techo absoluto por jugada; 0 = sin techo
-	LimiteDiario int64  `gorm:"not null;default:200000" json:"limite_diario"` // 0 = sin limite
-	Orden       int     `gorm:"not null;default:0" json:"orden"`
-	Activo      bool    `gorm:"not null;default:true" json:"activo"`
+	Codigo       string  `gorm:"primaryKey;size:32" json:"codigo"`
+	Nombre       string  `gorm:"not null" json:"nombre"`
+	Descripcion  string  `json:"descripcion"`
+	MinApuesta   int64   `gorm:"not null;default:200" json:"min_apuesta"`
+	MaxApuesta   int64   `gorm:"not null;default:50000" json:"max_apuesta"`
+	RTP          float64 `gorm:"not null;default:96" json:"rtp"`
+	MaxMultipl   int64   `gorm:"not null;default:10" json:"max_multiplicador"`
+	MaxPremio    int64   `gorm:"not null;default:0" json:"max_premio"`         // techo absoluto por jugada; 0 = sin techo
+	LimiteDiario int64   `gorm:"not null;default:200000" json:"limite_diario"` // 0 = sin limite
+	Orden        int     `gorm:"not null;default:0" json:"orden"`
+	Activo       bool    `gorm:"not null;default:true" json:"activo"`
 }
 
 // CasinoRound es una jugada de casino. ServerSeedHash compromete el resultado
@@ -155,4 +156,73 @@ func (r *CasinoRound) AfterFind(tx *gorm.DB) error {
 		return nil
 	}
 	return json.Unmarshal([]byte(r.ResultadoRaw), &r.Resultado)
+}
+
+// BingoRonda es una jugada de bingo 75. La apuesta se descuenta al abrir y la
+// ronda queda abierta mientras se cantan bolillas de a una; el premio se calcula
+// por las líneas completadas en los cartones. El orden de las 75 bolillas y los
+// cartones se derivan de las semillas (provably fair).
+type BingoRonda struct {
+	ID             uint      `gorm:"primaryKey" json:"id"`
+	UserID         uint      `gorm:"not null;index" json:"user_id"`
+	Monto          int64     `gorm:"not null" json:"monto"` // apuesta total (por cartón x cartones)
+	MontoPorCarton int64     `gorm:"not null" json:"monto_por_carton"`
+	Cartones       int       `gorm:"not null;default:1" json:"cartones"`
+	CartonesRaw    string    `gorm:"column:cartones_raw;type:text" json:"-"`
+	Grids          [][][]int `gorm:"-" json:"grids"` // cartón -> fila -> columna
+	OrdenRaw       string    `gorm:"column:orden_raw;type:text" json:"-"`
+	Orden          []int     `gorm:"-" json:"orden"` // 75 bolillas mezcladas
+	CantadasRaw    string    `gorm:"column:cantadas_raw;type:text" json:"-"`
+	Cantadas       []int     `gorm:"-" json:"cantadas"` // bolillas ya cantadas
+	Estado         string    `gorm:"not null;default:abierta" json:"estado"`
+	Multiplicador  float64   `gorm:"not null;default:0" json:"multiplicador"`
+	Premio         int64     `gorm:"not null;default:0" json:"premio"`
+	Lineas         int       `gorm:"not null;default:0" json:"lineas"` // mayor nº de líneas en un cartón
+	ClientSeed     string    `gorm:"size:64" json:"client_seed"`
+	ServerSeedHash string    `gorm:"size:64" json:"server_seed_hash"`
+	Nonce          int64     `json:"nonce"`
+	CreatedAt      time.Time `json:"created_at"`
+}
+
+func (BingoRonda) TableName() string { return "bingo_rondas" }
+
+func (b *BingoRonda) BeforeSave(tx *gorm.DB) error {
+	cb, err := json.Marshal(b.Grids)
+	if err != nil {
+		return err
+	}
+	ob, err := json.Marshal(b.Orden)
+	if err != nil {
+		return err
+	}
+	if b.Cantadas == nil {
+		b.Cantadas = []int{}
+	}
+	db, err := json.Marshal(b.Cantadas)
+	if err != nil {
+		return err
+	}
+	b.CartonesRaw = string(cb)
+	b.OrdenRaw = string(ob)
+	b.CantadasRaw = string(db)
+	return nil
+}
+
+func (b *BingoRonda) AfterFind(tx *gorm.DB) error {
+	if b.CartonesRaw != "" {
+		if err := json.Unmarshal([]byte(b.CartonesRaw), &b.Grids); err != nil {
+			return err
+		}
+	}
+	if b.OrdenRaw != "" {
+		if err := json.Unmarshal([]byte(b.OrdenRaw), &b.Orden); err != nil {
+			return err
+		}
+	}
+	if b.CantadasRaw != "" {
+		if err := json.Unmarshal([]byte(b.CantadasRaw), &b.Cantadas); err != nil {
+			return err
+		}
+	}
+	return nil
 }

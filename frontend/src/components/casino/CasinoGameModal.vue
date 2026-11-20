@@ -20,6 +20,7 @@ import HiloGame from './juegos/HiloGame.vue'
 import AltoGame from './juegos/AltoGame.vue'
 import FortunaGame from './juegos/FortunaGame.vue'
 import BaccaratGame from './juegos/BaccaratGame.vue'
+import BingoGame from './juegos/BingoGame.vue'
 import AstSlotGame from './juegos/AstSlotGame.vue'
 import PokerGame from './juegos/PokerGame.vue'
 
@@ -195,6 +196,17 @@ const guias: Partial<Record<CodigoJuego, Guia>> = {
       { t: 'Reparto automático', d: 'Dos cartas por mano y la regla de la tercera carta define el resultado.' },
     ],
     premios: [{ etq: 'Jugador', mult: 'x2' }, { etq: 'Banca', mult: 'x2 menos 5%' }, { etq: 'Empate', mult: 'x8' }],
+  },
+  bingo: {
+    pasos: [
+      { t: 'Elegí la cantidad de cartones', d: 'De 1 a 4. La apuesta se multiplica por la cantidad de cartones.' },
+      { t: 'Cantá las bolillas', d: 'Se cantan 42 de las 75. Las casillas acertadas se marcan solas.' },
+      { t: 'Buscá línea o cartón lleno', d: 'Una línea devuelve lo apostado; dos o más líneas paga x3 y el cartón lleno x25.' },
+    ],
+    premios: [
+      { etq: '1 línea', mult: 'x1' }, { etq: '2 o más líneas', mult: 'x3' },
+      { etq: 'Cartón lleno', mult: 'x25' },
+    ],
   },
 }
 
@@ -378,6 +390,11 @@ function repetir() {
         :monto="monto"
         :cargando="cargando"
         @jugar="jugar"
+      />
+      <BingoGame
+        v-else-if="juego.codigo === 'bingo'"
+        :monto="monto"
+        :client-seed="clientSeed"
       />
       <AstSlotGame
         v-else-if="esSlotAst"

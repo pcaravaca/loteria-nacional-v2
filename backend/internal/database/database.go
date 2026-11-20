@@ -53,6 +53,7 @@ func Open(cfg *config.Config) (*gorm.DB, error) {
 		&models.CasinoGame{},
 		&models.CasinoRound{},
 		&models.BlackjackMano{},
+		&models.BingoRonda{},
 		&models.PokerMano{},
 		&models.AuditLog{},
 		&models.LimitesJugador{},

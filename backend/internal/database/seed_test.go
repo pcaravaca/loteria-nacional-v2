@@ -3,7 +3,9 @@ package database
 import (
 	"testing"
 
+	"loteria-backend/internal/casino"
 	"loteria-backend/internal/config"
+	"loteria-backend/internal/models"
 )
 
 // TestSeedCasino verifica que los juegos se creen con su estado correcto:
@@ -21,16 +23,29 @@ func TestSeedCasino(t *testing.T) {
 	if err := db.Table("casino_juegos").Count(&total).Error; err != nil {
 		t.Fatalf("contar: %v", err)
 	}
-	if total != 34 {
-		t.Fatalf("se esperaban 34 juegos, hay %d", total)
+	if total != 35 {
+		t.Fatalf("se esperaban 35 juegos, hay %d", total)
 	}
 
 	var activos int64
 	if err := db.Table("casino_juegos").Where("activo = ?", true).Count(&activos).Error; err != nil {
 		t.Fatalf("contar activos: %v", err)
 	}
-	if activos != 34 {
+	if activos != 35 {
 		t.Fatalf("los juegos deberian quedar activos, hay %d", activos)
+	}
+
+	// El bingo queda activo y con la apuesta máxima recortada por el techo de
+	// premio (x100 de peor caso: 25 por cartón x 4 cartones).
+	var bingo models.CasinoGame
+	if err := db.Where("codigo = ?", models.CasinoBingo).First(&bingo).Error; err != nil {
+		t.Fatalf("bingo: %v", err)
+	}
+	if !bingo.Activo {
+		t.Error("el bingo debería quedar activo")
+	}
+	if maximo := casino.ApuestaMaxima(bingo.MaxApuesta, bingo.MaxMultipl, bingo.MaxPremio, bingo.Codigo); maximo != 10000 {
+		t.Errorf("apuesta máxima del bingo = %d, esperaba 10000", maximo)
 	}
 
 	var techo int64

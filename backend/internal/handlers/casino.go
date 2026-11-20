@@ -111,6 +111,11 @@ func (h *CasinoHandler) RotarSemilla(c *gin.Context) {
 		c.JSON(http.StatusConflict, gin.H{"error": "tenes una mano de video poker abierta: cobrala antes de rotar la semilla"})
 		return
 	}
+	if err := h.db.Model(&models.BingoRonda{}).
+		Where("user_id = ? AND estado = ?", userID, "abierta").Count(&abiertas).Error; err == nil && abiertas > 0 {
+		c.JSON(http.StatusConflict, gin.H{"error": "tenes una jugada de bingo abierta: cobrala antes de rotar la semilla"})
+		return
+	}
 
 	semilla, hash, err := casino.NuevaSemilla()
 	if err != nil {
@@ -344,32 +349,36 @@ func (h *CasinoHandler) Stats(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "no se pudieron cargar las estadisticas"})
 		return
 	}
-	// El blackjack guarda sus manos aparte, asi que se suman sus totales.
-	var bjTotal struct {
-		Jugadas   int64
-		Apostado  int64
-		Premios   int64
-		Beneficio int64
+	// El blackjack y el bingo guardan sus rondas en tablas aparte, asi que se
+	// suman sus totales a mano.
+	sumar := func(codigo string, total fila) {
+		if total.Jugadas == 0 {
+			return
+		}
+		total.Juego = codigo
+		for i := range filas {
+			if filas[i].Juego == codigo {
+				filas[i].Jugadas += total.Jugadas
+				filas[i].Apostado += total.Apostado
+				filas[i].Premios += total.Premios
+				filas[i].Beneficio += total.Beneficio
+				return
+			}
+		}
+		filas = append(filas, total)
 	}
+	var bjTotal fila
 	h.db.Model(&models.BlackjackMano{}).
 		Select("count(*) as jugadas, COALESCE(sum(monto),0) as apostado, COALESCE(sum(premio),0) as premios, COALESCE(sum(monto - premio),0) as beneficio").
 		Scan(&bjTotal)
-	if bjTotal.Jugadas > 0 {
-		encontrado := false
-		for i := range filas {
-			if filas[i].Juego == models.CasinoBlackjack {
-				filas[i].Jugadas += bjTotal.Jugadas
-				filas[i].Apostado += bjTotal.Apostado
-				filas[i].Premios += bjTotal.Premios
-				filas[i].Beneficio += bjTotal.Beneficio
-				encontrado = true
-				break
-			}
-		}
-		if !encontrado {
-			filas = append(filas, fila{models.CasinoBlackjack, bjTotal.Jugadas, bjTotal.Apostado, bjTotal.Premios, bjTotal.Beneficio})
-		}
-	}
+	sumar(models.CasinoBlackjack, bjTotal)
+
+	var bgTotal fila
+	h.db.Model(&models.BingoRonda{}).
+		Select("count(*) as jugadas, COALESCE(sum(monto),0) as apostado, COALESCE(sum(premio),0) as premios, COALESCE(sum(monto - premio),0) as beneficio").
+		Scan(&bgTotal)
+	sumar(models.CasinoBingo, bgTotal)
+
 	c.JSON(http.StatusOK, filas)
 }
 
@@ -515,6 +524,14 @@ func (h *CasinoHandler) apostadoHoy(userID uint, codigo string, desde time.Time)
 			Where("user_id = ? AND created_at >= ?", userID, desde).
 			Select("COALESCE(SUM(monto),0)").Scan(&bj).Error; err == nil {
 			total += bj
+		}
+	}
+	if codigo == models.CasinoBingo {
+		var bg int64
+		if err := h.db.Model(&models.BingoRonda{}).
+			Where("user_id = ? AND created_at >= ?", userID, desde).
+			Select("COALESCE(SUM(monto),0)").Scan(&bg).Error; err == nil {
+			total += bg
 		}
 	}
 	return total
