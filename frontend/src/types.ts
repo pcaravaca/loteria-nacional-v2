@@ -131,6 +131,16 @@ export interface Resumen {
 
 // ---------------- Mini casino ----------------
 
+export interface ModalidadCatalogo {
+  codigo: string
+  nombre: string
+  descripcion: string
+  pagos: { etiqueta: string; mult: string }[]
+  // Mayor multiplicador que puede pagar la modalidad (el hilo en racha x6,
+  // el alto en racha x4, etc.).
+  mult_max: number
+}
+
 export interface CasinoGame {
   codigo: string
   nombre: string
@@ -138,12 +148,16 @@ export interface CasinoGame {
   min_apuesta: number
   max_apuesta: number
   rtp: number
+  // RTP medido jugando al azar (sin estrategia). 0 = no aplica: el juego es de
+  // azar puro y se muestra con un solo RTP.
+  rtp_casual: number
   max_multiplicador: number
   max_premio: number
   apuesta_max?: number
   orden: number
   activo: boolean
   limite_diario: number
+  modalidades?: ModalidadCatalogo[]
 }
 
 export interface CasinoStats {
@@ -156,8 +170,9 @@ export interface CasinoStats {
 
 export interface CasinoRound {
   id: number
-  // Fuente de la jugada: casino_rondas, bingo_rondas o gemas_rondas. Define a
-  // que endpoint de verificacion se despacha.
+  // Fuente de la jugada: casino_rondas, bingo_rondas, gemas_rondas,
+  // casino_blackjack, domino_rondas, ajedrez_rondas, backgammon_rondas o
+  // tetris_rondas. Define a que endpoint de verificacion se despacha.
   source?: string
   game: string
   nombre?: string

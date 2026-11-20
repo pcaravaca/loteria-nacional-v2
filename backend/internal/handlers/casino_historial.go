@@ -15,17 +15,23 @@ import (
 // Historial y verificacion unificados del casino.
 //
 // Los juegos no todos guardan sus jugadas en la misma tabla: los rapidos usan
-// casino_rondas, el bingo usa bingo_rondas y gemas usa gemas_rondas. El lobby
-// consulta una sola lista y verifica con un solo endpoint, asi que aca se juntan
-// las fuentes en un formato comun y el endpoint de verificacion despacha segun
-// el origen de la ronda.
+// casino_rondas, el bingo usa bingo_rondas, gemas usa gemas_rondas y el
+// blackjack guarda cada mano en casino_blackjack. El lobby consulta una sola
+// lista y verifica con un solo endpoint, asi que aca se juntan las fuentes en
+// un formato comun y el endpoint de verificacion despacha segun el origen de
+// la ronda.
 
 // Fuentes del historial. El cliente manda `source` al verificar para no
 // depender de que los ids de las tablas no se pisen entre si.
 const (
-	FuenteCasino = "casino"
-	FuenteBingo  = "bingo"
-	FuenteGemas  = "gemas"
+	FuenteCasino     = "casino"
+	FuenteBingo      = "bingo"
+	FuenteGemas      = "gemas"
+	FuenteBlackjack  = "blackjack"
+	FuenteDomino     = "domino"
+	FuenteAjedrez    = "ajedrez"
+	FuenteBackgammon = "backgammon"
+	FuenteTetris     = "tetris"
 )
 
 // RondaHistorial es la fila comun del historial. Mantiene los campos que ya
@@ -192,6 +198,143 @@ func (h *CasinoHandler) historialRondas(userID uint, limite int) []RondaHistoria
 		}
 	}
 
+	var manos []models.BlackjackMano
+	if err := h.db.Where("user_id = ?", userID).
+		Order("created_at desc").Limit(limite).Find(&manos).Error; err == nil {
+		for _, r := range manos {
+			filas = append(filas, RondaHistorial{
+				ID:             r.ID,
+				Source:         FuenteBlackjack,
+				Game:           models.CasinoBlackjack,
+				Nombre:         nombres[models.CasinoBlackjack],
+				Monto:          r.Monto,
+				Multiplicador:  r.Multiplicador,
+				Premio:         r.Premio,
+				Estado:         r.Estado,
+				ClientSeed:     r.ClientSeed,
+				ServerSeedHash: r.ServerSeedHash,
+				Nonce:          r.Nonce,
+				Resultado: gin.H{
+					"mano":    r.Mano,
+					"crupier": r.Crupier,
+					"seguro":  r.Seguro,
+				},
+				CreatedAt: r.CreatedAt,
+			})
+		}
+	}
+
+	var dominos []models.DominoRonda
+	if err := h.db.Where("user_id = ?", userID).
+		Order("created_at desc").Limit(limite).Find(&dominos).Error; err == nil {
+		for _, r := range dominos {
+			filas = append(filas, RondaHistorial{
+				ID:             r.ID,
+				Source:         FuenteDomino,
+				Game:           models.CasinoDomino,
+				Nombre:         nombres[models.CasinoDomino],
+				Monto:          r.Monto,
+				Multiplicador:  r.Multiplicador,
+				Premio:         r.Premio,
+				Estado:         r.Estado,
+				ClientSeed:     r.ClientSeed,
+				ServerSeedHash: r.ServerSeedHash,
+				Nonce:          r.Nonce,
+				Resultado: gin.H{
+					"mano":      r.Mano,
+					"casa":      r.Casa,
+					"tablero":   r.Tablero,
+					"jugadas":   len(r.Jugadas),
+					"fichas":    len(r.Mano),
+					"contrario": len(r.Casa),
+				},
+				CreatedAt: r.CreatedAt,
+			})
+		}
+	}
+
+	var ajedrez []models.AjedrezRonda
+	if err := h.db.Where("user_id = ?", userID).
+		Order("created_at desc").Limit(limite).Find(&ajedrez).Error; err == nil {
+		for _, r := range ajedrez {
+			filas = append(filas, RondaHistorial{
+				ID:             r.ID,
+				Source:         FuenteAjedrez,
+				Game:           models.CasinoAjedrez,
+				Nombre:         nombres[models.CasinoAjedrez],
+				Monto:          r.Monto,
+				Multiplicador:  r.Multiplicador,
+				Premio:         r.Premio,
+				Estado:         r.Estado,
+				ClientSeed:     r.ClientSeed,
+				ServerSeedHash: r.ServerSeedHash,
+				Nonce:          r.Nonce,
+				Resultado: gin.H{
+					"fen":      r.FEN,
+					"tema":     r.Tema,
+					"opciones": r.Opciones,
+					"jugadas":  len(r.Jugadas),
+				},
+				CreatedAt: r.CreatedAt,
+			})
+		}
+	}
+
+	var backgammons []models.BackgammonRonda
+	if err := h.db.Where("user_id = ?", userID).
+		Order("created_at desc").Limit(limite).Find(&backgammons).Error; err == nil {
+		for _, r := range backgammons {
+			filas = append(filas, RondaHistorial{
+				ID:             r.ID,
+				Source:         FuenteBackgammon,
+				Game:           models.CasinoBackgammon,
+				Nombre:         nombres[models.CasinoBackgammon],
+				Monto:          r.Monto,
+				Multiplicador:  r.Multiplicador,
+				Premio:         r.Premio,
+				Estado:         r.Estado,
+				ClientSeed:     r.ClientSeed,
+				ServerSeedHash: r.ServerSeedHash,
+				Nonce:          r.Nonce,
+				Resultado: gin.H{
+					"jugador": r.Jugador,
+					"casa":    r.Casa,
+					"ganador": r.Ganador,
+					"jugadas": len(r.Jugadas),
+				},
+				CreatedAt: r.CreatedAt,
+			})
+		}
+	}
+
+	var tetris []models.TetrisRonda
+	if err := h.db.Where("user_id = ?", userID).
+		Order("created_at desc").Limit(limite).Find(&tetris).Error; err == nil {
+		for _, r := range tetris {
+			filas = append(filas, RondaHistorial{
+				ID:             r.ID,
+				Source:         FuenteTetris,
+				Game:           models.CasinoTetris,
+				Nombre:         nombres[models.CasinoTetris],
+				Monto:          r.Monto,
+				Multiplicador:  r.Multiplicador,
+				Premio:         r.Premio,
+				Lineas:         r.Lineas,
+				Estado:         r.Estado,
+				ClientSeed:     r.ClientSeed,
+				ServerSeedHash: r.ServerSeedHash,
+				Nonce:          r.Nonce,
+				Resultado: gin.H{
+					"lineas":  r.Lineas,
+					"pieza":   r.Pieza,
+					"piezas":  len(r.Piezas),
+					"jugadas": len(r.Jugadas),
+				},
+				CreatedAt: r.CreatedAt,
+			})
+		}
+	}
+
 	sort.SliceStable(filas, func(i, j int) bool { return filas[i].CreatedAt.After(filas[j].CreatedAt) })
 	if len(filas) > limite {
 		filas = filas[:limite]
@@ -212,13 +355,17 @@ func (h *CasinoHandler) Verify(c *gin.Context) {
 
 	switch fuente := c.Query("source"); fuente {
 	case "":
-		for _, f := range []string{FuenteCasino, FuenteBingo, FuenteGemas} {
+		for _, f := range []string{
+			FuenteCasino, FuenteBingo, FuenteGemas, FuenteBlackjack,
+			FuenteDomino, FuenteAjedrez, FuenteBackgammon, FuenteTetris,
+		} {
 			if h.verificarFuente(c, userID, id, f) {
 				return
 			}
 		}
 		c.JSON(http.StatusNotFound, gin.H{"error": "ronda no encontrada"})
-	case FuenteCasino, FuenteBingo, FuenteGemas:
+	case FuenteCasino, FuenteBingo, FuenteGemas, FuenteBlackjack,
+		FuenteDomino, FuenteAjedrez, FuenteBackgammon, FuenteTetris:
 		if !h.verificarFuente(c, userID, id, fuente) {
 			c.JSON(http.StatusNotFound, gin.H{"error": "ronda no encontrada"})
 		}
@@ -238,6 +385,16 @@ func (h *CasinoHandler) verificarFuente(c *gin.Context, userID uint, id uint64, 
 		return h.verificarBingo(c, userID, id)
 	case FuenteGemas:
 		return h.verificarGemas(c, userID, id)
+	case FuenteBlackjack:
+		return h.verificarBlackjack(c, userID, id)
+	case FuenteDomino:
+		return h.verificarDomino(c, userID, id)
+	case FuenteAjedrez:
+		return h.verificarAjedrez(c, userID, id)
+	case FuenteBackgammon:
+		return h.verificarBackgammon(c, userID, id)
+	case FuenteTetris:
+		return h.verificarTetris(c, userID, id)
 	}
 	return false
 }
@@ -382,7 +539,275 @@ func (h *CasinoHandler) verificarGemas(c *gin.Context, userID uint, id uint64) b
 	return true
 }
 
+// verificarBlackjack reproduce la mano inicial desde las semillas: el mazo sale
+// de Baraja(client, server, nonce) y las posiciones 0/2 son del jugador y 1/3
+// del crupier. Verificar las cuatro cartas iniciales es suficiente para probar
+// que la mano no se altero despues del reparto.
+func (h *CasinoHandler) verificarBlackjack(c *gin.Context, userID uint, id uint64) bool {
+	var ronda models.BlackjackMano
+	if err := h.db.Where("id = ? AND user_id = ?", id, userID).First(&ronda).Error; err != nil {
+		return false
+	}
+	var user models.User
+	if err := h.db.First(&user, userID).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "usuario no encontrado"})
+		return true
+	}
+
+	mazo := casino.Baraja(ronda.ClientSeed, user.CasinoSeed, ronda.Nonce, 64)
+	verificado := casino.HashSemilla(user.CasinoSeed) == ronda.ServerSeedHash &&
+		len(ronda.Mano) >= 2 && len(ronda.Crupier) >= 2 &&
+		ronda.Mano[0] == mazo[0] && ronda.Mano[1] == mazo[2] &&
+		ronda.Crupier[0] == mazo[1] && ronda.Crupier[1] == mazo[3]
+
+	c.JSON(http.StatusOK, Verificacion{
+		RondaID:        ronda.ID,
+		Source:         FuenteBlackjack,
+		Juego:          models.CasinoBlackjack,
+		Nombre:         h.nombreJuego(models.CasinoBlackjack),
+		Monto:          ronda.Monto,
+		Multiplicador:  ronda.Multiplicador,
+		Premio:         ronda.Premio,
+		Estado:         ronda.Estado,
+		ClientSeed:     ronda.ClientSeed,
+		ServerSeedHash: ronda.ServerSeedHash,
+		ServerSeed:     user.CasinoSeed,
+		Nonce:          ronda.Nonce,
+		Sorteo:         mazo,
+		Resultado: gin.H{
+			"mano":    ronda.Mano,
+			"crupier": ronda.Crupier,
+			"seguro":  ronda.Seguro,
+		},
+		Verificado: verificado,
+		CreatedAt:  ronda.CreatedAt,
+	})
+	return true
+}
+
+// verificarDomino reproduce la mano desde las semillas: el reparto sale de
+// DominoSorteo y la casa responde siempre con la ficha valida de mayor
+// puntaje, de modo que las jugadas guardadas reproducen mano, casa y tablero.
+// Si la ronda ya se cerro, ademas exige que el premio y el multiplicador
+// coincidan con el ganador reproducido.
+func (h *CasinoHandler) verificarDomino(c *gin.Context, userID uint, id uint64) bool {
+	var ronda models.DominoRonda
+	if err := h.db.Where("id = ? AND user_id = ?", id, userID).First(&ronda).Error; err != nil {
+		return false
+	}
+	var user models.User
+	if err := h.db.First(&user, userID).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "usuario no encontrado"})
+		return true
+	}
+
+	rep, err := casino.DominoRepetir(ronda.ClientSeed, user.CasinoSeed, ronda.Nonce, ronda.Jugadas)
+	verificado := err == nil &&
+		casino.HashSemilla(user.CasinoSeed) == ronda.ServerSeedHash &&
+		dominoIgualar(dominoManoA(rep.Mano), ronda.Mano) &&
+		dominoIgualar(dominoManoA(rep.Casa), ronda.Casa) &&
+		dominoIgualar(dominoManoA(rep.Tablero), ronda.Tablero)
+	if ronda.Estado == "pagada" {
+		verificado = verificado && rep.Fin &&
+			ronda.Premio == casino.DominoPremio(ronda.Monto, rep.Ganador) &&
+			ronda.Multiplicador == casino.DominoMultiplicador(rep.Ganador)
+	}
+
+	c.JSON(http.StatusOK, Verificacion{
+		RondaID:        ronda.ID,
+		Source:         FuenteDomino,
+		Juego:          models.CasinoDomino,
+		Nombre:         h.nombreJuego(models.CasinoDomino),
+		Monto:          ronda.Monto,
+		Multiplicador:  ronda.Multiplicador,
+		Premio:         ronda.Premio,
+		Estado:         ronda.Estado,
+		ClientSeed:     ronda.ClientSeed,
+		ServerSeedHash: ronda.ServerSeedHash,
+		ServerSeed:     user.CasinoSeed,
+		Nonce:          ronda.Nonce,
+		Sorteo: gin.H{
+			"mano":    ronda.Mano,
+			"casa":    ronda.Casa,
+			"tablero": ronda.Tablero,
+		},
+		Resultado: gin.H{
+			"jugadas": ronda.Jugadas,
+			"ganador": rep.Ganador,
+			"fin":     rep.Fin,
+		},
+		Verificado: verificado,
+		CreatedAt:  ronda.CreatedAt,
+	})
+	return true
+}
+
+// verificarAjedrez reproduce la posicion y el orden de las opciones desde las
+// semillas. Cubre el hash de la semilla, el FEN, las cuatro opciones y el
+// premio/multiplicador segun el acierto reproducido.
+func (h *CasinoHandler) verificarAjedrez(c *gin.Context, userID uint, id uint64) bool {
+	var ronda models.AjedrezRonda
+	if err := h.db.Where("id = ? AND user_id = ?", id, userID).First(&ronda).Error; err != nil {
+		return false
+	}
+	var user models.User
+	if err := h.db.First(&user, userID).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "usuario no encontrado"})
+		return true
+	}
+
+	p, opciones, acierto := casino.AjedrezRepetir(ronda.ClientSeed, user.CasinoSeed, ronda.Nonce, ronda.Jugadas)
+	verificado := casino.HashSemilla(user.CasinoSeed) == ronda.ServerSeedHash &&
+		p.FEN == ronda.FEN &&
+		p.Correcta == ronda.Correcta &&
+		igualarCadenas(opciones, ronda.Opciones) &&
+		ronda.Premio == casino.AjedrezPremio(ronda.Monto, acierto) &&
+		ronda.Multiplicador == casino.AjedrezMultiplicador(acierto)
+
+	c.JSON(http.StatusOK, Verificacion{
+		RondaID:        ronda.ID,
+		Source:         FuenteAjedrez,
+		Juego:          models.CasinoAjedrez,
+		Nombre:         h.nombreJuego(models.CasinoAjedrez),
+		Monto:          ronda.Monto,
+		Multiplicador:  ronda.Multiplicador,
+		Premio:         ronda.Premio,
+		Estado:         ronda.Estado,
+		ClientSeed:     ronda.ClientSeed,
+		ServerSeedHash: ronda.ServerSeedHash,
+		ServerSeed:     user.CasinoSeed,
+		Nonce:          ronda.Nonce,
+		Sorteo:         opciones,
+		Resultado: gin.H{
+			"fen":      ronda.FEN,
+			"tema":     ronda.Tema,
+			"correcta": ronda.Correcta,
+			"jugadas":  ronda.Jugadas,
+			"acierto":  acierto,
+		},
+		Verificado: verificado,
+		CreatedAt:  ronda.CreatedAt,
+	})
+	return true
+}
+
+// verificarBackgammon reproduce la carrera completa desde las semillas cuando
+// la ronda ya esta cerrada (la casa mueve siempre la ficha mas atrasada). La
+// ronda abierta no se puede reproducir entera porque el motor sigue pidiendo
+// jugadas hasta el fin; para ese estado se verifican el hash de la semilla y
+// que los dados guardados coincidan con el lance que les toca.
+func (h *CasinoHandler) verificarBackgammon(c *gin.Context, userID uint, id uint64) bool {
+	var ronda models.BackgammonRonda
+	if err := h.db.Where("id = ? AND user_id = ?", id, userID).First(&ronda).Error; err != nil {
+		return false
+	}
+	var user models.User
+	if err := h.db.First(&user, userID).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "usuario no encontrado"})
+		return true
+	}
+
+	dado1, dado2 := casino.BackgammonDados(ronda.ClientSeed, user.CasinoSeed, ronda.Nonce, ronda.Lance)
+	verificado := casino.HashSemilla(user.CasinoSeed) == ronda.ServerSeedHash &&
+		dado1 == ronda.Dado1 && dado2 == ronda.Dado2
+	rep, err := casino.BackgammonRepetir(ronda.ClientSeed, user.CasinoSeed, ronda.Nonce, ronda.Jugadas)
+	if ronda.Estado == "pagada" {
+		verificado = verificado && err == nil && rep.Fin &&
+			rep.Ganador == ronda.Ganador &&
+			igualarEnteros(rep.Jugador[:], ronda.Jugador[:]) &&
+			igualarEnteros(rep.Casa[:], ronda.Casa[:]) &&
+			ronda.Premio == casino.BackgammonPremio(ronda.Monto, rep.Ganador) &&
+			ronda.Multiplicador == casino.BackgammonMultiplicador(rep.Ganador)
+	}
+
+	c.JSON(http.StatusOK, Verificacion{
+		RondaID:        ronda.ID,
+		Source:         FuenteBackgammon,
+		Juego:          models.CasinoBackgammon,
+		Nombre:         h.nombreJuego(models.CasinoBackgammon),
+		Monto:          ronda.Monto,
+		Multiplicador:  ronda.Multiplicador,
+		Premio:         ronda.Premio,
+		Estado:         ronda.Estado,
+		ClientSeed:     ronda.ClientSeed,
+		ServerSeedHash: ronda.ServerSeedHash,
+		ServerSeed:     user.CasinoSeed,
+		Nonce:          ronda.Nonce,
+		Sorteo:         []int{dado1, dado2},
+		Resultado: gin.H{
+			"jugador": ronda.Jugador,
+			"casa":    ronda.Casa,
+			"ganador": ronda.Ganador,
+			"jugadas": ronda.Jugadas,
+		},
+		Verificado: verificado,
+		CreatedAt:  ronda.CreatedAt,
+	})
+	return true
+}
+
+// verificarTetris reproduce el tablero y las lineas desde las semillas: la
+// secuencia de piezas sale de TetrisSecuencia y cada jugada guardada coloca la
+// pieza en la columna y rotacion elegidas.
+func (h *CasinoHandler) verificarTetris(c *gin.Context, userID uint, id uint64) bool {
+	var ronda models.TetrisRonda
+	if err := h.db.Where("id = ? AND user_id = ?", id, userID).First(&ronda).Error; err != nil {
+		return false
+	}
+	var user models.User
+	if err := h.db.First(&user, userID).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "usuario no encontrado"})
+		return true
+	}
+
+	tablero, lineas, err := casino.TetrisRepetir(ronda.ClientSeed, user.CasinoSeed, ronda.Nonce, ronda.Jugadas)
+	verificado := err == nil &&
+		casino.HashSemilla(user.CasinoSeed) == ronda.ServerSeedHash &&
+		lineas == ronda.Lineas &&
+		tetrisIgualar(tablero, ronda.Tablero) &&
+		ronda.Premio == casino.TetrisPremio(ronda.Monto, lineas) &&
+		ronda.Multiplicador == casino.TetrisMult(lineas)
+
+	c.JSON(http.StatusOK, Verificacion{
+		RondaID:        ronda.ID,
+		Source:         FuenteTetris,
+		Juego:          models.CasinoTetris,
+		Nombre:         h.nombreJuego(models.CasinoTetris),
+		Monto:          ronda.Monto,
+		Multiplicador:  ronda.Multiplicador,
+		Premio:         ronda.Premio,
+		Lineas:         lineas,
+		Estado:         ronda.Estado,
+		ClientSeed:     ronda.ClientSeed,
+		ServerSeedHash: ronda.ServerSeedHash,
+		ServerSeed:     user.CasinoSeed,
+		Nonce:          ronda.Nonce,
+		Sorteo:         ronda.Piezas,
+		Resultado: gin.H{
+			"tablero": ronda.Tablero,
+			"piezas":  ronda.Piezas,
+			"lineas":  lineas,
+			"jugadas": ronda.Jugadas,
+		},
+		Verificado: verificado,
+		CreatedAt:  ronda.CreatedAt,
+	})
+	return true
+}
+
 func igualarEnteros(a, b []int) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
+}
+
+func igualarCadenas(a, b []string) bool {
 	if len(a) != len(b) {
 		return false
 	}

@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { nextTick, ref, watch } from 'vue'
+import { computed, nextTick, ref, watch } from 'vue'
 import { colones } from '@/utils/formato'
 import { reproducir } from '@/utils/sfx'
+import { modalidadCompartida, modalidadPorCodigo, modalidadesDe } from './modalidades'
 
 const props = defineProps<{
   resultado: any
@@ -13,13 +14,18 @@ const emit = defineEmits<{ jugar: [Record<string, unknown>] }>()
 
 type Tipo = 'jugador' | 'banca' | 'empate'
 
+const JUEGO = 'baccarat'
+const modalidades = modalidadesDe(JUEGO)
+const modalidad = modalidadCompartida(JUEGO)
+const cfg = computed(() => modalidadPorCodigo(JUEGO, modalidad.value))
+
 const tipo = ref<Tipo>('jugador')
 const PALOS = ['♠', '♥', '♦', '♣']
-const opciones: { t: Tipo; etiqueta: string; nota: string }[] = [
+const opciones = computed<{ t: Tipo; etiqueta: string; nota: string }[]>(() => [
   { t: 'jugador', etiqueta: 'Jugador x2', nota: 'Paga 1 a 1' },
-  { t: 'banca', etiqueta: 'Banca x2', nota: '5% de comisión' },
+  { t: 'banca', etiqueta: 'Banca x2', nota: cfg.value.codigo === 'sin-comision' ? 'Sin comisión' : '5% de comisión' },
   { t: 'empate', etiqueta: 'Empate x8', nota: 'Paga 8 a 1' },
-]
+])
 
 // Las figuras y los diez valen 0 en baccarat; el as vale 1.
 function figura(v: number): string {
@@ -47,13 +53,31 @@ watch(
   },
 )
 
+function elegirModalidad(codigo: string) {
+  modalidad.value = codigo
+  reproducir('tecla')
+}
+
 function jugar() {
-  emit('jugar', { tipo: tipo.value })
+  emit('jugar', { tipo: tipo.value, modalidad: modalidad.value })
 }
 </script>
 
 <template>
   <div class="baccarat">
+    <div class="modalidades">
+      <button
+        v-for="m in modalidades"
+        :key="m.codigo"
+        class="chip"
+        :class="{ activa: modalidad === m.codigo }"
+        @click="elegirModalidad(m.codigo)"
+      >
+        {{ m.nombre }}
+      </button>
+    </div>
+    <p class="regla">{{ cfg.descripcion }}</p>
+
     <div class="manos">
       <div class="mano" :class="{ 'resalta-ganador': resultado?.resultado === 'jugador' }">
         <span class="etiqueta">Jugador</span>
@@ -112,6 +136,10 @@ function jugar() {
       </button>
     </div>
 
+    <div class="paytable">
+      <span v-for="p in cfg.pagos" :key="p.etiqueta">{{ p.etiqueta }} {{ p.mult }}</span>
+    </div>
+
     <button class="btn btn-primary btn-block" :disabled="cargando" @click="jugar">
       {{ cargando ? 'Repartiendo…' : 'Repartir cartas' }}
     </button>
@@ -120,6 +148,8 @@ function jugar() {
 
 <style scoped>
 .baccarat { display: flex; flex-direction: column; gap: 14px; }
+.modalidades { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+.regla { margin: 0; font-size: 12px; color: var(--faint); text-align: center; line-height: 1.35; }
 .manos { display: grid; grid-template-columns: 1fr auto 1fr; gap: 10px; align-items: stretch; }
 .mano { background: #05080c; border: 1px solid var(--border); border-radius: 12px; padding: 12px; display: flex; flex-direction: column; gap: 8px; align-items: center; }
 .etiqueta { font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
@@ -145,5 +175,6 @@ function jugar() {
 }
 .chip small { font-weight: 400; color: var(--faint); font-size: 10.5px; }
 .chip.activa { border-color: var(--prim); color: var(--prim-2); background: var(--prim-dim); }
+.paytable { display: flex; justify-content: center; gap: 12px; flex-wrap: wrap; font-size: 11px; color: var(--faint); }
 @keyframes aparición { from { opacity: 0; transform: translateY(-8px) rotate(-6deg); } to { opacity: 1; transform: none; } }
 </style>

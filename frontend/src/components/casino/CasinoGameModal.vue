@@ -25,6 +25,11 @@ import { esBingo } from './juegos/bingoVariantes'
 import GemasGame from './juegos/GemasGame.vue'
 import AstSlotGame from './juegos/AstSlotGame.vue'
 import PokerGame from './juegos/PokerGame.vue'
+import DominoGame from './juegos/DominoGame.vue'
+import AjedrezGame from './juegos/AjedrezGame.vue'
+import BackgammonGame from './juegos/BackgammonGame.vue'
+import TetrisGame from './juegos/TetrisGame.vue'
+import { modalidadCompartida } from './juegos/modalidades'
 
 const props = defineProps<{ juego: CasinoGame; clientSeed: string }>()
 const emit = defineEmits<{ cerrar: [] }>()
@@ -269,6 +274,53 @@ const guias: Partial<Record<string, Guia>> = {
       { etq: '12 o más', mult: 'x5' },
     ],
   },
+  domino: {
+    pasos: [
+      { t: 'Abri la mano', d: 'Recibís 7 fichas dobles; la casa recibe otras 7. La apuesta se cobra al abrir.' },
+      { t: 'Encajá una ficha', d: 'Tu ficha debe coincidir con alguno de los dos extremos de la cadena.' },
+      { t: 'Vacá la mano', d: 'Gana quien se queda sin fichas. Si ambos pasan dos veces, gana la menor suma.' },
+    ],
+    premios: [
+      { etq: 'Ganar la mano', mult: 'x1.52' },
+      { etq: 'Empate', mult: 'x1 (devuelve)' },
+      { etq: 'Perder', mult: 'x0' },
+    ],
+  },
+  ajedrez: {
+    pasos: [
+      { t: 'Mirá el tablero', d: 'Es una posición real de mate en una: las blancas juegan primero.' },
+      { t: 'Elegí el mate', d: 'Cuatro jugadas legales: solo una da jaque mate.' },
+      { t: 'Cobrar', d: 'Si acertás, la casa paga x3.5.' },
+    ],
+    premios: [
+      { etq: 'Mate acertado', mult: 'x3.5' },
+      { etq: 'Jugada incorrecta', mult: 'x0' },
+    ],
+  },
+  backgammon: {
+    pasos: [
+      { t: 'Abri la carrera', d: 'Tenés tres fichas en el punto 0; la casa tiene otras tres.' },
+      { t: 'Avanzá una ficha', d: 'Tirás dos dados y movés una ficha por la suma. Los dobles duplican el avance.' },
+      { t: 'Sacá las tres', d: 'El primero que llega a 12 con las tres fichas gana.' },
+    ],
+    premios: [
+      { etq: 'Ganar la carrera', mult: 'x1.85' },
+      { etq: 'Perder', mult: 'x0' },
+    ],
+  },
+  tetris: {
+    pasos: [
+      { t: 'Abri la ronda', d: 'Recibís una secuencia de 8 piezas (dos bolsas de 7 mezcladas con el sorteo).' },
+      { t: 'Elegí columna y rotación', d: 'Girá la pieza y soltala en la columna que quieras.' },
+      { t: 'Completá líneas', d: 'Las líneas limpias definen el multiplicador.' },
+    ],
+    premios: [
+      { etq: '1 línea', mult: 'x0.28' }, { etq: '2 líneas', mult: 'x0.55' },
+      { etq: '3 líneas', mult: 'x0.85' }, { etq: '4 líneas', mult: 'x1.15' },
+      { etq: '5 líneas', mult: 'x1.45' }, { etq: '6 líneas', mult: 'x1.75' },
+      { etq: '7 líneas', mult: 'x2.05' }, { etq: '8 o más', mult: 'x2.35' },
+    ],
+  },
 }
 
 // Guías genéricas para el catalogo AST (slots y video poker).
@@ -299,6 +351,16 @@ const guia = computed<Guia | undefined>(() => {
 })
 const esSlotAst = computed(() => astSlots.some((s) => s.codigo === props.juego.codigo))
 const esPokerAst = computed(() => astPokers.some((p) => p.codigo === props.juego.codigo))
+// El tope del encabezado depende de la modalidad elegida: el backend expone
+// `mult_max` por modalidad en el catalogo (el hilo en racha paga x6, no el x2
+// del catalogo). La seleccion la comparte el tablero del juego.
+const modalidad = modalidadCompartida(props.juego.codigo)
+const multMaxModal = computed(() => {
+  const lista = props.juego.modalidades ?? []
+  if (lista.length === 0) return props.juego.max_multiplicador
+  const sel = lista.find((m) => m.codigo === modalidad.value) ?? lista[0]
+  return sel.mult_max || props.juego.max_multiplicador
+})
 const saldo = computed(() => auth.user?.saldo ?? 0)
 // El tope de premio puede recortar la apuesta maxima; el backend envia ese valor
 // ya calculado y es el que vale.
@@ -341,7 +403,7 @@ function repetir() {
     <div class="casino-modal" :data-tema="auth.temaCasino" :style="{ zoom: zoom / 100 }">
       <div class="tema-marquesina">
         <b>{{ juego.nombre }}</b>
-        <span>Min {{ colones(juego.min_apuesta) }} · Max x{{ juego.max_multiplicador }}</span>
+        <span>Min {{ colones(juego.min_apuesta) }} · Max x{{ multMaxModal }}</span>
         <span class="zoom-ctl">
           <button type="button" title="Achicar el tablero" @click="cambiarZoom(-10)">A−</button>
           <button type="button" class="zoom-val" title="Restablecer tamano" @click="zoom = fijarZoom(100)">{{ zoom }}%</button>
@@ -475,6 +537,26 @@ function repetir() {
       <PokerGame
         v-else-if="esPokerAst"
         :codigo="juego.codigo"
+        :monto="monto"
+        :client-seed="clientSeed"
+      />
+      <DominoGame
+        v-else-if="juego.codigo === 'domino'"
+        :monto="monto"
+        :client-seed="clientSeed"
+      />
+      <AjedrezGame
+        v-else-if="juego.codigo === 'ajedrez'"
+        :monto="monto"
+        :client-seed="clientSeed"
+      />
+      <BackgammonGame
+        v-else-if="juego.codigo === 'backgammon'"
+        :monto="monto"
+        :client-seed="clientSeed"
+      />
+      <TetrisGame
+        v-else-if="juego.codigo === 'tetris'"
         :monto="monto"
         :client-seed="clientSeed"
       />

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { onMounted } from 'vue'
 import { useMarcaStore } from '@/stores/marca'
+import { rtpDe } from '@/utils/rtpCasino'
 
 const marca = useMarcaStore()
 onMounted(() => marca.cargar())
@@ -8,6 +9,10 @@ onMounted(() => marca.cargar())
 // RTP declarado en backend/internal/database/seed.go (SeedCasino). Es el mismo
 // valor que muestra cada tarjeta del casino; se mide por simulacion sobre el
 // algoritmo de sorteo, no por auditoria externa.
+//
+// rtp_casual es el RTP jugando al azar, sin estrategia: solo lo declaran los
+// juegos con decisiones (domino, ajedrez, backgammon, tetris). El resto queda
+// en null y se muestra con un solo numero.
 const rtpJuegos = [
   { nombre: 'Dados del Sur', codigo: 'dados', rtp: '88.0' },
   { nombre: 'Fortuna CR', codigo: 'slots', rtp: '94.7' },
@@ -25,7 +30,19 @@ const rtpJuegos = [
   { nombre: 'Baccarat', codigo: 'baccarat', rtp: '98.7' },
   { nombre: 'Bingo 75', codigo: 'bingo', rtp: '88.3' },
   { nombre: 'Gemas', codigo: 'gemas', rtp: '95.0' },
+  { nombre: 'Dominó', codigo: 'domino', rtp: '89.43' },
+  { nombre: 'Ajedrez Relámpago', codigo: 'ajedrez', rtp: '86.59' },
+  { nombre: 'Backgammon', codigo: 'backgammon', rtp: '89.21' },
+  { nombre: 'Tetris por Líneas', codigo: 'tetris', rtp: '82.95' },
 ]
+
+// rtpCasualDe devuelve el RTP casual declarado de un juego, o null si es de
+// azar puro (no aplica).
+function rtpCasualDe(codigo: string): string | null {
+  const par = rtpDe(codigo)
+  return par && par.rtp_casual > 0 ? par.rtp_casual.toFixed(2) : null
+}
+
 </script>
 
 <template>
@@ -267,17 +284,29 @@ const rtpJuegos = [
         <div class="table-wrap">
           <table class="table">
             <thead>
-              <tr><th>Juego</th><th>Código</th><th>RTP declarado</th></tr>
+              <tr>
+                <th>Juego</th><th>Código</th>
+                <th>Jugando bien</th><th>Jugando al azar</th>
+              </tr>
             </thead>
             <tbody>
               <tr v-for="j in rtpJuegos" :key="j.codigo">
                 <td class="fuerte">{{ j.nombre }}</td>
                 <td class="mono">{{ j.codigo }}</td>
                 <td class="mono">{{ j.rtp }}%</td>
+                <td class="mono">{{ rtpCasualDe(j.codigo) !== null ? rtpCasualDe(j.codigo) + '%' : '—' }}</td>
               </tr>
             </tbody>
           </table>
         </div>
+        <p class="seccion-nota">
+          <b>Jugando bien</b> asume que se aplica la jugada hábil: en dominó la ficha de mayor puntaje, en
+          ajedrez el mate, en backgammon la ficha más atrasada y en tetris mantener el pozo bajo.
+          <b>Jugando al azar</b> es el mismo juego decidiendo al azar, sin estrategia: es la cifra que
+          obtiene quien no piensa la jugada, y es la que la casa espera como línea de base.
+          Los juegos de azar puro (ruleta, keno, raspa, bingo, slots, dados) no tienen segunda cifra
+          porque no hay ninguna decisión que tomar.
+        </p>
         <p class="nota">
           Las máquinas AST (tragamonedas y video poker) muestran su RTP por banda (90–98%) en cada tarjeta.
         </p>

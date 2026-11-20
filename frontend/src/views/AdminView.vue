@@ -490,7 +490,7 @@ async function cerrarSorteo() {
         <table class="table">
           <thead>
             <tr>
-              <th>Juego</th><th>Activo</th><th>Mín</th><th>Máx</th><th>RTP %</th>
+              <th>Juego</th><th>Activo</th><th>Mín</th><th>Máx</th><th>RTP %</th><th>RTP al azar %</th>
               <th>Tope premio</th><th>Tope diario</th><th>Jugadas</th><th>Beneficio</th><th></th>
             </tr>
           </thead>
@@ -506,9 +506,15 @@ async function cerrarSorteo() {
               </td>
               <td><input v-model.number="j.min_apuesta" type="number" class="input input-sm" /></td>
               <td><input v-model.number="j.max_apuesta" type="number" class="input input-sm" /></td>
-              <td title="Retorno teórico al jugador (%).">
+              <td title="Retorno teórico al jugador (%). Se edita desde acá.">
                 <input v-model.number="j.rtp" type="number" step="0.1" min="1" max="100" class="input input-sm" />
               </td>
+              <td
+                class="mono"
+                :title="j.rtp_casual > 0
+                  ? 'RTP jugando al azar, sin estrategia. Valor declarado en el seed; no se edita desde acá.'
+                  : 'Juego de azar puro: no aplica RTP casual.'"
+              >{{ j.rtp_casual > 0 ? j.rtp_casual.toFixed(2) : '—' }}</td>
               <td title="Premio máximo por jugada. 0 = sin techo.">
                 <input v-model.number="j.max_premio" type="number" class="input input-sm" />
               </td>
@@ -526,6 +532,11 @@ async function cerrarSorteo() {
           </tbody>
         </table>
       </div>
+      <p v-if="juegos.length" class="hint" style="margin-top:8px">
+        «RTP al azar» es el retorno jugando sin estrategia; solo lo declaran los juegos con decisiones
+        (dominó, ajedrez, backgammon, tetris). Es el valor declarado en el seed y no se edita desde esta
+        pantalla; el RTP «jugando bien» sí.
+      </p>
       <EmptyState v-else-if="!cargando" icono="🎲" titulo="Sin juegos" />
     </div>
 

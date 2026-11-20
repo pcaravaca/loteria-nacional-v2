@@ -31,7 +31,8 @@ func NewCasinoHandler(db *gorm.DB, cfg *config.Config) *CasinoHandler {
 // Games devuelve el catalogo de juegos activos.
 type juegoResponse struct {
 	models.CasinoGame
-	ApuestaMax int64 `json:"apuesta_max"` // max_apuesta ya recortado por el techo de premio
+	ApuestaMax  int64              `json:"apuesta_max"` // max_apuesta ya recortado por el techo de premio
+	Modalidades []casino.Modalidad `json:"modalidades"` // variantes seleccionables (vacio si no tiene)
 }
 
 // Games lista los juegos con la apuesta maxima real: si hay techo de premio, es
@@ -60,8 +61,9 @@ func (h *CasinoHandler) Games(c *gin.Context) {
 			continue
 		}
 		salida = append(salida, juegoResponse{
-			CasinoGame: j,
-			ApuestaMax: casino.ApuestaMaxima(j.MaxApuesta, j.MaxMultipl, j.MaxPremio, j.Codigo),
+			CasinoGame:  j,
+			ApuestaMax:  casino.ApuestaMaxima(j.MaxApuesta, j.MaxMultipl, j.MaxPremio, j.Codigo),
+			Modalidades: casino.Modalidades(j.Codigo),
 		})
 	}
 	c.JSON(http.StatusOK, salida)
@@ -133,6 +135,26 @@ func (h *CasinoHandler) RotarSemilla(c *gin.Context) {
 	if err := h.db.Model(&models.GemasRonda{}).
 		Where("user_id = ? AND estado = ?", userID, "abierta").Count(&abiertas).Error; err == nil && abiertas > 0 {
 		c.JSON(http.StatusConflict, gin.H{"error": "tenes una jugada de gemas abierta: reventala antes de rotar la semilla"})
+		return
+	}
+	if err := h.db.Model(&models.DominoRonda{}).
+		Where("user_id = ? AND estado = ?", userID, "abierta").Count(&abiertas).Error; err == nil && abiertas > 0 {
+		c.JSON(http.StatusConflict, gin.H{"error": "tenes una mano de domino abierta: cerrala antes de rotar la semilla"})
+		return
+	}
+	if err := h.db.Model(&models.AjedrezRonda{}).
+		Where("user_id = ? AND estado = ?", userID, "abierta").Count(&abiertas).Error; err == nil && abiertas > 0 {
+		c.JSON(http.StatusConflict, gin.H{"error": "tenes una jugada de ajedrez abierta: cerrala antes de rotar la semilla"})
+		return
+	}
+	if err := h.db.Model(&models.BackgammonRonda{}).
+		Where("user_id = ? AND estado = ?", userID, "abierta").Count(&abiertas).Error; err == nil && abiertas > 0 {
+		c.JSON(http.StatusConflict, gin.H{"error": "tenes una carrera de backgammon abierta: cerrala antes de rotar la semilla"})
+		return
+	}
+	if err := h.db.Model(&models.TetrisRonda{}).
+		Where("user_id = ? AND estado = ?", userID, "abierta").Count(&abiertas).Error; err == nil && abiertas > 0 {
+		c.JSON(http.StatusConflict, gin.H{"error": "tenes una ronda de tetris abierta: cerrala antes de rotar la semilla"})
 		return
 	}
 
@@ -368,6 +390,31 @@ func (h *CasinoHandler) Stats(c *gin.Context) {
 		Scan(&gmTotal)
 	sumar(models.CasinoGemas, gmTotal)
 
+	// Los cuatro juegos de mesa tambien guardan sus rondas en tablas propias.
+	var dmTotal fila
+	h.db.Model(&models.DominoRonda{}).
+		Select("count(*) as jugadas, COALESCE(sum(monto),0) as apostado, COALESCE(sum(premio),0) as premios, COALESCE(sum(monto - premio),0) as beneficio").
+		Scan(&dmTotal)
+	sumar(models.CasinoDomino, dmTotal)
+
+	var ajTotal fila
+	h.db.Model(&models.AjedrezRonda{}).
+		Select("count(*) as jugadas, COALESCE(sum(monto),0) as apostado, COALESCE(sum(premio),0) as premios, COALESCE(sum(monto - premio),0) as beneficio").
+		Scan(&ajTotal)
+	sumar(models.CasinoAjedrez, ajTotal)
+
+	var bgmTotal fila
+	h.db.Model(&models.BackgammonRonda{}).
+		Select("count(*) as jugadas, COALESCE(sum(monto),0) as apostado, COALESCE(sum(premio),0) as premios, COALESCE(sum(monto - premio),0) as beneficio").
+		Scan(&bgmTotal)
+	sumar(models.CasinoBackgammon, bgmTotal)
+
+	var ttTotal fila
+	h.db.Model(&models.TetrisRonda{}).
+		Select("count(*) as jugadas, COALESCE(sum(monto),0) as apostado, COALESCE(sum(premio),0) as premios, COALESCE(sum(monto - premio),0) as beneficio").
+		Scan(&ttTotal)
+	sumar(models.CasinoTetris, ttTotal)
+
 	c.JSON(http.StatusOK, filas)
 }
 
@@ -529,6 +576,38 @@ func (h *CasinoHandler) apostadoHoy(userID uint, codigo string, desde time.Time)
 			Where("user_id = ? AND created_at >= ?", userID, desde).
 			Select("COALESCE(SUM(monto),0)").Scan(&gm).Error; err == nil {
 			total += gm
+		}
+	}
+	if codigo == models.CasinoDomino {
+		var dm int64
+		if err := h.db.Model(&models.DominoRonda{}).
+			Where("user_id = ? AND created_at >= ?", userID, desde).
+			Select("COALESCE(SUM(monto),0)").Scan(&dm).Error; err == nil {
+			total += dm
+		}
+	}
+	if codigo == models.CasinoAjedrez {
+		var aj int64
+		if err := h.db.Model(&models.AjedrezRonda{}).
+			Where("user_id = ? AND created_at >= ?", userID, desde).
+			Select("COALESCE(SUM(monto),0)").Scan(&aj).Error; err == nil {
+			total += aj
+		}
+	}
+	if codigo == models.CasinoBackgammon {
+		var bgm int64
+		if err := h.db.Model(&models.BackgammonRonda{}).
+			Where("user_id = ? AND created_at >= ?", userID, desde).
+			Select("COALESCE(SUM(monto),0)").Scan(&bgm).Error; err == nil {
+			total += bgm
+		}
+	}
+	if codigo == models.CasinoTetris {
+		var tt int64
+		if err := h.db.Model(&models.TetrisRonda{}).
+			Where("user_id = ? AND created_at >= ?", userID, desde).
+			Select("COALESCE(SUM(monto),0)").Scan(&tt).Error; err == nil {
+			total += tt
 		}
 	}
 	return total

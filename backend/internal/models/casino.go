@@ -30,6 +30,10 @@ const (
 	CasinoBingoDiamante  = "bingo-diamante"
 	CasinoBingoRelampago = "bingo-relampago"
 	CasinoGemas          = "gemas"
+	CasinoDomino         = "domino"
+	CasinoAjedrez        = "ajedrez"
+	CasinoBackgammon     = "backgammon"
+	CasinoTetris         = "tetris"
 )
 
 // CasinoGame es un juego del mini casino con sus limites y su RTP declarado.
@@ -40,6 +44,7 @@ type CasinoGame struct {
 	MinApuesta   int64   `gorm:"not null;default:200" json:"min_apuesta"`
 	MaxApuesta   int64   `gorm:"not null;default:50000" json:"max_apuesta"`
 	RTP          float64 `gorm:"not null;default:96" json:"rtp"`
+	RTPCasual    float64 `gorm:"not null;default:0" json:"rtp_casual"` // RTP jugando al azar; 0 = no aplica (juego de azar puro)
 	MaxMultipl   int64   `gorm:"not null;default:10" json:"max_multiplicador"`
 	MaxPremio    int64   `gorm:"not null;default:0" json:"max_premio"`         // techo absoluto por jugada; 0 = sin techo
 	LimiteDiario int64   `gorm:"not null;default:200000" json:"limite_diario"` // 0 = sin limite
@@ -287,6 +292,208 @@ func (g *GemasRonda) AfterFind(tx *gorm.DB) error {
 		if err := json.Unmarshal([]byte(g.JugadasRaw), &g.Jugadas); err != nil {
 			return err
 		}
+	}
+	return nil
+}
+
+
+// DominoRonda es una mano de domino contra la casa. La apuesta se descuenta
+// al abrir y la mano queda abierta mientras el jugador y la casa juegan fichas.
+// El reparto sale de las semillas (provably fair) y la casa responde siempre
+// con la ficha valida de mayor puntaje, asi que la mano se puede reproducir.
+type DominoRonda struct {
+	ID             uint      `gorm:"primaryKey" json:"id"`
+	UserID         uint      `gorm:"not null;index" json:"user_id"`
+	Monto          int64     `gorm:"not null" json:"monto"`
+	ManoRaw        string    `gorm:"column:mano_raw;type:text" json:"-"`
+	Mano           [][2]int  `gorm:"-" json:"mano"`
+	CasaRaw        string    `gorm:"column:casa_raw;type:text" json:"-"`
+	Casa           [][2]int  `gorm:"-" json:"casa"`
+	TableroRaw     string    `gorm:"column:tablero_raw;type:text" json:"-"`
+	Tablero        [][2]int  `gorm:"-" json:"tablero"`
+	Turno          string    `gorm:"size:16" json:"turno"`
+	JugadasRaw     string    `gorm:"column:jugadas_raw;type:text" json:"-"`
+	Jugadas        [][2]int  `gorm:"-" json:"jugadas"` // [ficha, lado] por jugada
+	Estado         string    `gorm:"not null;default:abierta" json:"estado"`
+	Multiplicador  float64   `gorm:"not null;default:0" json:"multiplicador"`
+	Premio         int64     `gorm:"not null;default:0" json:"premio"`
+	ClientSeed     string    `gorm:"size:64" json:"client_seed"`
+	ServerSeedHash string    `gorm:"size:64" json:"server_seed_hash"`
+	Nonce          int64     `json:"nonce"`
+	CreatedAt      time.Time `json:"created_at"`
+}
+
+func (DominoRonda) TableName() string { return "domino_rondas" }
+
+func (d *DominoRonda) BeforeSave(tx *gorm.DB) error {
+	mb, _ := json.Marshal(d.Mano)
+	cb, _ := json.Marshal(d.Casa)
+	tb, _ := json.Marshal(d.Tablero)
+	jb, _ := json.Marshal(d.Jugadas)
+	d.ManoRaw = string(mb)
+	d.CasaRaw = string(cb)
+	d.TableroRaw = string(tb)
+	d.JugadasRaw = string(jb)
+	return nil
+}
+
+func (d *DominoRonda) AfterFind(tx *gorm.DB) error {
+	if d.ManoRaw != "" {
+		json.Unmarshal([]byte(d.ManoRaw), &d.Mano)
+	}
+	if d.CasaRaw != "" {
+		json.Unmarshal([]byte(d.CasaRaw), &d.Casa)
+	}
+	if d.TableroRaw != "" {
+		json.Unmarshal([]byte(d.TableroRaw), &d.Tablero)
+	}
+	if d.JugadasRaw != "" {
+		json.Unmarshal([]byte(d.JugadasRaw), &d.Jugadas)
+	}
+	return nil
+}
+
+// AjedrezRonda es un puzzle de mate en una. Se apuesta al abrir la posicion y
+// se liquida al elegir una de las cuatro jugadas propuestas.
+type AjedrezRonda struct {
+	ID             uint      `gorm:"primaryKey" json:"id"`
+	UserID         uint      `gorm:"not null;index" json:"user_id"`
+	Monto          int64     `gorm:"not null" json:"monto"`
+	FEN            string    `gorm:"size:128" json:"fen"`
+	Correcta       string    `gorm:"size:8" json:"correcta"`
+	OpcionesRaw    string    `gorm:"column:opciones_raw;type:text" json:"-"`
+	Opciones       []string  `gorm:"-" json:"opciones"`
+	JugadasRaw     string    `gorm:"column:jugadas_raw;type:text" json:"-"`
+	Jugadas        []string  `gorm:"-" json:"jugadas"`
+	Tema           string    `gorm:"size:32" json:"tema"`
+	Estado         string    `gorm:"not null;default:abierta" json:"estado"`
+	Multiplicador  float64   `gorm:"not null;default:0" json:"multiplicador"`
+	Premio         int64     `gorm:"not null;default:0" json:"premio"`
+	ClientSeed     string    `gorm:"size:64" json:"client_seed"`
+	ServerSeedHash string    `gorm:"size:64" json:"server_seed_hash"`
+	Nonce          int64     `json:"nonce"`
+	CreatedAt      time.Time `json:"created_at"`
+}
+
+func (AjedrezRonda) TableName() string { return "ajedrez_rondas" }
+
+func (a *AjedrezRonda) BeforeSave(tx *gorm.DB) error {
+	ob, _ := json.Marshal(a.Opciones)
+	jb, _ := json.Marshal(a.Jugadas)
+	a.OpcionesRaw = string(ob)
+	a.JugadasRaw = string(jb)
+	return nil
+}
+
+func (a *AjedrezRonda) AfterFind(tx *gorm.DB) error {
+	if a.OpcionesRaw != "" {
+		json.Unmarshal([]byte(a.OpcionesRaw), &a.Opciones)
+	}
+	if a.JugadasRaw != "" {
+		json.Unmarshal([]byte(a.JugadasRaw), &a.Jugadas)
+	}
+	return nil
+}
+
+// BackgammonRonda es una carrera simplificada de tres fichas por lado. La
+// tirada de dados sale de las semillas (provably fair) y la casa mueve siempre
+// la ficha mas atrasada.
+type BackgammonRonda struct {
+	ID             uint      `gorm:"primaryKey" json:"id"`
+	UserID         uint      `gorm:"not null;index" json:"user_id"`
+	Monto          int64     `gorm:"not null" json:"monto"`
+	Jugador        [3]int    `gorm:"-" json:"jugador"`
+	Casa           [3]int    `gorm:"-" json:"casa"`
+	JugadorRaw     string    `gorm:"column:jugador_raw;type:text" json:"-"`
+	CasaRaw        string    `gorm:"column:casa_raw;type:text" json:"-"`
+	Turno          string    `gorm:"size:16" json:"turno"`
+	Dado1          int       `json:"dado1"`
+	Dado2          int       `json:"dado2"`
+	Dobles         bool      `json:"dobles"`
+	Lance          int       `json:"lance"`
+	Fin            bool      `json:"fin"`
+	Ganador        string    `gorm:"size:16" json:"ganador"`
+	JugadasRaw     string    `gorm:"column:jugadas_raw;type:text" json:"-"`
+	Jugadas        []int     `gorm:"-" json:"jugadas"` // ficha elegida por turno
+	Estado         string    `gorm:"not null;default:abierta" json:"estado"`
+	Multiplicador  float64   `gorm:"not null;default:0" json:"multiplicador"`
+	Premio         int64     `gorm:"not null;default:0" json:"premio"`
+	ClientSeed     string    `gorm:"size:64" json:"client_seed"`
+	ServerSeedHash string    `gorm:"size:64" json:"server_seed_hash"`
+	Nonce          int64     `json:"nonce"`
+	CreatedAt      time.Time `json:"created_at"`
+}
+
+func (BackgammonRonda) TableName() string { return "backgammon_rondas" }
+
+func (b *BackgammonRonda) BeforeSave(tx *gorm.DB) error {
+	jb, _ := json.Marshal(b.Jugador)
+	cb, _ := json.Marshal(b.Casa)
+	pb, _ := json.Marshal(b.Jugadas)
+	b.JugadorRaw = string(jb)
+	b.CasaRaw = string(cb)
+	b.JugadasRaw = string(pb)
+	return nil
+}
+
+func (b *BackgammonRonda) AfterFind(tx *gorm.DB) error {
+	if b.JugadorRaw != "" {
+		json.Unmarshal([]byte(b.JugadorRaw), &b.Jugador)
+	}
+	if b.CasaRaw != "" {
+		json.Unmarshal([]byte(b.CasaRaw), &b.Casa)
+	}
+	if b.JugadasRaw != "" {
+		json.Unmarshal([]byte(b.JugadasRaw), &b.Jugadas)
+	}
+	return nil
+}
+
+// TetrisRonda es una ronda de Tetris por lineas. La secuencia de piezas sale de
+// las semillas (provably fair) y el jugador elige columna y rotacion de cada
+// pieza; el pago depende de las lineas acumuladas.
+type TetrisRonda struct {
+	ID             uint      `gorm:"primaryKey" json:"id"`
+	UserID         uint      `gorm:"not null;index" json:"user_id"`
+	Monto          int64     `gorm:"not null" json:"monto"`
+	TableroRaw     string    `gorm:"column:tablero_raw;type:text" json:"-"`
+	Tablero        []int     `gorm:"-" json:"tablero"` // 72 celdas
+	PiezasRaw      string    `gorm:"column:piezas_raw;type:text" json:"-"`
+	Piezas         []int     `gorm:"-" json:"piezas"`
+	Pieza          int       `json:"pieza"`
+	Lineas         int       `json:"lineas"`
+	JugadasRaw     string    `gorm:"column:jugadas_raw;type:text" json:"-"`
+	Jugadas        [][2]int  `gorm:"-" json:"jugadas"` // [columna, rotacion]
+	Estado         string    `gorm:"not null;default:abierta" json:"estado"`
+	Multiplicador  float64   `gorm:"not null;default:0" json:"multiplicador"`
+	Premio         int64     `gorm:"not null;default:0" json:"premio"`
+	ClientSeed     string    `gorm:"size:64" json:"client_seed"`
+	ServerSeedHash string    `gorm:"size:64" json:"server_seed_hash"`
+	Nonce          int64     `json:"nonce"`
+	CreatedAt      time.Time `json:"created_at"`
+}
+
+func (TetrisRonda) TableName() string { return "tetris_rondas" }
+
+func (t *TetrisRonda) BeforeSave(tx *gorm.DB) error {
+	tb, _ := json.Marshal(t.Tablero)
+	pb, _ := json.Marshal(t.Piezas)
+	jb, _ := json.Marshal(t.Jugadas)
+	t.TableroRaw = string(tb)
+	t.PiezasRaw = string(pb)
+	t.JugadasRaw = string(jb)
+	return nil
+}
+
+func (t *TetrisRonda) AfterFind(tx *gorm.DB) error {
+	if t.TableroRaw != "" {
+		json.Unmarshal([]byte(t.TableroRaw), &t.Tablero)
+	}
+	if t.PiezasRaw != "" {
+		json.Unmarshal([]byte(t.PiezasRaw), &t.Piezas)
+	}
+	if t.JugadasRaw != "" {
+		json.Unmarshal([]byte(t.JugadasRaw), &t.Jugadas)
 	}
 	return nil
 }

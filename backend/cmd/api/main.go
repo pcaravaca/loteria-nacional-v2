@@ -221,6 +221,23 @@ func main() {
 	pk.POST("/casino/poker", casinoH.PokerRepartir)
 	pk.POST("/casino/poker/:id/cobrar", casinoH.PokerCobrar)
 
+	// Juegos de mesa: dominó, ajedrez relámpago, backgammon y tetris por líneas.
+	// Todos cobran la apuesta al abrir la ronda y se verifican con las semillas.
+	mesa := authed.Group("")
+	mesa.Use(middleware.GeoBlock(cfg))
+	mesa.POST("/casino/domino/start", casinoH.DominoStart)
+	mesa.POST("/casino/domino/:id/move", casinoH.DominoMove)
+	mesa.GET("/casino/domino/:id/verificar", casinoH.DominoVerificar)
+	mesa.POST("/casino/ajedrez/start", casinoH.AjedrezStart)
+	mesa.POST("/casino/ajedrez/:id/move", casinoH.AjedrezMove)
+	mesa.GET("/casino/ajedrez/:id/verificar", casinoH.AjedrezVerificar)
+	mesa.POST("/casino/backgammon/start", casinoH.BackgammonStart)
+	mesa.POST("/casino/backgammon/:id/move", casinoH.BackgammonMove)
+	mesa.GET("/casino/backgammon/:id/verificar", casinoH.BackgammonVerificar)
+	mesa.POST("/casino/tetris/start", casinoH.TetrisStart)
+	mesa.POST("/casino/tetris/:id/move", casinoH.TetrisMove)
+	mesa.GET("/casino/tetris/:id/verificar", casinoH.TetrisVerificar)
+
 	if cfg.SorteosCierreAuto {
 		handlers.IniciarSweepSorteos(db, true, time.Duration(cfg.SorteosSweepMin)*time.Minute, 15*time.Minute)
 		log.Printf("cierre automatico de sorteos vencidos activado (cada %d min, gracia 15 min)", cfg.SorteosSweepMin)

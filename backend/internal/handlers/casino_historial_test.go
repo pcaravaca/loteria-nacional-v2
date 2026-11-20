@@ -18,8 +18,9 @@ import (
 )
 
 // Pruebas del historial y la verificacion unificados: cubren que el listado
-// junta casino_rondas, bingo_rondas y gemas_rondas (incluso sin premio) y que
-// el endpoint unificado verifica rondas de las tres fuentes.
+// junta casino_rondas, bingo_rondas, gemas_rondas, casino_blackjack y las cuatro
+// tablas de mesa (domino, ajedrez, backgammon, tetris), y que el endpoint
+// unificado verifica rondas de todas las fuentes, abiertas y cerradas.
 
 type historialTestEnv struct {
 	h    *CasinoHandler
@@ -211,6 +212,65 @@ func decodearVerificacion(t *testing.T, w *httptest.ResponseRecorder) verificaci
 	return out
 }
 
+func (e *historialTestEnv) blackjackStart(t *testing.T) uint {
+	t.Helper()
+	c, w := e.contexto("POST", "/casino/blackjack/start", map[string]any{
+		"monto": 500, "client_seed": "cli-historial",
+	}, gin.Params{})
+	e.h.BlackjackStart(c)
+	if w.Code != http.StatusCreated {
+		t.Fatalf("blackjack start respondio %d: %s", w.Code, w.Body.String())
+	}
+	var out struct {
+		ManoID uint `json:"mano_id"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &out); err != nil {
+		t.Fatalf("decode blackjack: %v", err)
+	}
+	return out.ManoID
+}
+
+func TestRoundsUnificadoIncluyeBlackjack(t *testing.T) {
+	env := nuevoHistorialTestEnv(t)
+
+	id := env.blackjackStart(t)
+	filas := env.rounds(t)
+	if len(filas) != 1 {
+		t.Fatalf("el historial trae %d filas, esperaba 1: %+v", len(filas), filas)
+	}
+	f := filas[0]
+	if f.Source != FuenteBlackjack || f.ID != id || f.Game != models.CasinoBlackjack {
+		t.Errorf("fila blackjack: source %q id %d game %q", f.Source, f.ID, f.Game)
+	}
+	if f.Monto != 500 {
+		t.Errorf("monto %d, esperaba 500", f.Monto)
+	}
+}
+
+func TestVerifyUnificadoRespondeParaBlackjack(t *testing.T) {
+	env := nuevoHistorialTestEnv(t)
+
+	id := env.blackjackStart(t)
+	w := env.verify(t, id, FuenteBlackjack)
+	if w.Code != http.StatusOK {
+		t.Fatalf("verificar blackjack respondio %d: %s", w.Code, w.Body.String())
+	}
+	res := decodearVerificacion(t, w)
+	if !res.Verificado {
+		t.Errorf("la verificacion de la mano no coincide: %+v", res)
+	}
+	if res.Juego != models.CasinoBlackjack || res.Source != FuenteBlackjack {
+		t.Errorf("juego %q source %q", res.Juego, res.Source)
+	}
+	if res.ServerSeed == "" || res.ClientSeed != "cli-historial" {
+		t.Errorf("semillas server %q client %q", res.ServerSeed, res.ClientSeed)
+	}
+	// Sin `source` tambien la encuentra.
+	if w := env.verify(t, id, ""); w.Code != http.StatusOK || !decodearVerificacion(t, w).Verificado {
+		t.Errorf("verificar sin source: %d %s", w.Code, w.Body.String())
+	}
+}
+
 func TestRoundsUnificadoIncluyeLasTresFuentes(t *testing.T) {
 	env := nuevoHistorialTestEnv(t)
 
@@ -312,4 +372,276 @@ func TestVerifyUnificadoRespondeParaLasTresFuentes(t *testing.T) {
 	if w := env.verify(t, 999999, FuenteBingo); w.Code != http.StatusNotFound {
 		t.Errorf("ronda inexistente respondio %d, esperaba 404", w.Code)
 	}
+}
+
+// mesaStart abre una ronda de un juego de mesa y devuelve su id y el estado
+// inicial. Reutiliza los handlers igual que las pruebas de mesa.
+func (e *historialTestEnv) mesaStart(t *testing.T, juego string, monto int64) (uint, mesaEstado) {
+	t.Helper()
+	c, w := e.contexto("POST", "/casino/"+juego+"/start", map[string]any{
+		"monto": monto, "client_seed": "cli-historial",
+	}, gin.Params{})
+	switch juego {
+	case "domino":
+		e.h.DominoStart(c)
+	case "ajedrez":
+		e.h.AjedrezStart(c)
+	case "backgammon":
+		e.h.BackgammonStart(c)
+	case "tetris":
+		e.h.TetrisStart(c)
+	default:
+		t.Fatalf("juego de mesa desconocido: %s", juego)
+	}
+	if w.Code != http.StatusCreated {
+		t.Fatalf("%s start respondio %d: %s", juego, w.Code, w.Body.String())
+	}
+	var out struct {
+		RondaID uint `json:"ronda_id"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &out); err != nil {
+		t.Fatalf("decode %s: %v", juego, err)
+	}
+	return out.RondaID, decodearMesa(t, w)
+}
+
+// mesaMove aplica un turno de un juego de mesa.
+func (e *historialTestEnv) mesaMove(t *testing.T, juego string, id uint, cuerpo any) *httptest.ResponseRecorder {
+	t.Helper()
+	params := gin.Params{{Key: "id", Value: strconv.FormatUint(uint64(id), 10)}}
+	c, w := e.contexto("POST", "/casino/"+juego+"/x/move", cuerpo, params)
+	switch juego {
+	case "domino":
+		e.h.DominoMove(c)
+	case "ajedrez":
+		e.h.AjedrezMove(c)
+	case "backgammon":
+		e.h.BackgammonMove(c)
+	case "tetris":
+		e.h.TetrisMove(c)
+	default:
+		t.Fatalf("juego de mesa desconocido: %s", juego)
+	}
+	return w
+}
+
+func (e *historialTestEnv) verificarCerrada(t *testing.T, id uint, fuente, juego string) {
+	t.Helper()
+	w := e.verify(t, id, fuente)
+	if w.Code != http.StatusOK {
+		t.Fatalf("%s: verificar %d respondio %d: %s", fuente, id, w.Code, w.Body.String())
+	}
+	res := decodearVerificacion(t, w)
+	if !res.Verificado {
+		t.Errorf("%s: la verificacion de la ronda cerrada no coincide: %s", fuente, w.Body.String())
+	}
+	if res.Juego != juego || res.Source != fuente {
+		t.Errorf("%s: juego %q source %q", fuente, res.Juego, res.Source)
+	}
+	if res.Monto != 1000 {
+		t.Errorf("%s: monto %d, esperaba 1000", fuente, res.Monto)
+	}
+	if res.ServerSeed == "" || res.ClientSeed != "cli-historial" {
+		t.Errorf("%s: semillas server %q client %q", fuente, res.ServerSeed, res.ClientSeed)
+	}
+}
+
+var fuentesDeMesa = []struct {
+	juego  string
+	game   string
+	fuente string
+}{
+	{"domino", models.CasinoDomino, FuenteDomino},
+	{"ajedrez", models.CasinoAjedrez, FuenteAjedrez},
+	{"backgammon", models.CasinoBackgammon, FuenteBackgammon},
+	{"tetris", models.CasinoTetris, FuenteTetris},
+}
+
+func TestRoundsUnificadoIncluyeLosCuatroJuegosDeMesa(t *testing.T) {
+	env := nuevoHistorialTestEnv(t)
+
+	ids := map[string]uint{}
+	for _, c := range fuentesDeMesa {
+		id, _ := env.mesaStart(t, c.juego, 1000)
+		ids[c.juego] = id
+	}
+
+	filas := env.rounds(t)
+	if len(filas) != len(fuentesDeMesa) {
+		t.Fatalf("el historial trae %d filas, esperaba %d: %+v", len(filas), len(fuentesDeMesa), filas)
+	}
+	porFuente := map[string]RondaHistorial{}
+	for _, f := range filas {
+		porFuente[f.Source] = f
+	}
+	for _, c := range fuentesDeMesa {
+		f, ok := porFuente[c.fuente]
+		if !ok {
+			t.Errorf("falta una jugada de %s en el historial", c.fuente)
+			continue
+		}
+		if f.ID != ids[c.juego] || f.Game != c.game || f.Monto != 1000 {
+			t.Errorf("%s: id %d game %q monto %d", c.fuente, f.ID, f.Game, f.Monto)
+		}
+		if f.Nombre == "" {
+			t.Errorf("%s: la fila no trae el nombre del juego", c.fuente)
+		}
+		if f.Estado != "abierta" {
+			t.Errorf("%s: estado %q, esperaba abierta", c.fuente, f.Estado)
+		}
+		if f.Resultado == nil {
+			t.Errorf("%s: la fila no trae un resultado resumido", c.fuente)
+		}
+	}
+}
+
+func TestVerifyUnificadoRespondeParaLosCuatroJuegosDeMesa(t *testing.T) {
+	env := nuevoHistorialTestEnv(t)
+
+	for _, c := range fuentesDeMesa {
+		id, _ := env.mesaStart(t, c.juego, 1000)
+		w := env.verify(t, id, c.fuente)
+		if w.Code != http.StatusOK {
+			t.Fatalf("%s: verificar %d respondio %d: %s", c.fuente, id, w.Code, w.Body.String())
+		}
+		res := decodearVerificacion(t, w)
+		if !res.Verificado {
+			t.Errorf("%s: la verificacion de la ronda abierta no coincide: %s", c.fuente, w.Body.String())
+		}
+		if res.Juego != c.game || res.Source != c.fuente {
+			t.Errorf("%s: juego %q source %q", c.fuente, res.Juego, res.Source)
+		}
+		if res.ServerSeed == "" || res.ClientSeed != "cli-historial" {
+			t.Errorf("%s: semillas server %q client %q", c.fuente, res.ServerSeed, res.ClientSeed)
+		}
+		// Sin `source` tambien la encuentra.
+		if w := env.verify(t, id, ""); w.Code != http.StatusOK || !decodearVerificacion(t, w).Verificado {
+			t.Errorf("%s: verificar sin source: %d %s", c.fuente, w.Code, w.Body.String())
+		}
+	}
+}
+
+// TestGamesExponenModalidadesConMultMax verifica que el catalogo que consume el
+// frontend traiga el mayor multiplicador por modalidad: el encabezado del modal
+// muestra ese tope segun la modalidad elegida (hilo racha x6, no el x2 del
+// catalogo).
+func TestGamesExponenModalidadesConMultMax(t *testing.T) {
+	env := nuevoHistorialTestEnv(t)
+	c, w := env.contexto("GET", "/casino/games", nil, gin.Params{})
+	c.Set("rol", models.RolCliente)
+	env.h.Games(c)
+	if w.Code != http.StatusOK {
+		t.Fatalf("games respondio %d: %s", w.Code, w.Body.String())
+	}
+	var juegos []struct {
+		Codigo      string `json:"codigo"`
+		Modalidades []struct {
+			Codigo  string `json:"codigo"`
+			MultMax int64  `json:"mult_max"`
+		} `json:"modalidades"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &juegos); err != nil {
+		t.Fatalf("decode games: %v", err)
+	}
+	type modalidadVista struct {
+		Codigo  string
+		MultMax int64
+	}
+	porCodigo := map[string][]modalidadVista{}
+	for _, j := range juegos {
+		for _, m := range j.Modalidades {
+			porCodigo[j.Codigo] = append(porCodigo[j.Codigo], modalidadVista{Codigo: m.Codigo, MultMax: m.MultMax})
+		}
+	}
+	hilo := porCodigo[models.CasinoHilo]
+	if len(hilo) == 0 {
+		t.Fatalf("hilo no expone modalidades: %+v", hilo)
+	}
+	for _, m := range hilo {
+		switch m.Codigo {
+		case "clasico":
+			if m.MultMax != 2 {
+				t.Errorf("hilo clasico: mult_max %d, queria 2", m.MultMax)
+			}
+		case "racha":
+			if m.MultMax != 6 {
+				t.Errorf("hilo racha: mult_max %d, queria 6", m.MultMax)
+			}
+		}
+	}
+	if dados := porCodigo[models.CasinoDados]; len(dados) != 0 {
+		t.Errorf("dados no tiene modalidades y trae %d", len(dados))
+	}
+}
+
+func TestVerifyUnificadoReproduceLasRondasCerradasDeMesa(t *testing.T) {
+	env := nuevoHistorialTestEnv(t)
+
+	// Dominó: se juega la primera ficha valida hasta que la mano cierra.
+	id, st := env.mesaStart(t, "domino", 1000)
+	for st.Estado == "abierta" {
+		var tab [][2]int
+		_ = json.Unmarshal(st.Tablero, &tab)
+		vacio := len(tab) == 0
+		ficha := -1
+		for i, f := range st.Mano {
+			if vacio || f[0] == st.Extremos[0] || f[1] == st.Extremos[0] ||
+				f[0] == st.Extremos[1] || f[1] == st.Extremos[1] {
+				ficha = i
+				break
+			}
+		}
+		w := env.mesaMove(t, "domino", id, map[string]any{"ficha": ficha})
+		if w.Code != http.StatusOK {
+			t.Fatalf("domino move respondio %d: %s", w.Code, w.Body.String())
+		}
+		st = decodearMesa(t, w)
+	}
+	env.verificarCerrada(t, id, FuenteDomino, models.CasinoDomino)
+
+	// Ajedrez: una jugada cierra la ronda.
+	id, st = env.mesaStart(t, "ajedrez", 1000)
+	w := env.mesaMove(t, "ajedrez", id, map[string]any{"opcion": 0})
+	if w.Code != http.StatusOK {
+		t.Fatalf("ajedrez move respondio %d: %s", w.Code, w.Body.String())
+	}
+	if st = decodearMesa(t, w); st.Estado != "pagada" {
+		t.Fatalf("ajedrez: estado %q, esperaba pagada", st.Estado)
+	}
+	env.verificarCerrada(t, id, FuenteAjedrez, models.CasinoAjedrez)
+
+	// Backgammon: se avanza la ficha mas atrasada hasta el fin de la carrera.
+	id, st = env.mesaStart(t, "backgammon", 1000)
+	for st.Estado == "abierta" {
+		elegido := 0
+		for i := 1; i < 3; i++ {
+			if st.Jugador[i] < st.Jugador[elegido] {
+				elegido = i
+			}
+		}
+		w := env.mesaMove(t, "backgammon", id, map[string]any{"ficha": elegido})
+		if w.Code != http.StatusOK {
+			t.Fatalf("backgammon move respondio %d: %s", w.Code, w.Body.String())
+		}
+		st = decodearMesa(t, w)
+	}
+	env.verificarCerrada(t, id, FuenteBackgammon, models.CasinoBackgammon)
+
+	// Tetris: se colocan las piezas en la primer columna valida hasta cerrar.
+	id, st = env.mesaStart(t, "tetris", 1000)
+	for st.Estado == "abierta" {
+		colocada := false
+		for col := 0; col < 6; col++ {
+			w := env.mesaMove(t, "tetris", id, map[string]any{"columna": col, "rotacion": 0})
+			if w.Code == http.StatusOK {
+				st = decodearMesa(t, w)
+				colocada = true
+				break
+			}
+		}
+		if !colocada {
+			t.Fatalf("tetris: no se pudo colocar la pieza: %s", w.Body.String())
+		}
+	}
+	env.verificarCerrada(t, id, FuenteTetris, models.CasinoTetris)
 }

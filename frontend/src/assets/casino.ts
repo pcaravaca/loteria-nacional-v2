@@ -15,6 +15,10 @@ import parleyCard from './casino/cards/parley.webp'
 import baccaratCard from './casino/cards/baccarat.webp'
 import bingoCard from './casino/cards/bingo.svg'
 import gemasCard from './casino/cards/gemas.svg'
+import dominoCard from './casino/cards/domino.svg'
+import ajedrezCard from './casino/cards/ajedrez.svg'
+import backgammonCard from './casino/cards/backgammon.svg'
+import tetrisCard from './casino/cards/tetris.svg'
 
 import dadosHero from './casino/hero/dados.webp'
 import slotsHero from './casino/hero/slots.webp'
@@ -32,6 +36,10 @@ import parleyHero from './casino/hero/parley.webp'
 import baccaratHero from './casino/hero/baccarat.webp'
 import bingoHero from './casino/hero/bingo.svg'
 import gemasHero from './casino/hero/gemas.svg'
+import dominoHero from './casino/hero/domino.svg'
+import ajedrezHero from './casino/hero/ajedrez.svg'
+import backgammonHero from './casino/hero/backgammon.svg'
+import tetrisHero from './casino/hero/tetris.svg'
 
 // Arte del catalogo AST Casino (ilustraciones generadas con la misma paleta).
 import astTuttifruti from './casino/ast/tuttifruti.webp'
@@ -102,6 +110,10 @@ export type CodigoJuego =
   | 'baccarat'
   | 'bingo'
   | 'gemas'
+  | 'domino'
+  | 'ajedrez'
+  | 'backgammon'
+  | 'tetris'
   // Catalogo AST Casino
   | 'spy'
   | 'tuttifruti'
@@ -141,6 +153,10 @@ export const cartas: Record<CodigoJuego, string> = {
   baccarat: baccaratCard,
   bingo: bingoCard,
   gemas: gemasCard,
+  domino: dominoCard,
+  ajedrez: ajedrezCard,
+  backgammon: backgammonCard,
+  tetris: tetrisCard,
   ...astArte,
 } as Record<CodigoJuego, string>
 
@@ -161,6 +177,10 @@ export const heroes: Record<CodigoJuego, string> = {
   baccarat: baccaratHero,
   bingo: bingoHero,
   gemas: gemasHero,
+  domino: dominoHero,
+  ajedrez: ajedrezHero,
+  backgammon: backgammonHero,
+  tetris: tetrisHero,
   ...astArte,
 } as Record<CodigoJuego, string>
 

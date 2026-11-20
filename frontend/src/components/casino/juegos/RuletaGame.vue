@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import { nextTick, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { colones } from '@/utils/formato'
 import { reproducir } from '@/utils/sfx'
+import { colorDeCasilla, modalidadCompartida, modalidadPorCodigo, modalidadesDe } from './modalidades'
 
 const props = defineProps<{
   resultado: any
@@ -10,23 +11,39 @@ const props = defineProps<{
 }>()
 const emit = defineEmits<{ jugar: [Record<string, unknown>] }>()
 
-const ROJO = new Set([1, 3, 5, 7, 9, 12, 14, 16, 18, 19, 21, 23, 25, 27, 30, 32, 34, 36])
-// Orden de la ruleta europea (el 0 seguido del 32).
-const ORDEN = [0, 32, 15, 19, 4, 21, 2, 25, 17, 34, 6, 27, 13, 36, 11, 30, 8, 23, 10, 5, 24, 16, 33, 1, 20, 14, 31, 9, 22, 18, 29, 7, 28, 12, 35, 3, 26]
-const PASO = (Math.PI * 2) / 37
+const JUEGO = 'ruleta'
+const modalidades = modalidadesDe(JUEGO)
+const modalidad = modalidadCompartida(JUEGO)
+const rueda = computed(() => modalidadPorCodigo(JUEGO, modalidad.value))
+// Casillas por las que se apuesta: la europea son los numeros del 0 al 36 y la
+// rapida una rueda corta con 0 y 00.
+const casillas = computed(() => rueda.value.casillas ?? [])
+// Orden de la rueda europea (el 0 seguido del 32), que es solo visual.
+const ORDEN_EUROPEA = ['0', '32', '15', '19', '4', '21', '2', '25', '17', '34', '6', '27', '13', '36', '11', '30', '8', '23', '10', '5', '24', '16', '33', '1', '20', '14', '31', '9', '22', '18', '29', '7', '28', '12', '35', '3', '26']
+// Lo que se dibuja: la rueda corta se muestra en el orden de sus casillas.
+const orden = computed(() => (rueda.value.codigo === 'rapida' ? casillas.value : ORDEN_EUROPEA))
+const paso = computed(() => (Math.PI * 2) / Math.max(1, orden.value.length))
 
 const canvas = ref<HTMLCanvasElement | null>(null)
 const tipo = ref<'pleno' | 'color'>('pleno')
-const numero = ref<number>(17)
+const numero = ref(17)
 const color = ref<'rojo' | 'negro'>('rojo')
 const rotacion = ref(0)
 const girando = ref(false)
 let animacion = 0
 
-function colorDe(n: number): string {
-  if (n === 0) return '#10b981'
-  return ROJO.has(n) ? '#b3242f' : '#14181f'
+function colorDe(casilla: string): string {
+  const c = colorDeCasilla(rueda.value, casilla)
+  return c === 'rojo' ? '#b3242f' : c === 'verde' ? '#10b981' : '#14181f'
 }
+
+// Al cambiar de modalidad la rueda se puede achicar: el pleno elegido tiene que
+// seguir siendo un indice valido.
+watch(casillas, (cs) => {
+  if (!cs.length) return
+  if (numero.value > cs.length - 1) numero.value = cs.length - 1
+  if (numero.value < 0) numero.value = 0
+})
 
 function dibujar() {
   const cv = canvas.value
@@ -60,25 +77,25 @@ function dibujar() {
 
   ctx.save()
   ctx.rotate(rotacion.value)
-  for (let i = 0; i < ORDEN.length; i++) {
-    const n = ORDEN[i]
-    const a0 = i * PASO - Math.PI / 2
+  for (let i = 0; i < orden.value.length; i++) {
+    const casilla = orden.value[i]
+    const a0 = i * paso.value - Math.PI / 2
     ctx.beginPath()
     ctx.moveTo(0, 0)
-    ctx.arc(0, 0, radio - 8, a0, a0 + PASO)
+    ctx.arc(0, 0, radio - 8, a0, a0 + paso.value)
     ctx.closePath()
-    ctx.fillStyle = colorDe(n)
+    ctx.fillStyle = colorDe(casilla)
     ctx.fill()
     ctx.strokeStyle = 'rgba(0,0,0,.5)'
     ctx.lineWidth = 1
     ctx.stroke()
 
     ctx.save()
-    ctx.rotate(a0 + PASO / 2)
-    ctx.fillStyle = n === 0 ? '#04140e' : '#f3f5f7'
+    ctx.rotate(a0 + paso.value / 2)
+    ctx.fillStyle = casilla === '0' || casilla === '00' ? '#04140e' : '#f3f5f7'
     ctx.font = 'bold 11px ui-sans-serif, system-ui'
     ctx.textAlign = 'center'
-    ctx.fillText(String(n), radio - 22, 4)
+    ctx.fillText(casilla, radio - 22, 4)
     ctx.restore()
   }
   ctx.restore()
@@ -93,10 +110,10 @@ function dibujar() {
   ctx.restore()
 }
 
-function anguloFinal(n: number): number {
-  const indice = ORDEN.indexOf(n)
-  // Queremos el numero en la parte superior (-PI/2).
-  const base = -Math.PI / 2 - indice * PASO
+function anguloFinal(casilla: string): number {
+  const indice = orden.value.indexOf(casilla)
+  // Queremos la casilla en la parte superior (-PI/2).
+  const base = -Math.PI / 2 - indice * paso.value
   const vueltas = Math.PI * 2 * (4 + Math.floor(Math.random() * 2))
   // Normalizamos para que gire siempre hacia adelante.
   let destino = base + vueltas
@@ -119,19 +136,19 @@ function animar(hasta: number) {
     girando.value = false
   }, duracion + 300)
 
-  const paso = (ahora: number) => {
+  const pasoAnim = (ahora: number) => {
     const t = Math.min(1, (ahora - inicio) / duracion)
     const eased = 1 - Math.pow(1 - t, 3)
     rotacion.value = desde + (hasta - desde) * eased
     dibujar()
     if (t < 1) {
-      animacion = requestAnimationFrame(paso)
+      animacion = requestAnimationFrame(pasoAnim)
     } else {
       window.clearTimeout(seguro)
       girando.value = false
     }
   }
-  animacion = requestAnimationFrame(paso)
+  animacion = requestAnimationFrame(pasoAnim)
 }
 
 watch(
@@ -140,15 +157,22 @@ watch(
     if (!r) return
     await nextTick()
     reproducir('giro')
-    animar(anguloFinal(r.numero))
+    animar(anguloFinal(String(r.casilla ?? r.numero)))
   },
 )
 
+// La rueda se redibuja al cambiar de modalidad y en cada apertura.
+watch([orden, rotacion], dibujar)
 onMounted(() => dibujar())
 
+function elegirModalidad(codigo: string) {
+  modalidad.value = codigo
+  reproducir('tecla')
+}
+
 function jugar() {
-  if (tipo.value === 'pleno') emit('jugar', { tipo: 'pleno', numero: numero.value })
-  else emit('jugar', { tipo: 'color', color: color.value })
+  if (tipo.value === 'pleno') emit('jugar', { tipo: 'pleno', numero: numero.value, modalidad: modalidad.value })
+  else emit('jugar', { tipo: 'color', color: color.value, modalidad: modalidad.value })
 }
 </script>
 
@@ -157,8 +181,12 @@ function jugar() {
     <div class="lienzo">
       <canvas ref="canvas" width="260" height="260" />
       <div v-if="resultado" class="resultado" :class="{ gana: premio > 0 }">
-        <span class="n" :class="{ 'resalta-ganador': premio > 0 }" :style="{ background: resultado.color === 'verde' ? '#10b981' : resultado.color === 'rojo' ? '#b3242f' : '#14181f' }">
-          {{ resultado.numero }}
+        <span
+          class="n"
+          :class="{ 'resalta-ganador': premio > 0 }"
+          :style="{ background: resultado.color === 'verde' ? '#10b981' : resultado.color === 'rojo' ? '#b3242f' : '#14181f' }"
+        >
+          {{ resultado.casilla ?? resultado.numero }}
         </span>
         <span class="c">{{ resultado.color }}</span>
         <strong v-if="premio > 0">{{ colones(premio) }}</strong>
@@ -166,19 +194,36 @@ function jugar() {
       </div>
     </div>
 
+    <div class="modalidades">
+      <button
+        v-for="m in modalidades"
+        :key="m.codigo"
+        class="chip"
+        :class="{ activa: modalidad === m.codigo }"
+        @click="elegirModalidad(m.codigo)"
+      >
+        {{ m.nombre }}
+      </button>
+    </div>
+    <p class="regla">{{ rueda.descripcion }}</p>
+
     <div class="modo">
-      <button class="chip" :class="{ activa: tipo === 'pleno' }" @click="tipo = 'pleno'; reproducir('tecla')">Pleno x35</button>
-      <button class="chip" :class="{ activa: tipo === 'color' }" @click="tipo = 'color'; reproducir('tecla')">Color x2</button>
+      <button class="chip" :class="{ activa: tipo === 'pleno' }" @click="tipo = 'pleno'; reproducir('tecla')">Pleno {{ rueda.pagos[0].mult }}</button>
+      <button class="chip" :class="{ activa: tipo === 'color' }" @click="tipo = 'color'; reproducir('tecla')">Color {{ rueda.pagos[1].mult }}</button>
     </div>
 
     <div v-if="tipo === 'pleno'" class="selector">
-      <button class="step" @click="numero = (numero + 36) % 37; reproducir('tecla')">−</button>
-      <div class="valor">{{ numero }}</div>
-      <button class="step" @click="numero = (numero + 1) % 37; reproducir('tecla')">+</button>
+      <button class="step" @click="numero = (numero + casillas.length - 1) % casillas.length; reproducir('tecla')">−</button>
+      <div class="valor">{{ casillas[numero] }}</div>
+      <button class="step" @click="numero = (numero + 1) % casillas.length; reproducir('tecla')">+</button>
     </div>
     <div v-else class="selector">
       <button class="color-btn rojo" :class="{ activa: color === 'rojo' }" @click="color = 'rojo'; reproducir('tecla')">Rojo</button>
       <button class="color-btn negro" :class="{ activa: color === 'negro' }" @click="color = 'negro'; reproducir('tecla')">Negro</button>
+    </div>
+
+    <div class="paytable">
+      <span v-for="p in rueda.pagos" :key="p.etiqueta">{{ p.etiqueta }} {{ p.mult }}</span>
     </div>
 
     <button class="btn btn-primary btn-block" :disabled="cargando || girando" @click="jugar">
@@ -201,6 +246,8 @@ function jugar() {
 }
 .resultado strong { color: var(--gold); font-size: 16px; }
 .resultado.gana { color: var(--prim-2); }
+.modalidades { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+.regla { margin: 0; font-size: 12px; color: var(--faint); text-align: center; line-height: 1.35; }
 .modo { display: flex; gap: 8px; }
 .chip { padding: 6px 12px; border-radius: 999px; border: 1px solid var(--border-soft); background: var(--surface); color: var(--muted); cursor: pointer; font-size: 12px; }
 .chip.activa { border-color: var(--prim); color: var(--prim-2); background: var(--prim-dim); }
@@ -211,4 +258,5 @@ function jugar() {
 .color-btn.rojo { background: #b3242f; }
 .color-btn.negro { background: #14181f; }
 .color-btn.activa { opacity: 1; border-color: var(--gold); }
+.paytable { display: flex; justify-content: center; gap: 12px; flex-wrap: wrap; font-size: 11px; color: var(--faint); }
 </style>

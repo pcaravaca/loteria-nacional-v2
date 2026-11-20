@@ -3,6 +3,7 @@ import { computed, ref, watch } from 'vue'
 import { colones } from '@/utils/formato'
 import { simbolos } from '@/assets/casino'
 import { reproducir } from '@/utils/sfx'
+import { modalidadCompartida, modalidadPorCodigo, modalidadesDe } from './modalidades'
 
 const props = defineProps<{
   resultado: any
@@ -10,6 +11,11 @@ const props = defineProps<{
   cargando: boolean
 }>()
 const emit = defineEmits<{ jugar: [Record<string, unknown>] }>()
+
+const JUEGO = 'raspa'
+const modalidades = modalidadesDe(JUEGO)
+const modalidad = modalidadCompartida(JUEGO)
+const cfg = computed(() => modalidadPorCodigo(JUEGO, modalidad.value))
 
 // Que casilleros pagaron: tres iguales marcan todos; un par marca las dos iguales.
 const pagaRaspa = computed(() => {
@@ -36,15 +42,33 @@ watch(
   },
 )
 
+function elegirModalidad(codigo: string) {
+  modalidad.value = codigo
+  reproducir('tecla')
+}
+
 function rascar() {
   reveladas.value = [false, false, false]
   reproducir('rodillo')
-  emit('jugar', {})
+  emit('jugar', { modalidad: modalidad.value })
 }
 </script>
 
 <template>
   <div class="raspa">
+    <div class="modalidades">
+      <button
+        v-for="m in modalidades"
+        :key="m.codigo"
+        class="chip"
+        :class="{ activa: modalidad === m.codigo }"
+        @click="elegirModalidad(m.codigo)"
+      >
+        {{ m.nombre }}
+      </button>
+    </div>
+    <p class="regla">{{ cfg.descripcion }}</p>
+
     <div class="panel">
       <div v-for="(s, i) in (resultado?.simbolos ?? ['?', '?', '?'])" :key="i" class="casilla"
            :class="{ 'resalta-ganador': premio > 0 && pagaRaspa[i] }">
@@ -58,7 +82,11 @@ function rascar() {
 
     <div v-if="resultado" class="estado" :class="{ gana: premio > 0 }">
       <template v-if="premio > 0"><span>Ganaste</span><strong>{{ colones(premio) }}</strong></template>
-      <span v-else class="neutro">Sin premio · tres iguales pagan x18</span>
+      <span v-else class="neutro">Sin premio · tres iguales pagan {{ cfg.pagos[0].mult }}</span>
+    </div>
+
+    <div class="paytable">
+      <span v-for="p in cfg.pagos" :key="p.etiqueta">{{ p.etiqueta }} {{ p.mult }}</span>
     </div>
 
     <button class="btn btn-primary btn-block" :disabled="cargando" @click="rascar">
@@ -69,6 +97,10 @@ function rascar() {
 
 <style scoped>
 .raspa { display: flex; flex-direction: column; gap: 12px; }
+.modalidades { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
+.chip { padding: 6px 12px; border-radius: 999px; border: 1px solid var(--border-soft); background: var(--surface); color: var(--muted); cursor: pointer; font-size: 12px; }
+.chip.activa { border-color: var(--prim); color: var(--prim-2); background: var(--prim-dim); }
+.regla { margin: 0; font-size: 12px; color: var(--faint); text-align: center; line-height: 1.35; }
 .panel { display: flex; gap: 10px; }
 .casilla {
   flex: 1; height: 108px; border-radius: 12px; overflow: hidden; position: relative;
@@ -87,4 +119,5 @@ function rascar() {
 .estado.gana { background: var(--prim-dim); border-color: rgba(16,185,129,.35); color: var(--prim-2); }
 .estado strong { color: var(--gold); font-size: 18px; margin-left: 6px; }
 .neutro { font-size: 12px; }
+.paytable { display: flex; justify-content: center; gap: 12px; flex-wrap: wrap; font-size: 11px; color: var(--faint); }
 </style>

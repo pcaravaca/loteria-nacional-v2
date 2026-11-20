@@ -3,6 +3,7 @@ package casino
 import (
 	"fmt"
 	"sort"
+	"strconv"
 )
 
 // Params son los parametros de la jugada que envia el cliente (su eleccion).
@@ -199,16 +200,71 @@ func ruletaColor(n int) string {
 	}
 }
 
+// ruletaRueda describe una modalidad de la ruleta: las casillas de la rueda en
+// orden y los multiplicadores del pleno y del color. El sorteo escoge un indice
+// de esa lista, asi que la rueda europea (del 0 al 36) sigue mandando el valor
+// tal cual y la rapida usa una rueda corta con 0 y 00.
+type ruletaRueda struct {
+	Casillas []string
+	Pleno    int64
+	Color    int64
+}
+
+var ruletaCasillasEuropeas = func() []string {
+	out := make([]string, 37)
+	for i := range out {
+		out[i] = strconv.Itoa(i)
+	}
+	return out
+}()
+
+var ruletaRuedas = map[string]ruletaRueda{
+	"europea": {
+		Casillas: ruletaCasillasEuropeas,
+		Pleno:    35,
+		Color:    2,
+	},
+	"rapida": {
+		Casillas: []string{"0", "00", "1", "2", "3", "4", "5", "6", "7", "8"},
+		Pleno:    8,
+		Color:    2,
+	},
+}
+
+// ruletaColorCasilla devuelve el color de una casilla de la modalidad elegida.
+// En la rapida los dos ceros son verdes y los pares son negros.
+func ruletaColorCasilla(modalidad, casilla string) string {
+	if modalidad == "rapida" {
+		switch casilla {
+		case "0", "00":
+			return "verde"
+		case "1", "3", "5", "7":
+			return "rojo"
+		default:
+			return "negro"
+		}
+	}
+	n, _ := strconv.Atoi(casilla)
+	return ruletaColor(n)
+}
+
 func jugarRuleta(monto int64, draws []int, p Params) (Outcome, error) {
 	if len(draws) < 1 {
 		return Outcome{}, fmt.Errorf("sorteo incompleto")
 	}
-	numero := draws[0] % 37
+	modCod, err := normalizarModalidad("ruleta", p)
+	if err != nil {
+		return Outcome{}, err
+	}
+	rueda := ruletaRuedas[modCod]
+	casilla := rueda.Casillas[draws[0]%len(rueda.Casillas)]
+	numero, _ := strconv.Atoi(casilla) // "00" no es numero: vale 0
+	color := ruletaColorCasilla(modCod, casilla)
+
 	tipo, err := p.String("tipo")
 	if err != nil {
 		return Outcome{}, err
 	}
-	color := ruletaColor(numero)
 
 	var mult int64
 	switch tipo {
@@ -217,11 +273,11 @@ func jugarRuleta(monto int64, draws []int, p Params) (Outcome, error) {
 		if err != nil {
 			return Outcome{}, err
 		}
-		if n < 0 || n > 36 {
-			return Outcome{}, fmt.Errorf("el numero debe estar entre 0 y 36")
+		if n < 0 || n >= len(rueda.Casillas) {
+			return Outcome{}, fmt.Errorf("el numero debe estar entre 0 y %d", len(rueda.Casillas)-1)
 		}
-		if n == numero {
-			mult = 35
+		if rueda.Casillas[n] == casilla {
+			mult = rueda.Pleno
 		}
 	case "color":
 		c, err := p.String("color")
@@ -232,19 +288,21 @@ func jugarRuleta(monto int64, draws []int, p Params) (Outcome, error) {
 			return Outcome{}, fmt.Errorf("el color debe ser rojo o negro")
 		}
 		if c == color {
-			mult = 2
+			mult = rueda.Color
 		}
 	default:
 		return Outcome{}, fmt.Errorf("tipo de apuesta invalido")
 	}
 
+	data := DataModalidad("ruleta", modCod)
+	data["numero"] = numero
+	data["casilla"] = casilla
+	data["color"] = color
+	data["tipo"] = tipo
+	data["casillas"] = len(rueda.Casillas)
 	return Outcome{
 		Multiplicador: mult,
-		Data: map[string]any{
-			"numero": numero,
-			"color":  color,
-			"tipo":   tipo,
-		},
+		Data:          data,
 	}, nil
 }
 
@@ -252,46 +310,91 @@ func jugarRuleta(monto int64, draws []int, p Params) (Outcome, error) {
 
 var raspaSimbolos = []string{"cereza", "campana", "siete", "diamante", "herradura", "barra"}
 
+// raspaCfg describe una modalidad de la raspa: cuantos simbolos entran en el
+// rodillo y cuanto paga el triple y el par.
+type raspaCfg struct {
+	Simbolos int
+	Triple   int64
+	Par      int64
+}
+
+var raspaCfgs = map[string]raspaCfg{
+	"clasica": {Simbolos: 6, Triple: 18, Par: 1},
+	"expres":  {Simbolos: 4, Triple: 5, Par: 1},
+}
+
 func jugarRaspa(monto int64, draws []int, p Params) (Outcome, error) {
 	if len(draws) < 3 {
 		return Outcome{}, fmt.Errorf("sorteo incompleto")
 	}
-	a := raspaSimbolos[draws[0]%len(raspaSimbolos)]
-	b := raspaSimbolos[draws[1]%len(raspaSimbolos)]
-	c := raspaSimbolos[draws[2]%len(raspaSimbolos)]
+	modCod, err := normalizarModalidad("raspa", p)
+	if err != nil {
+		return Outcome{}, err
+	}
+	cfg := raspaCfgs[modCod]
+	simbolos := raspaSimbolos[:cfg.Simbolos]
+	a := simbolos[draws[0]%len(simbolos)]
+	b := simbolos[draws[1]%len(simbolos)]
+	c := simbolos[draws[2]%len(simbolos)]
 
 	var mult int64
 	switch {
 	case a == b && b == c:
-		mult = 18
+		mult = cfg.Triple
 	case a == b || b == c || a == c:
-		mult = 1
+		mult = cfg.Par
 	}
+	data := DataModalidad("raspa", modCod)
+	data["simbolos"] = []string{a, b, c}
+	data["simbolos_totales"] = cfg.Simbolos
 	return Outcome{
 		Multiplicador: mult,
-		Data: map[string]any{
-			"simbolos": []string{a, b, c},
-		},
+		Data:          data,
 	}, nil
 }
 
 // ---------------------------------------------------------------- keno
 
-func kenoBolillas(draws []int) []int {
+// kenoCfg describe una modalidad del keno: de donde salen las bolillas, cuantas
+// se cantan, cuantos numeros elige el jugador y cuanto paga cada acierto.
+type kenoCfg struct {
+	Bolillas int
+	Elegidos int
+	Cantidad int
+	Tabla    map[int]int64
+}
+
+var kenoCfgs = map[string]kenoCfg{
+	"clasico": {
+		Bolillas: 60,
+		Elegidos: 5,
+		Cantidad: 15,
+		Tabla:    map[int]int64{2: 1, 3: 3, 4: 8, 5: 65},
+	},
+	"relampago": {
+		Bolillas: 40,
+		Elegidos: 4,
+		Cantidad: 8,
+		Tabla:    map[int]int64{1: 1, 2: 2, 3: 5, 4: 8},
+	},
+}
+
+// kenoBolillas devuelve `cantidad` bolillas distintas entre 1 y `bolillas`.
+func kenoBolillas(draws []int, bolillas, cantidad int) []int {
 	vistos := map[int]bool{}
-	out := make([]int, 0, 15)
+	out := make([]int, 0, cantidad)
 	for _, d := range draws {
-		n := (d % 60) + 1
+		n := (d % bolillas) + 1
 		for vistos[n] {
-			n = n%60 + 1
+			n = n%bolillas + 1
 		}
 		vistos[n] = true
 		out = append(out, n)
-		if len(out) == 15 {
+		if len(out) == cantidad {
 			return out
 		}
 	}
-	for n := 1; len(out) < 15 && n <= 60; n++ {
+	for n := 1; len(out) < cantidad && n <= bolillas; n++ {
 		if !vistos[n] {
 			vistos[n] = true
 			out = append(out, n)
@@ -303,17 +406,22 @@ func kenoBolillas(draws []int) []int {
 var kenoMultipl = map[int]int64{2: 1, 3: 3, 4: 8, 5: 65}
 
 func jugarKeno(monto int64, draws []int, p Params) (Outcome, error) {
+	modCod, err := normalizarModalidad("keno", p)
+	if err != nil {
+		return Outcome{}, err
+	}
+	cfg := kenoCfgs[modCod]
 	tuyos, err := p.Ints("numeros")
 	if err != nil {
 		return Outcome{}, err
 	}
-	if len(tuyos) != 5 {
-		return Outcome{}, fmt.Errorf("debemos elegir exactamente 5 numeros")
+	if len(tuyos) != cfg.Elegidos {
+		return Outcome{}, fmt.Errorf("debemos elegir exactamente %d numeros", cfg.Elegidos)
 	}
 	vistos := map[int]bool{}
 	for _, n := range tuyos {
-		if n < 1 || n > 60 {
-			return Outcome{}, fmt.Errorf("los numeros deben estar entre 1 y 60")
+		if n < 1 || n > cfg.Bolillas {
+			return Outcome{}, fmt.Errorf("los numeros deben estar entre 1 y %d", cfg.Bolillas)
 		}
 		if vistos[n] {
 			return Outcome{}, fmt.Errorf("los numeros no pueden repetirse")
@@ -321,7 +429,7 @@ func jugarKeno(monto int64, draws []int, p Params) (Outcome, error) {
 		vistos[n] = true
 	}
 
-	bolillas := kenoBolillas(draws)
+	bolillas := kenoBolillas(draws, cfg.Bolillas, cfg.Cantidad)
 	aciertos := 0
 	for _, b := range bolillas {
 		if vistos[b] {
@@ -329,16 +437,19 @@ func jugarKeno(monto int64, draws []int, p Params) (Outcome, error) {
 		}
 	}
 	mult := int64(0)
-	if m, ok := kenoMultipl[aciertos]; ok {
+	if m, ok := cfg.Tabla[aciertos]; ok {
 		mult = m
 	}
+	data := DataModalidad("keno", modCod)
+	data["bolillas"] = bolillas
+	data["tus_numeros"] = tuyos
+	data["aciertos"] = aciertos
+	data["tabla"] = cfg.Tabla
+	data["bolillas_totales"] = cfg.Bolillas
+	data["elegidos"] = cfg.Elegidos
 	return Outcome{
 		Multiplicador: mult,
-		Data: map[string]any{
-			"bolillas":    bolillas,
-			"tus_numeros": tuyos,
-			"aciertos":    aciertos,
-		},
+		Data:          data,
 	}, nil
 }
 
@@ -351,25 +462,55 @@ const cascadaFilas = 9
 
 var cascadaTabla = []int64{10, 5, 3, 1, 0, 0, 1, 3, 5, 10}
 
+// cascadaCfg describe una modalidad de la cascada: filas de pinchos y la tabla
+// de la fila de casillas (filas+1 valores). La clasica es la de 9 filas.
+type cascadaCfg struct {
+	Filas int
+	Tabla []int64
+}
+
+var cascadaCfgs = map[string]cascadaCfg{
+	"clasica":  {Filas: cascadaFilas, Tabla: cascadaTabla},
+	"rapida":   {Filas: 5, Tabla: []int64{4, 2, 0, 0, 2, 4}},
+	"profunda": {Filas: 12, Tabla: []int64{10, 9, 6, 3, 1, 0, 0, 0, 1, 3, 6, 9, 10}},
+}
+
+// cascadaFilasMax es la mayor cantidad de filas entre las modalidades: define
+// cuantos draws pide el juego (las modalidades cortas ignoran los de sobra).
+func cascadaFilasMax() int {
+	max := 0
+	for _, c := range cascadaCfgs {
+		if c.Filas > max {
+			max = c.Filas
+		}
+	}
+	return max
+}
+
 func jugarCascada(monto int64, draws []int, p Params) (Outcome, error) {
-	if len(draws) < cascadaFilas {
+	modCod, err := normalizarModalidad("cascada", p)
+	if err != nil {
+		return Outcome{}, err
+	}
+	cfg := cascadaCfgs[modCod]
+	if len(draws) < cfg.Filas {
 		return Outcome{}, fmt.Errorf("sorteo incompleto")
 	}
-	camino := make([]int, 0, cascadaFilas)
+	camino := make([]int, 0, cfg.Filas)
 	pos := 0
-	for i := 0; i < cascadaFilas; i++ {
+	for i := 0; i < cfg.Filas; i++ {
 		d := draws[i] % 2
 		camino = append(camino, d)
 		pos += d
 	}
+	data := DataModalidad("cascada", modCod)
+	data["camino"] = camino
+	data["posicion"] = pos
+	data["tabla"] = cfg.Tabla
+	data["filas"] = cfg.Filas
 	return Outcome{
-		Multiplicador: cascadaTabla[pos],
-		Data: map[string]any{
-			"camino":   camino,
-			"posicion": pos,
-			"tabla":    cascadaTabla,
-			"filas":    cascadaFilas,
-		},
+		Multiplicador: cfg.Tabla[pos],
+		Data:          data,
 	}, nil
 }
 
@@ -379,8 +520,25 @@ var hiloFiguras = []string{"", "A", "2", "3", "4", "5", "6", "7", "8", "9", "10"
 
 func hiloCarta(draw int) int { return draw%13 + 1 }
 
+// hiloCfg describe una modalidad del hilo: cuantas cartas se reparten y el
+// multiplicador de la racha (0 significa el clasico, que paga x2 por un acierto).
+type hiloCfg struct {
+	Cartas int
+	Mult   int64
+}
+
+var hiloCfgs = map[string]hiloCfg{
+	"clasico": {Cartas: 2, Mult: 0},
+	"racha":   {Cartas: 3, Mult: 6},
+}
+
 func jugarHilo(monto int64, draws []int, p Params) (Outcome, error) {
-	if len(draws) < 2 {
+	modCod, err := normalizarModalidad("hilo", p)
+	if err != nil {
+		return Outcome{}, err
+	}
+	cfg := hiloCfgs[modCod]
+	if len(draws) < cfg.Cartas {
 		return Outcome{}, fmt.Errorf("sorteo incompleto")
 	}
 	dir, err := p.String("direccion")
@@ -390,24 +548,44 @@ func jugarHilo(monto int64, draws []int, p Params) (Outcome, error) {
 	if dir != "mayor" && dir != "menor" {
 		return Outcome{}, fmt.Errorf("la direccion debe ser mayor o menor")
 	}
-	base := hiloCarta(draws[0])
-	siguiente := hiloCarta(draws[1])
-	var mult int64
-	switch {
-	case dir == "mayor" && siguiente > base:
-		mult = 2
-	case dir == "menor" && siguiente < base:
-		mult = 2
+	cartas := make([]int, 0, cfg.Cartas)
+	for i := 0; i < cfg.Cartas; i++ {
+		cartas = append(cartas, hiloCarta(draws[i]))
 	}
+	// En la racha hay que acertar todas las predicciones seguidas.
+	gano := true
+	for i := 1; i < len(cartas); i++ {
+		if dir == "mayor" && cartas[i] <= cartas[i-1] {
+			gano = false
+		}
+		if dir == "menor" && cartas[i] >= cartas[i-1] {
+			gano = false
+		}
+	}
+	mult := int64(0)
+	if gano {
+		if cfg.Mult > 0 {
+			mult = cfg.Mult
+		} else {
+			mult = 2
+		}
+	}
+	figuras := make([]string, 0, len(cartas))
+	for _, c := range cartas {
+		figuras = append(figuras, hiloFiguras[c])
+	}
+	data := DataModalidad("hilo", modCod)
+	data["base"] = cartas[0]
+	data["siguiente"] = cartas[1]
+	data["figura_base"] = hiloFiguras[cartas[0]]
+	data["figura_siguiente"] = hiloFiguras[cartas[1]]
+	data["cartas"] = cartas
+	data["figuras"] = figuras
+	data["direccion"] = dir
+	data["tiros"] = cfg.Cartas - 1
 	return Outcome{
 		Multiplicador: mult,
-		Data: map[string]any{
-			"base":             base,
-			"siguiente":        siguiente,
-			"figura_base":      hiloFiguras[base],
-			"figura_siguiente": hiloFiguras[siguiente],
-			"direccion":        dir,
-		},
+		Data:          data,
 	}, nil
 }
 
@@ -417,15 +595,32 @@ func jugarHilo(monto int64, draws []int, p Params) (Outcome, error) {
 // El RTP depende del riesgo elegido (~96% en los extremos, menor en el medio).
 var altoTopes = map[int]int64{2: 48, 5: 19, 10: 9, 25: 3, 48: 2, 75: 1, 90: 1, 95: 1}
 
+// altoCfg describe una modalidad del alto/menor: cuantos tiros hay que acertar y
+// el multiplicador de la racha (0 significa el clasico, que paga segun el tope).
+type altoCfg struct {
+	Tiros int
+	Mult  int64
+}
+
+var altoCfgs = map[string]altoCfg{
+	"clasico": {Tiros: 1, Mult: 0},
+	"racha":   {Tiros: 2, Mult: 4},
+}
+
 func jugarAlto(monto int64, draws []int, p Params) (Outcome, error) {
-	if len(draws) < 1 {
+	modCod, err := normalizarModalidad("alto", p)
+	if err != nil {
+		return Outcome{}, err
+	}
+	cfg := altoCfgs[modCod]
+	if len(draws) < cfg.Tiros {
 		return Outcome{}, fmt.Errorf("sorteo incompleto")
 	}
 	tope, err := p.Int("tope")
 	if err != nil {
 		return Outcome{}, err
 	}
-	mult, ok := altoTopes[tope]
+	multTope, ok := altoTopes[tope]
 	if !ok {
 		return Outcome{}, fmt.Errorf("tope invalido: elegi uno de la lista")
 	}
@@ -436,24 +631,37 @@ func jugarAlto(monto int64, draws []int, p Params) (Outcome, error) {
 	if direccion != "bajo" && direccion != "sobre" {
 		return Outcome{}, fmt.Errorf("la direccion debe ser bajo o sobre")
 	}
-	tirada := draws[0]%100 + 1
-	var gano bool
-	if direccion == "bajo" {
-		gano = tirada <= tope
-	} else {
-		gano = tirada > 100-tope
+	tiradas := make([]int, 0, cfg.Tiros)
+	gano := true
+	for i := 0; i < cfg.Tiros; i++ {
+		tirada := draws[i]%100 + 1
+		tiradas = append(tiradas, tirada)
+		if direccion == "bajo" {
+			if tirada > tope {
+				gano = false
+			}
+		} else if tirada <= 100-tope {
+			gano = false
+		}
 	}
-	if !gano {
-		mult = 0
+	mult := int64(0)
+	if gano {
+		if cfg.Mult > 0 {
+			mult = cfg.Mult
+		} else {
+			mult = multTope
+		}
 	}
+	data := DataModalidad("alto", modCod)
+	data["tirada"] = tiradas[0]
+	data["tiradas"] = tiradas
+	data["tope"] = tope
+	data["direccion"] = direccion
+	data["tabla"] = altoTopes
+	data["tiros"] = cfg.Tiros
 	return Outcome{
 		Multiplicador: mult,
-		Data: map[string]any{
-			"tirada":    tirada,
-			"tope":      tope,
-			"direccion": direccion,
-			"tabla":     altoTopes,
-		},
+		Data:          data,
 	}, nil
 }
 
@@ -606,11 +814,28 @@ func baccaratTotal(cartas []int) int {
 	return t % 10
 }
 
+// baccaratCfg describe una modalidad del baccarat: si la banca cobra comision y
+// cuanto paga cuando la banca gana con 6 (0 = paga el resto igual).
+type baccaratCfg struct {
+	Comision  bool
+	BancaSeis int64
+}
+
+var baccaratCfgs = map[string]baccaratCfg{
+	"estandar":     {Comision: true, BancaSeis: 0},
+	"sin-comision": {Comision: false, BancaSeis: 1},
+}
+
 // jugarBaccarat reparte dos cartas por mano y aplica la regla de la tercera
 // carta (el jugador pide con 0-5 y se planta con 6-7; la banca sigue la tabla
 // oficial segun la tercera carta del jugador). El empate paga x8 y las apuestas
 // a jugador o banca quedan en empate (se devuelve la apuesta).
 func jugarBaccarat(monto int64, draws []int, p Params) (Outcome, error) {
+	modCod, err := normalizarModalidad("baccarat", p)
+	if err != nil {
+		return Outcome{}, err
+	}
+	cfg := baccaratCfgs[modCod]
 	tipo, err := p.String("tipo")
 	if err != nil {
 		return Outcome{}, err
@@ -674,25 +899,35 @@ func jugarBaccarat(monto int64, draws []int, p Params) (Outcome, error) {
 	case tb > tj && tipo == "banca":
 		mult = 2
 		// La banca paga 0.95 por cada peso: la comision del 5% se descuenta
-		// de la ganancia al momento de pagar (ver casino.Premio).
-		comision = monto / 20
+		// de la ganancia al momento de pagar (ver casino.Premio). En la
+		// modalidad sin comision no se descuenta nada, pero la banca que gana
+		// con 6 paga la mitad (la regla del "super 6").
+		if cfg.Comision {
+			comision = monto / 20
+		} else if cfg.BancaSeis > 0 && tb == 6 {
+			mult = cfg.BancaSeis
+		}
 	case tj == tb && tipo == "empate":
 		mult = 8
 	case tj == tb:
-		mult = 1 // las manos en empate devuelven la apuesta
+		// Las manos en empate devuelven la apuesta en la modalidad estandar;
+		// en la sin comision el empate no devuelve nada.
+		if cfg.Comision {
+			mult = 1
+		}
 	}
 
+	data := DataModalidad("baccarat", modCod)
+	data["cartas_jugador"] = jugador
+	data["cartas_banca"] = banca
+	data["total_jugador"] = tj
+	data["total_banca"] = tb
+	data["tipo"] = tipo
+	data["resultado"] = resultadoBaccarat(tj, tb)
+	data["comision"] = comision
 	return Outcome{
 		Multiplicador: mult,
-		Data: map[string]any{
-			"cartas_jugador": jugador,
-			"cartas_banca":   banca,
-			"total_jugador":  tj,
-			"total_banca":    tb,
-			"tipo":           tipo,
-			"resultado":      resultadoBaccarat(tj, tb),
-			"comision":       comision,
-		},
+		Data:          data,
 	}, nil
 }
 
@@ -753,6 +988,68 @@ func Jugar(codigo string, monto int64, draws []int, p Params) (Outcome, error) {
 	return Outcome{}, fmt.Errorf("juego no soportado: %s", codigo)
 }
 
+// multMaximaModalidad devuelve el mayor multiplicador que puede pagar una
+// modalidad concreta del juego. Lo usa MultMaximoJuego para recortar la
+// apuesta maxima sin tocar el multiplicador que audita el jugador.
+func multMaximaModalidad(codigoJuego, codigoModalidad string) int64 {
+	switch codigoJuego {
+	case "ruleta":
+		if r, ok := ruletaRuedas[codigoModalidad]; ok {
+			return max(r.Pleno, r.Color)
+		}
+	case "keno":
+		if c, ok := kenoCfgs[codigoModalidad]; ok {
+			return maxMapInt64(c.Tabla)
+		}
+	case "raspa":
+		if c, ok := raspaCfgs[codigoModalidad]; ok {
+			return max(c.Triple, c.Par)
+		}
+	case "baccarat":
+		if _, ok := baccaratCfgs[codigoModalidad]; ok {
+			// El empate siempre paga x8; la banca paga x2 (x1 con 6 en la
+			// modalidad sin comision).
+			return 8
+		}
+	case "alto":
+		if c, ok := altoCfgs[codigoModalidad]; ok {
+			if c.Mult > 0 {
+				return c.Mult
+			}
+			return maxMapInt64(altoTopes)
+		}
+	case "hilo":
+		if c, ok := hiloCfgs[codigoModalidad]; ok {
+			if c.Mult > 0 {
+				return c.Mult
+			}
+			return 2
+		}
+	case "cascada":
+		if c, ok := cascadaCfgs[codigoModalidad]; ok {
+			var max int64
+			for _, v := range c.Tabla {
+				if v > max {
+					max = v
+				}
+			}
+			return max
+		}
+	}
+	return 0
+}
+
+// maxMapInt64 devuelve el mayor valor de un mapa de multiplicadores.
+func maxMapInt64(m map[int]int64) int64 {
+	var max int64
+	for _, v := range m {
+		if v > max {
+			max = v
+		}
+	}
+	return max
+}
+
 // MultiplicadorMaximo devuelve el peor multiplicador posible de un juego. El
 // blackjack puede doblar y ganar, asi que paga hasta 4 veces la apuesta; el
 // natural (3:2) solo se da antes de doblar.
@@ -780,7 +1077,13 @@ func MultiplicadorMaximo(codigo string, maxMultipl int64) int64 {
 	if m := MaxMultiplPoker(codigo); m > 0 {
 		return m
 	}
+	// Los juegos que tienen modalidades pueden pagar mas que el multiplicador
+	// declarado en el catalogo (el hilo en racha paga x6). El tope cubre todas
+	// las modalidades para que ninguna apuesta supere el techo de premio.
 	if maxMultipl > 0 {
+		if m := MultMaximoJuego(codigo); m > maxMultipl {
+			return m
+		}
 		return maxMultipl
 	}
 	return 0
@@ -815,10 +1118,15 @@ func Draws(codigo string) int {
 	case "keno":
 		return 24
 	case "cascada":
-		return cascadaFilas
+		// La modalidad profunda pide 12 draws; las cortas ignoran los de sobra.
+		return cascadaFilasMax()
 	case "hilo":
+		// La racha reparte tres cartas; el clasico usa solo las dos primeras.
+		return 3
+	case "alto":
+		// La racha tira dos veces; el clasico usa solo la primera.
 		return 2
-	case "alto", "fortuna", "moneda", "suertudo":
+	case "fortuna", "moneda", "suertudo":
 		return 1
 	case "parley":
 		return 4
@@ -837,8 +1145,16 @@ func Draws(codigo string) int {
 	return 1
 }
 
-// RTP aproximado por simulacion (util para afinar multiplicadores).
+// RTP aproximado por simulacion de la modalidad por defecto (util para afinar
+// multiplicadores).
 func RTP(codigo string, iteraciones int) float64 {
+	return RTPModalidad(codigo, "", iteraciones)
+}
+
+// RTPModalidad mide por simulacion el retorno al jugador de una modalidad
+// concreta. Con modalidad vacia usa la clasica. La apuesta de referencia es la
+// misma que usa RTP para el resto de los juegos.
+func RTPModalidad(codigo, modalidad string, iteraciones int) float64 {
 	if iteraciones <= 0 {
 		iteraciones = 200000
 	}
@@ -846,30 +1162,48 @@ func RTP(codigo string, iteraciones int) float64 {
 	for i := 0; i < iteraciones; i++ {
 		seed := fmt.Sprintf("sim-%d", i)
 		draws := Sortear(seed, "sim", int64(i), Draws(codigo), 1<<31-1)
-		var p Params
-		switch codigo {
-		case "dados":
-			p = Params{"suma": 7}
-		case "ruleta":
-			p = Params{"tipo": "pleno", "numero": 17}
-		case "keno":
-			p = Params{"numeros": []int{1, 2, 3, 4, 5}}
-		case "cascada":
-			p = Params{}
-		case "hilo":
-			p = Params{"direccion": "mayor"}
-		case "alto":
-			p = Params{"tope": 48, "direccion": "bajo"}
-		case "fortuna":
-			p = Params{}
-		case "baccarat":
-			p = Params{"tipo": "banca"}
-		}
-		out, err := Jugar(codigo, 1000, draws, p)
+		out, err := Jugar(codigo, 1000, draws, paramsRTP(codigo, modalidad))
 		if err != nil {
 			continue
 		}
 		suma += float64(Premio(1000, out)) / 1000
 	}
 	return suma / float64(iteraciones) * 100
+}
+
+// paramsRTP es la apuesta de referencia de la simulacion: una por juego, elegida
+// para que el RTP sea representativo de cada modalidad.
+func paramsRTP(codigo, modalidad string) Params {
+	p := Params{}
+	if modalidad != "" {
+		p["modalidad"] = modalidad
+	}
+	switch codigo {
+	case "dados":
+		p["suma"] = 7
+	case "ruleta":
+		p["tipo"] = "pleno"
+		if modalidad == "rapida" {
+			p["numero"] = 5
+		} else {
+			p["numero"] = 17
+		}
+	case "keno":
+		if modalidad == "relampago" {
+			p["numeros"] = []int{1, 2, 3, 4}
+		} else {
+			p["numeros"] = []int{1, 2, 3, 4, 5}
+		}
+	case "cascada":
+	case "hilo":
+		p["direccion"] = "mayor"
+	case "alto":
+		p["tope"] = 48
+		p["direccion"] = "bajo"
+	case "fortuna":
+	case "baccarat":
+		p["tipo"] = "banca"
+	case "raspa":
+	}
+	return p
 }
