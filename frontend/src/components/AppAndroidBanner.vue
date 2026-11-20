@@ -1,13 +1,9 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 
-const esAndroid = ref(false)
-if (typeof navigator !== 'undefined') {
-  const ua = navigator.userAgent || ''
-  const plataforma =
-    (navigator as unknown as { userAgentData?: { platform?: string } }).userAgentData?.platform || ''
-  esAndroid.value = /Android/i.test(ua) || /Android/i.test(plataforma)
-}
+import { esDispositivoAndroid } from '@/utils/dispositivo'
+
+const esAndroid = ref(esDispositivoAndroid())
 const cerrado = ref(sessionStorage.getItem('app-banner-cerrado') === '1')
 const mostrar = computed(() => esAndroid.value && !cerrado.value)
 function cerrar() {

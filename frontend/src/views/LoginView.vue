@@ -1,5 +1,6 @@
 
 .brand-img { width: 40px; height: 40px; border-radius: 12px; object-fit: cover; display: block; }<script setup lang="ts">
+import AppAndroidBanner from '@/components/AppAndroidBanner.vue'
 import { useMarcaStore } from '@/stores/marca'
 
 const marca = useMarcaStore()
@@ -50,6 +51,7 @@ async function enviar() {
 
     <div class="auth-form">
       <div class="auth-card">
+        <AppAndroidBanner />
         <h1>Bienvenido de nuevo</h1>
         <p class="sub">Ingresa tus credenciales para continuar</p>
 

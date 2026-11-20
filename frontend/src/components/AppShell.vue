@@ -5,6 +5,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 import { useMarcaStore } from '@/stores/marca'
 import AppAndroidBanner from '@/components/AppAndroidBanner.vue'
+import { esDispositivoAndroid } from '@/utils/dispositivo'
 
 const marca = useMarcaStore()
 import { colones } from '@/utils/formato'
@@ -13,6 +14,7 @@ const route = useRoute()
 const router = useRouter()
 const auth = useAuthStore()
 const abierto = ref(false)
+const esAndroid = esDispositivoAndroid()
 
 const titulos: Record<string, string> = {
   dashboard: 'Panel de control',
@@ -86,6 +88,10 @@ function salir() {
           {{ item.label }}
         </router-link>
       </nav>
+      <a v-if="esAndroid" class="app-cta" href="/descargar/">
+        <span class="app-cta-ico">▣</span>
+        <span><b>App Android</b><small>Descargala gratis</small></span>
+      </a>
 
       <div class="sidebar-foot">
         <div class="user-chip">
