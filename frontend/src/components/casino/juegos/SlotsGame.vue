@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onUnmounted, ref, watch } from 'vue'
+import { computed, onUnmounted, ref, watch } from 'vue'
 import { colones } from '@/utils/formato'
 import { ordenSimbolos, paytable, simbolos } from '@/assets/casino'
 
@@ -10,6 +10,22 @@ const props = defineProps<{
   rondaKey: number
 }>()
 const emit = defineEmits<{ jugar: [Record<string, unknown>] }>()
+
+// Que rodillos pagaron: si salieron tres iguales marcan los tres; si solo
+// coinciden los dos primeros, marcan esos dos.
+const ganadores = computed<number[]>(() => {
+  const r = props.resultado?.rodillos
+  if (!Array.isArray(r) || r.length !== 3 || props.premio <= 0) return []
+  if (r[0] === r[1] && r[1] === r[2]) return [0, 1, 2]
+  if (r[0] === r[1]) return [0, 1]
+  return []
+})
+const motivo = computed(() => {
+  const r = props.resultado?.rodillos
+  if (!r || !ganadores.value.length) return ''
+  if (ganadores.value.length === 3) return `Tres ${r[0]}`
+  return `Dos ${r[0]}`
+})
 
 const visibles = ref<string[]>(['cereza', 'campana', 'siete'])
 const girando = ref(false)
@@ -61,7 +77,7 @@ function jugar() {
       <div class="rieles-marco">
         <div class="rieles-railes"></div>
     <div class="reels" :class="{ girando }">
-      <div v-for="(s, i) in visibles" :key="i" class="reel">
+      <div v-for="(s, i) in visibles" :key="i" class="reel" :class="{ ganador: ganadores.includes(i) }">
         <img :src="simbolos[s]" :alt="s" draggable="false" />
       </div>
     </div>
@@ -72,7 +88,7 @@ function jugar() {
 
     <div v-if="resultado" class="estado" :class="{ gana: premio > 0 }">
       <template v-if="premio > 0">
-        <span>Ganaste</span><strong>{{ colones(premio) }}</strong>
+        <span>Ganaste{{ motivo ? ' · ' + motivo : '' }}</span><strong>{{ colones(premio) }}</strong>
       </template>
       <span v-else class="neutro">Sin premio</span>
     </div>
@@ -92,7 +108,21 @@ function jugar() {
   </div>
 </template>
 
-<style scoped>
+<style scoped>.reel.ganador {
+  border-color: var(--gold);
+  box-shadow: 0 0 0 2px var(--gold), 0 0 24px rgba(245, 185, 66, .55);
+  animation: brillo 1.1s ease-in-out infinite alternate;
+}
+.reel.ganador img { animation: rebote .5s ease 2; }
+@keyframes brillo {
+  from { box-shadow: 0 0 0 2px var(--gold), 0 0 10px rgba(245, 185, 66, .35); }
+  to { box-shadow: 0 0 0 3px #ffe9a8, 0 0 30px rgba(245, 185, 66, .75); }
+}
+@keyframes rebote {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+
 /* Carcasa de maquina tragamonedas: se reconoce aunque este quieta. */
 .cabina {
   border-radius: 18px; padding: 10px; display: flex; flex-direction: column; gap: 8px;
