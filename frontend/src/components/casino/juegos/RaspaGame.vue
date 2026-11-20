@@ -1,5 +1,13 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
+// Que casilleros pagaron: tres iguales marcan todos; un par marca las dos iguales.
+const pagaRaspa = computed(() => {
+  const s = props.resultado?.simbolos ?? []
+  if (!s.length || props.premio <= 0) return [false, false, false]
+  // Si dos o mas casilleros son iguales, esos son los que pagaron.
+  return s.map((v, i) => s.some((o, j) => j !== i && o === v))
+})
+
+import { computed, ref, watch } from 'vue'
 import { colones } from '@/utils/formato'
 import { simbolos } from '@/assets/casino'
 
@@ -32,7 +40,8 @@ function rascar() {
 <template>
   <div class="raspa">
     <div class="panel">
-      <div v-for="(s, i) in (resultado?.simbolos ?? ['?', '?', '?'])" :key="i" class="casilla">
+      <div v-for="(s, i) in (resultado?.simbolos ?? ['?', '?', '?'])" :key="i" class="casilla"
+           :class="{ 'resalta-ganador': premio > 0 && pagaRaspa[i] }">
         <img v-if="reveladas[i]" :src="simbolos[s]" :alt="s" />
         <span v-else class="plata">
           <span class="signo">?</span>

@@ -324,6 +324,18 @@ input, select, textarea, button { font-size: 16px; } /* evita el zoom automatico
   --gold: #d4a437; --gold-dim: rgba(212, 164, 55, .14);
 }
 
+
+/* Resaltado de los items que pagaron (todos los juegos lo reutilizan) */
+.resalta-ganador {
+  border-color: var(--gold) !important;
+  box-shadow: 0 0 0 2px var(--gold), 0 0 26px rgba(245, 185, 66, .55);
+  animation: resalto 1s ease-in-out infinite alternate;
+}
+@keyframes resalto {
+  from { transform: scale(1); }
+  to { transform: scale(1.06); }
+}
+
 /* ---------- modal ---------- */
 .modal-backdrop {
   position: fixed; inset: 0; background: rgba(3, 6, 10, .7);

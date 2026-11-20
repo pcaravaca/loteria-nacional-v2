@@ -64,9 +64,8 @@ const puntos: Record<number, number[]> = {
         v-for="n in 11"
         :key="n"
         class="num"
-        :class="{ activa: suma === n + 1 }"
-        @click="suma = n + 1"
-      >
+        :class="{ activa: suma === n + 1, 'resalta-ganador': premio > 0 && resultado?.suma === suma }"
+        @click="suma = n + 1">
         {{ n + 1 }}
         <small>x{{ mult[n + 1] }}</small>
       </button>

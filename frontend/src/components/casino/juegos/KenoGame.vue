@@ -58,9 +58,8 @@ function jugar() {
         v-for="n in numeros"
         :key="n"
         class="num"
-        :class="{ activa: elegidos.includes(n), salida: bolillas.includes(n) }"
-        @click="toggle(n)"
-      >{{ n }}</button>
+        :class="{ activa: elegidos.includes(n), salida: bolillas.includes(n), 'resalta-ganador': premio > 0 && (resultado?.aciertos ?? []).includes(n) }"
+        @click="toggle(n)">{{ n }}</button>
     </div>
 
     <div class="ayuda">Elegí 5 números ({{ elegidos.length }}/5)</div>
