@@ -41,5 +41,12 @@ export function clearToken() {
 }
 
 export function getToken() {
+  // La app nativa abre la web con ?token=JWT para heredar la sesion ya iniciada.
+  const porUrl = new URLSearchParams(window.location.search).get('token')
+  if (porUrl) {
+    setToken(porUrl)
+    const limpia = window.location.pathname + window.location.hash
+    window.history.replaceState(null, '', limpia)
+  }
   return localStorage.getItem(TOKEN_KEY)
 }
