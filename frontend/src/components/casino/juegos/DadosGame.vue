@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { colones } from '@/utils/formato'
+import { reproducir } from '@/utils/sfx'
 
 const props = defineProps<{
   resultado: any
@@ -11,8 +12,8 @@ const emit = defineEmits<{ jugar: [Record<string, unknown>] }>()
 
 // Multiplicadores declarados: el servidor es la fuente de verdad.
 const mult: Record<number, number> = {
-  2: 30, 3: 15, 4: 10, 5: 8, 6: 6, 7: 5,
-  8: 6, 9: 8, 10: 10, 11: 15, 12: 30,
+  2: 27, 3: 14, 4: 9, 5: 7, 6: 6, 7: 5,
+  8: 6, 9: 7, 10: 9, 11: 14, 12: 27,
 }
 
 const suma = ref<number>(7)
@@ -23,6 +24,7 @@ watch(
   (r) => {
     if (!r) return
     girando.value = true
+    reproducir('giro')
     setTimeout(() => (girando.value = false), 700)
   },
 )
@@ -64,8 +66,8 @@ const puntos: Record<number, number[]> = {
         v-for="n in 11"
         :key="n"
         class="num"
-        :class="{ activa: suma === n + 1, 'resalta-ganador': premio > 0 && resultado?.suma === suma }"
-        @click="suma = n + 1">
+        :class="{ activa: suma === n + 1, 'resalta-ganador': premio > 0 && resultado?.suma === n + 1 }"
+        @click="suma = n + 1; reproducir('tecla')">
         {{ n + 1 }}
         <small>x{{ mult[n + 1] }}</small>
       </button>

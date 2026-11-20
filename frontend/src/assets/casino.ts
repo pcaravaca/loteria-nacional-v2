@@ -14,6 +14,7 @@ import suertudoCard from './casino/cards/suertudo.webp'
 import parleyCard from './casino/cards/parley.webp'
 import baccaratCard from './casino/cards/baccarat.webp'
 import bingoCard from './casino/cards/bingo.svg'
+import gemasCard from './casino/cards/gemas.svg'
 
 import dadosHero from './casino/hero/dados.webp'
 import slotsHero from './casino/hero/slots.webp'
@@ -30,6 +31,7 @@ import suertudoHero from './casino/hero/suertudo.webp'
 import parleyHero from './casino/hero/parley.webp'
 import baccaratHero from './casino/hero/baccarat.webp'
 import bingoHero from './casino/hero/bingo.svg'
+import gemasHero from './casino/hero/gemas.svg'
 
 // Arte del catalogo AST Casino (ilustraciones generadas con la misma paleta).
 import astTuttifruti from './casino/ast/tuttifruti.webp'
@@ -99,6 +101,7 @@ export type CodigoJuego =
   | 'parley'
   | 'baccarat'
   | 'bingo'
+  | 'gemas'
   // Catalogo AST Casino
   | 'spy'
   | 'tuttifruti'
@@ -137,6 +140,7 @@ export const cartas: Record<CodigoJuego, string> = {
   parley: parleyCard,
   baccarat: baccaratCard,
   bingo: bingoCard,
+  gemas: gemasCard,
   ...astArte,
 } as Record<CodigoJuego, string>
 
@@ -156,6 +160,7 @@ export const heroes: Record<CodigoJuego, string> = {
   parley: parleyHero,
   baccarat: baccaratHero,
   bingo: bingoHero,
+  gemas: gemasHero,
   ...astArte,
 } as Record<CodigoJuego, string>
 

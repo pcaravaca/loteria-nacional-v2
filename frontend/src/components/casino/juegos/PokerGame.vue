@@ -3,6 +3,7 @@ import { onMounted, ref } from 'vue'
 import { api } from '@/api/client'
 import { useAuthStore } from '@/stores/auth'
 import { colones } from '@/utils/formato'
+import { reproducir } from '@/utils/sfx'
 
 const props = defineProps<{ codigo: string; monto: number; clientSeed: string }>()
 
@@ -59,6 +60,7 @@ async function repartir() {
     premio.value = 0
     multiplicador.value = 0
     fase.value = 'cartas'
+    reproducir('carta')
     await auth.cargar()
   } catch (e: any) {
     error.value = e?.response?.data?.error ?? e.message
@@ -80,6 +82,8 @@ async function cobrar() {
     multiplicador.value = data.resultado?.multipl ?? 0
     manoFinal.value = data.resultado?.mano ?? ''
     fase.value = 'final'
+    reproducir('carta')
+    window.setTimeout(() => reproducir(premio.value > 0 ? 'ganar' : 'perder'), 280)
     await auth.cargar()
   } catch (e: any) {
     error.value = e?.response?.data?.error ?? e.message
@@ -122,6 +126,7 @@ onMounted(nueva)
             roja: etiqueta(c).roja,
             retenida: fase === 'cartas' && retenidas[i],
             fija: fase === 'final' && retenidas[i],
+            'resalta-ganador': fase === 'final' && premio > 0,
             comodin: etiqueta(c).comodin,
           }"
           :disabled="fase === 'final' || cargando"
@@ -173,7 +178,9 @@ onMounted(nueva)
   color: #10161c; display: flex; flex-direction: column; align-items: center; justify-content: center;
   gap: 2px; font-weight: 700; box-shadow: 0 6px 14px rgba(0, 0, 0, .35);
   border: 1px solid transparent; transition: transform .15s, box-shadow .15s;
+  animation: aparecer .25s ease both;
 }
+@keyframes aparecer { from { transform: translateY(-8px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
 .carta.roja { color: #b3202c; }
 .carta.comodin { background: linear-gradient(160deg, #2a1e3f, #120a1c); color: #e8d9a8; }
 .carta.retenida { transform: translateY(-8px); box-shadow: 0 0 0 2px var(--gold), 0 10px 18px rgba(0, 0, 0, .4); }

@@ -6,8 +6,9 @@ import type { AuditEntry, CasinoGame, CasinoStats, Loteria, Sorteo, User } from 
 import { colones, estadoSorteo, fechaHora, tipoLabel } from '@/utils/formato'
 import Modal from '@/components/Modal.vue'
 import EmptyState from '@/components/EmptyState.vue'
+import AccesosAdmin from '@/components/admin/AccesosAdmin.vue'
 
-type Tab = 'usuarios' | 'loterias' | 'sorteas' | 'casino' | 'rifas' | 'reportes'
+type Tab = 'usuarios' | 'loterias' | 'sorteas' | 'casino' | 'rifas' | 'accesos' | 'reportes'
 
 const tabs: { id: Tab; label: string; ico: string }[] = [
   { id: 'usuarios', label: 'Usuarios', ico: '👥' },
@@ -15,6 +16,7 @@ const tabs: { id: Tab; label: string; ico: string }[] = [
   { id: 'sorteas', label: 'Sorteos', ico: '📅' },
   { id: 'casino', label: 'Casino', ico: '🎲' },
   { id: 'rifas', label: 'Rifas', ico: '🎁' },
+  { id: 'accesos', label: 'Accesos', ico: '🔑' },
   { id: 'reportes', label: 'Reportes', ico: '📊' },
 ]
 const route = useRoute()
@@ -55,7 +57,7 @@ async function cargar() {
       api.get<User[]>('/admin/usuarios'),
       api.get<Loteria[]>('/loterias', { params: { todas: 1 } }),
       api.get<Sorteo[]>('/sorteos'),
-      api.get<CasinoGame[]>('/casino/games'),
+      api.get<CasinoGame[]>('/casino/games', { params: { todas: 1 } }),
       api.get<CasinoStats[]>('/admin/casino/stats'),
       api.get<any[]>('/admin/rifas'),
     ])
@@ -584,6 +586,10 @@ async function cerrarSorteo() {
         </table>
       </div>
       <EmptyState v-else-if="!cargando" icono="🎁" titulo="Sin rifas" />
+    </div>
+
+    <div v-show="tab === 'accesos'">
+      <AccesosAdmin />
     </div>
 
     <div v-show="tab === 'reportes'">

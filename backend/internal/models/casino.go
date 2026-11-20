@@ -10,21 +10,26 @@ import (
 // Juegos del mini casino. El resultado y el pago se calculan siempre en el
 // servidor; el cliente solo anima lo que este le devuelve.
 const (
-	CasinoDados     = "dados"
-	CasinoSlots     = "slots"
-	CasinoRuleta    = "ruleta"
-	CasinoRaspa     = "raspa"
-	CasinoKeno      = "keno"
-	CasinoBlackjack = "blackjack"
-	CasinoCascada   = "cascada"
-	CasinoHilo      = "hilo"
-	CasinoAlto      = "alto"
-	CasinoFortuna   = "fortuna"
-	CasinoMoneda    = "moneda"
-	CasinoSuertudo  = "suertudo"
-	CasinoParley    = "parley"
-	CasinoBaccarat  = "baccarat"
-	CasinoBingo     = "bingo"
+	CasinoDados          = "dados"
+	CasinoSlots          = "slots"
+	CasinoRuleta         = "ruleta"
+	CasinoRaspa          = "raspa"
+	CasinoKeno           = "keno"
+	CasinoBlackjack      = "blackjack"
+	CasinoCascada        = "cascada"
+	CasinoHilo           = "hilo"
+	CasinoAlto           = "alto"
+	CasinoFortuna        = "fortuna"
+	CasinoMoneda         = "moneda"
+	CasinoSuertudo       = "suertudo"
+	CasinoParley         = "parley"
+	CasinoBaccarat       = "baccarat"
+	CasinoBingo          = "bingo"
+	CasinoBingo90        = "bingo90"
+	CasinoBingoEsquinas  = "bingo-esquinas"
+	CasinoBingoDiamante  = "bingo-diamante"
+	CasinoBingoRelampago = "bingo-relampago"
+	CasinoGemas          = "gemas"
 )
 
 // CasinoGame es un juego del mini casino con sus limites y su RTP declarado.
@@ -158,13 +163,14 @@ func (r *CasinoRound) AfterFind(tx *gorm.DB) error {
 	return json.Unmarshal([]byte(r.ResultadoRaw), &r.Resultado)
 }
 
-// BingoRonda es una jugada de bingo 75. La apuesta se descuenta al abrir y la
+// BingoRonda es una jugada de bingo. La apuesta se descuenta al abrir y la
 // ronda queda abierta mientras se cantan bolillas de a una; el premio se calcula
-// por las líneas completadas en los cartones. El orden de las 75 bolillas y los
-// cartones se derivan de las semillas (provably fair).
+// segun la variante (patrones y multiplicadores propios). El orden de las
+// bolillas y los cartones se derivan de las semillas (provably fair).
 type BingoRonda struct {
 	ID             uint      `gorm:"primaryKey" json:"id"`
 	UserID         uint      `gorm:"not null;index" json:"user_id"`
+	Variante       string    `gorm:"size:32;not null;default:bingo" json:"variante"`
 	Monto          int64     `gorm:"not null" json:"monto"` // apuesta total (por cartón x cartones)
 	MontoPorCarton int64     `gorm:"not null" json:"monto_por_carton"`
 	Cartones       int       `gorm:"not null;default:1" json:"cartones"`
@@ -221,6 +227,64 @@ func (b *BingoRonda) AfterFind(tx *gorm.DB) error {
 	}
 	if b.CantadasRaw != "" {
 		if err := json.Unmarshal([]byte(b.CantadasRaw), &b.Cantadas); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// GemasRonda es una jugada de Gemas (match-3). La apuesta se descuenta al
+// abrir la ronda y el jugador tiene una cantidad limitada de intercambios; el
+// tablero inicial y el chorro de relleno se derivan de las semillas (provably
+// fair), y cada intercambio se guarda para poder auditar la jugada compelta.
+type GemasRonda struct {
+	ID             uint      `gorm:"primaryKey" json:"id"`
+	UserID         uint      `gorm:"not null;index" json:"user_id"`
+	Monto          int64     `gorm:"not null" json:"monto"`
+	TableroRaw     string    `gorm:"column:tablero_raw;type:text" json:"-"`
+	Tablero        []int     `gorm:"-" json:"tablero"` // 64 celdas: 0..6 base, 7 gema rayo
+	StreamOffset   int       `gorm:"not null;default:0" json:"stream_offset"`
+	Cursor         int       `gorm:"not null;default:0" json:"cursor"` // posicion del chorro de relleno
+	JugadasRaw     string    `gorm:"column:jugadas_raw;type:text" json:"-"`
+	Jugadas        [][2]int  `gorm:"-" json:"jugadas"` // pares de celdas intercambiadas
+	Movimientos    int       `gorm:"not null;default:0" json:"movimientos"`
+	Puntos         int64     `gorm:"not null;default:0" json:"puntos"`
+	Estado         string    `gorm:"not null;default:abierta" json:"estado"` // abierta | pagada
+	Multiplicador  float64   `gorm:"not null;default:0" json:"multiplicador"`
+	Premio         int64     `gorm:"not null;default:0" json:"premio"`
+	ClientSeed     string    `gorm:"size:64" json:"client_seed"`
+	ServerSeedHash string    `gorm:"size:64" json:"server_seed_hash"`
+	Nonce          int64     `json:"nonce"`
+	CreatedAt      time.Time `json:"created_at"`
+}
+
+func (GemasRonda) TableName() string { return "gemas_rondas" }
+
+func (g *GemasRonda) BeforeSave(tx *gorm.DB) error {
+	tb, err := json.Marshal(g.Tablero)
+	if err != nil {
+		return err
+	}
+	if g.Jugadas == nil {
+		g.Jugadas = [][2]int{}
+	}
+	jb, err := json.Marshal(g.Jugadas)
+	if err != nil {
+		return err
+	}
+	g.TableroRaw = string(tb)
+	g.JugadasRaw = string(jb)
+	return nil
+}
+
+func (g *GemasRonda) AfterFind(tx *gorm.DB) error {
+	if g.TableroRaw != "" {
+		if err := json.Unmarshal([]byte(g.TableroRaw), &g.Tablero); err != nil {
+			return err
+		}
+	}
+	if g.JugadasRaw != "" {
+		if err := json.Unmarshal([]byte(g.JugadasRaw), &g.Jugadas); err != nil {
 			return err
 		}
 	}

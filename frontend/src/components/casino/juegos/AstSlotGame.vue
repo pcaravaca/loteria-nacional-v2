@@ -2,6 +2,7 @@
 import { onMounted, onUnmounted, ref, watch } from 'vue'
 import { colones } from '@/utils/formato'
 import { astSimbolo } from '@/assets/ast'
+import { reproducir } from '@/utils/sfx'
 
 const props = defineProps<{
   codigo: string
@@ -40,6 +41,7 @@ onMounted(pintarInicial)
 function girar() {
   const [rodillos, filas] = dimensiones()
   girando.value = true
+  reproducir('rodillo')
   lineasGanadoras.value = []
   celdasGanadoras.value = new Set()
   visibles.value = Array.from({ length: rodillos }, () =>
@@ -100,7 +102,7 @@ function jugar() {
           v-for="(s, f) in columna"
           :key="f"
           class="celda"
-          :class="{ intensa: celdasGanadoras.has(`${c}:${f}`) }"
+          :class="{ intensa: celdasGanadoras.has(`${c}:${f}`), 'resalta-ganador': celdasGanadoras.has(`${c}:${f}`) }"
         >
           <span>{{ astSimbolo(codigo, s) }}</span>
         </div>

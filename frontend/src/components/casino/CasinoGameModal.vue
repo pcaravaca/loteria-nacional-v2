@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { api } from '@/api/client'
 import { useAuthStore } from '@/stores/auth'
 import type { CasinoGame, PlayResponse } from '@/types'
@@ -21,6 +21,8 @@ import AltoGame from './juegos/AltoGame.vue'
 import FortunaGame from './juegos/FortunaGame.vue'
 import BaccaratGame from './juegos/BaccaratGame.vue'
 import BingoGame from './juegos/BingoGame.vue'
+import { esBingo } from './juegos/bingoVariantes'
+import GemasGame from './juegos/GemasGame.vue'
 import AstSlotGame from './juegos/AstSlotGame.vue'
 import PokerGame from './juegos/PokerGame.vue'
 
@@ -68,11 +70,15 @@ if (typeof document !== 'undefined') {
   })
 }
 
+// Apertura del tablero: un tono corto acompaña la carga de cualquier juego.
+// El contexto de audio ya fue desbloqueado por el clic que abrio el modal.
+onMounted(() => reproducir('tecla'))
+
 const rapidos = [500, 1000, 5000, 10000]
 // Guía por juego (aprobada por Peter: se muestra arriba del tablero).
 // Los multiplicadores son los del backend (internal/casino/games.go).
 type Guia = { pasos: { t: string; d: string }[]; premios: { etq: string; mult: string }[] }
-const guias: Partial<Record<CodigoJuego, Guia>> = {
+const guias: Partial<Record<string, Guia>> = {
   dados: {
     pasos: [
       { t: 'Elegí la suma', d: 'Del 2 al 12. Cuanto más rara, más paga.' },
@@ -197,6 +203,18 @@ const guias: Partial<Record<CodigoJuego, Guia>> = {
     ],
     premios: [{ etq: 'Jugador', mult: 'x2' }, { etq: 'Banca', mult: 'x2 menos 5%' }, { etq: 'Empate', mult: 'x8' }],
   },
+  gemas: {
+    pasos: [
+      { t: 'Elegí dos gemas vecinas', d: 'Tocá una gema y después la de al lado para intercambiarlas. Si forman un grupo de 3+, revientan y pagás.' },
+      { t: 'Cuidado con las cascadas', d: 'Al caer las gemas pueden armarse más grupos: cada cascada multiplica el pago.' },
+      { t: 'Reventá o llegá a 25', d: 'Los grupos de 4+ dejan una gema rayo que limpia su fila y columna. Podés liquidar antes con "Reventar".' },
+    ],
+    premios: [
+      { etq: '3 gemas', mult: '1 a 20 pts' }, { etq: '4 gemas', mult: 'x2' },
+      { etq: '5 gemas', mult: 'x3' }, { etq: 'Gema rayo', mult: '40 pts' },
+      { etq: 'Cascada', mult: 'x1 / x2 / x3' },
+    ],
+  },
   bingo: {
     pasos: [
       { t: 'Elegí la cantidad de cartones', d: 'De 1 a 4. La apuesta se multiplica por la cantidad de cartones.' },
@@ -206,6 +224,49 @@ const guias: Partial<Record<CodigoJuego, Guia>> = {
     premios: [
       { etq: '1 línea', mult: 'x1' }, { etq: '2 o más líneas', mult: 'x3' },
       { etq: 'Cartón lleno', mult: 'x25' },
+    ],
+  },
+  bingo90: {
+    pasos: [
+      { t: 'Elegí la cantidad de cartones', d: 'De 1 a 4. La apuesta se multiplica por la cantidad de cartones.' },
+      { t: 'Cantá las bolillas', d: 'Se cantan 60 de las 90. Las líneas del ticket 3x9 se marcan solas.' },
+      { t: 'Buscá líneas o cartón lleno', d: 'Una línea paga x2, dos líneas x5 y el cartón lleno x40.' },
+    ],
+    premios: [
+      { etq: '1 línea', mult: 'x2' }, { etq: '2 líneas', mult: 'x5' },
+      { etq: 'Cartón lleno', mult: 'x40' },
+    ],
+  },
+  'bingo-esquinas': {
+    pasos: [
+      { t: 'Elegí la cantidad de cartones', d: 'De 1 a 4. La apuesta se multiplica por la cantidad de cartones.' },
+      { t: 'Cantá las bolillas', d: 'Se cantan 42 de las 75. Las casillas acertadas se marcan solas.' },
+      { t: 'Cuatro esquinas', d: 'Completá las cuatro esquinas del cartón para ganar x9; el cartón lleno paga x25.' },
+    ],
+    premios: [
+      { etq: 'Cuatro esquinas', mult: 'x9' }, { etq: 'Cartón lleno', mult: 'x25' },
+    ],
+  },
+  'bingo-diamante': {
+    pasos: [
+      { t: 'Elegí la cantidad de cartones', d: 'De 1 a 4. La apuesta se multiplica por la cantidad de cartones.' },
+      { t: 'Cantá las bolillas', d: 'Se cantan 42 de las 75. Las casillas acertadas se marcan solas.' },
+      { t: 'El diamante', d: 'Completá el centro libre y sus cuatro vecinos para ganar x9; el cartón lleno paga x25.' },
+    ],
+    premios: [
+      { etq: 'Diamante', mult: 'x9' }, { etq: 'Cartón lleno', mult: 'x25' },
+    ],
+  },
+  'bingo-relampago': {
+    pasos: [
+      { t: 'Elegí la cantidad de cartones', d: 'De 1 a 4. La apuesta se multiplica por la cantidad de cartones.' },
+      { t: 'Solo 20 cantadas', d: 'Se cantan 20 de las 75: la jugada es corta y el pago es un fijo por tus aciertos.' },
+      { t: 'Cuantos más aciertos, más pagás', d: '6 a 8 aciertos x1, 9 x2, 10 x3, 11 x4 y 12 o más x5.' },
+    ],
+    premios: [
+      { etq: '6 a 8 aciertos', mult: 'x1' }, { etq: '9 aciertos', mult: 'x2' },
+      { etq: '10 aciertos', mult: 'x3' }, { etq: '11 aciertos', mult: 'x4' },
+      { etq: '12 o más', mult: 'x5' },
     ],
   },
 }
@@ -392,7 +453,13 @@ function repetir() {
         @jugar="jugar"
       />
       <BingoGame
-        v-else-if="juego.codigo === 'bingo'"
+        v-else-if="esBingo(juego.codigo)"
+        :monto="monto"
+        :client-seed="clientSeed"
+        :variante="juego.codigo"
+      />
+      <GemasGame
+        v-else-if="juego.codigo === 'gemas'"
         :monto="monto"
         :client-seed="clientSeed"
       />
@@ -489,12 +556,18 @@ function repetir() {
 .tema-marquesina {
   border-radius: 12px; padding: 10px 14px; display: flex; align-items: center; gap: 10px;
   text-transform: uppercase; letter-spacing: .18em; font-size: 13px; font-weight: 800;
-  border: 1px solid transparent;
+  border: 1px solid transparent; flex-wrap: wrap; row-gap: 6px;
 }
+.tema-marquesina > b { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .tema-marquesina span {
   margin-left: auto; text-transform: none; letter-spacing: .02em; font-weight: 400;
-  font-size: 11px; opacity: .8;
+  font-size: 11px; opacity: .8; min-width: 0; overflow: hidden; text-overflow: ellipsis;
+  white-space: nowrap;
 }
+/* Que el control de tamano y el de pantalla completa nunca se pisen: ocupan
+   la derecha y, si no entran, bajan a una segunda linea. */
+.zoom-ctl { flex: none; }
+.btn-pantalla { flex: none; }
 .tema-arena {
   border-radius: 16px; border: 1px solid; padding: 10px;
   box-shadow: inset 0 14px 30px rgba(0,0,0,.45);

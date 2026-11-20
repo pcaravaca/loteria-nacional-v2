@@ -40,10 +40,24 @@ func rifasGanadores(db *gorm.DB, r models.Rifa) []models.GanadorRifa {
 	return out
 }
 
-// Listar devuelve todas las rifas con el progreso de venta.
+// Listar devuelve las rifas con el progreso de venta. Los admin/agentes ven el
+// catalogo completo; el resto solo las rifas con acceso activo.
 func (h *RifasHandler) Listar(c *gin.Context) {
+	q := h.db.Model(&models.Rifa{})
+	if !rolOperador(c) {
+		ids, err := RifasVisibles(h.db, c.GetUint("userID"))
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "no se pudieron cargar las rifas"})
+			return
+		}
+		if len(ids) == 0 {
+			c.JSON(http.StatusOK, []any{})
+			return
+		}
+		q = q.Where("id IN ?", ids)
+	}
 	var rifas []models.Rifa
-	if err := h.db.Order("estado asc, fecha_sorteo asc").Find(&rifas).Error; err != nil {
+	if err := q.Order("estado asc, fecha_sorteo asc").Find(&rifas).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "no se pudieron cargar las rifas"})
 		return
 	}
@@ -77,6 +91,9 @@ func (h *RifasHandler) Detalle(c *gin.Context) {
 	var rifa models.Rifa
 	if err := h.db.First(&rifa, id).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "rifa no encontrada"})
+		return
+	}
+	if !rolOperador(c) && !ExigirAcceso(c, h.db, c.GetUint("userID"), models.ContenidoRifa, strconv.FormatUint(uint64(rifa.ID), 10)) {
 		return
 	}
 	var nums []models.RifaNumero
@@ -137,6 +154,11 @@ func (h *RifasHandler) Comprar(c *gin.Context) {
 	}
 	if rifa.Estado != models.RifaAbierta {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "la rifa no está abierta"})
+		return
+	}
+	// El acceso por paquete o por jugador puede apagar la rifa: la compra se
+	// rechaza con 403 aunque el estado siga abierto.
+	if !ExigirAcceso(c, h.db, userID, models.ContenidoRifa, strconv.FormatUint(uint64(rifa.ID), 10)) {
 		return
 	}
 	for _, n := range req.Numeros {

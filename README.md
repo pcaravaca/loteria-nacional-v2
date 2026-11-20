@@ -129,9 +129,15 @@ GET  /api/casino/games            POST /api/casino/play
 GET  /api/casino/seed             POST /api/casino/seed/rotate
 POST /api/casino/blackjack        POST /api/casino/blackjack/:id/hit|stand|double
 POST /api/casino/blackjack/:id/surrender | /insurance
-GET  /api/casino/rounds           GET  /api/casino/rounds/:id/verify
+GET  /api/casino/rounds           GET  /api/casino/rounds/:id/verify[?source=casino|bingo|gemas]
 GET  /api/admin/casino/stats      PATCH /api/admin/casino/games/:codigo
 ```
+
+El historial (`/api/casino/rounds`) une las jugadas de `casino_rondas`,
+`bingo_rondas` y `gemas_rondas` en un solo formato; cada fila trae `source`
+para derivar la verificacion. `GET /api/casino/rounds/:id/verify` despacha
+internamente a la verificacion de la fuente indicada (si no se pasa
+`?source=`, busca en las tres).
 
 El blackjack incluye rendicion (late surrender: recupera la mitad de la apuesta,
 solo con la mano inicial) y seguro (con As visible del crupier: cuesta la mitad

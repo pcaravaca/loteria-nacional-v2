@@ -86,8 +86,8 @@ func Premio(monto int64, out Outcome) int64 {
 // ---------------------------------------------------------------- dados
 
 var dadosMultipl = map[int]int64{
-	2: 30, 3: 15, 4: 10, 5: 8, 6: 6, 7: 5,
-	8: 6, 9: 8, 10: 10, 11: 15, 12: 30,
+	2: 27, 3: 14, 4: 9, 5: 7, 6: 6, 7: 5,
+	8: 6, 9: 7, 10: 9, 11: 14, 12: 27,
 }
 
 func jugarDados(monto int64, draws []int, p Params) (Outcome, error) {
@@ -761,9 +761,18 @@ func MultiplicadorMaximo(codigo string, maxMultipl int64) int64 {
 		return 4
 	}
 	// El bingo paga hasta x25 por cartón y admite hasta 4 cartones: el peor
-	// caso absoluto es x100 sobre la apuesta por cartón.
+	// caso absoluto es x100 sobre la apuesta por cartón. Cada variante tiene su
+	// propio tope (el 90 paga x40 por cartón).
 	if codigo == "bingo" {
 		return 25 * 4
+	}
+	if mult := BingoMultMaximo(codigo); mult > 0 {
+		return mult
+	}
+	// Gemas: 25 intercambios con multiplicador de cascada creciente. El tope
+	// declarado deja margen por encima de lo que la simulacion alguna vez midio.
+	if codigo == "gemas" {
+		return 100
 	}
 	if m := MaxMultiplSlot(codigo); m > 0 {
 		return m

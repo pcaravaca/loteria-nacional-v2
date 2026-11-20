@@ -4,16 +4,21 @@ import { api } from '@/api/client'
 import { useAuthStore } from '@/stores/auth'
 import { colones } from '@/utils/formato'
 import { reproducir } from '@/utils/sfx'
+import {
+  bingoVariante,
+  celdasGanadoras,
+  etiquetaBolilla,
+  type BingoVarianteCfg,
+} from './bingoVariantes'
 
-const props = defineProps<{ monto: number; clientSeed: string }>()
+const props = defineProps<{ monto: number; clientSeed: string; variante?: string }>()
 
 const auth = useAuthStore()
 
-const CANTADAS = 42
-const LETRAS = ['B', 'I', 'N', 'G', 'O']
-
 interface BingoEstado {
   ronda_id: number
+  variante: string
+  nombre_variante: string
   monto: number
   monto_por_carton: number
   cartones: number
@@ -22,9 +27,15 @@ interface BingoEstado {
   cantadas: number[]
   bolilla: number
   cantidad_cantadas: number
+  tope_cantadas: number
+  bolillas: number
+  filas: number
+  columnas: number
+  centro_libre: boolean
   estado: string
   lineas: number
   lleno: boolean
+  patron: string
   tiers: number[]
   premio: number
   premio_pagado: number
@@ -34,12 +45,18 @@ interface BingoEstado {
   nonce: number
 }
 
+const cfg = computed<BingoVarianteCfg>(() => bingoVariante(props.variante ?? 'bingo'))
+
 const cartonesQty = ref(1)
 const ronda = ref<BingoEstado | null>(null)
 const cargando = ref(false)
 const error = ref('')
-const auto = ref(false)
-let timer: number | null = null
+// El canto es automático por defecto: se puede pausar o cantar a mano.
+const auto = ref(true)
+const reloj = ref(0)
+let timeout: number | null = null
+let ticker: number | null = null
+let proximoEn = 0
 
 const saldo = computed(() => auth.user?.saldo ?? 0)
 const totalApuesta = computed(() => props.monto * cartonesQty.value)
@@ -50,41 +67,107 @@ const tiers = computed(() => ronda.value?.tiers ?? [])
 const premio = computed(() => ronda.value?.premio ?? 0)
 const premioPagado = computed(() => ronda.value?.premio_pagado ?? 0)
 const abierta = computed(() => estado.value === 'abierta')
-const puedeCantar = computed(() => abierta.value && cantadas.value.length < CANTADAS && !cargando.value)
+const tope = computed(() => ronda.value?.tope_cantadas ?? cfg.value.tope)
+const cantadasSet = computed(() => new Set(cantadas.value))
+const puedeCantar = computed(
+  () => abierta.value && cantadas.value.length < tope.value && !cargando.value,
+)
+
+// Tablero completo de bolillas: se dibuja apenas se abre la ventana, sin esperar
+// al primer canto.
+const bolitasTablero = computed(() => {
+  const out: number[] = []
+  for (let n = 1; n <= cfg.value.bolillas; n++) out.push(n)
+  return out
+})
 
 // Casillas marcadas por cartón, según las bolillas cantadas. El centro es libre.
 const marcadas = computed<boolean[][][]>(() => {
   const grids = ronda.value?.grids ?? []
-  const vistos = new Set(cantadas.value)
+  const vistos = cantadasSet.value
+  const cm = Math.floor(cfg.value.filas / 2)
+  const cc = Math.floor(cfg.value.columnas / 2)
   return grids.map((grid) =>
     grid.map((fila, r) =>
-      fila.map((num, c) => (r === 2 && c === 2 ? true : num !== 0 && vistos.has(num))),
+      fila.map(
+        (num, c) =>
+          (cfg.value.centroLibre && r === cm && c === cc) ||
+          (num !== 0 && vistos.has(num)),
+      ),
     ),
   )
 })
 
-function detenerAuto() {
-  if (timer !== null) {
-    window.clearInterval(timer)
-    timer = null
-  }
-  auto.value = false
+// Casillas que formaron el patrón ganador de cada cartón.
+const ganadoras = computed<Set<string>[]>(() => {
+  const grids = ronda.value?.grids ?? []
+  return grids.map((grid, n) => celdasGanadoras(cfg.value, grid, marcadas.value[n] ?? []))
+})
+
+// Bolitas que se mezclan en la tómbola. Las posiciones son fijas (no saltan al
+// re-render) y el tambor gira con CSS.
+function pseudo(n: number) {
+  const x = Math.sin(n * 12.9898) * 43758.5453
+  return x - Math.floor(x)
+}
+const bolitas = computed(() =>
+  Array.from({ length: 18 }, (_, i) => ({
+    left: `${14 + pseudo(i + 1) * 68}%`,
+    top: `${14 + pseudo(i + 50) * 68}%`,
+    background: `hsl(${Math.round(pseudo(i + 99) * 360)} 70% 55%)`,
+  })),
+)
+
+function etiqueta(n: number) {
+  return etiquetaBolilla(cfg.value, n)
 }
 
-function alternarAuto() {
-  if (auto.value) {
-    detenerAuto()
-    return
+function demora() {
+  return 1500 + Math.random() * 1000
+}
+
+function detenerTimers() {
+  if (timeout !== null) {
+    window.clearTimeout(timeout)
+    timeout = null
   }
+  if (ticker !== null) {
+    window.clearInterval(ticker)
+    ticker = null
+  }
+}
+
+function programar() {
+  detenerTimers()
+  if (!auto.value || !abierta.value) return
+  const d = demora()
+  proximoEn = Date.now() + d
+  reloj.value = d / 1000
+  timeout = window.setTimeout(() => {
+    void cantoAutomatico()
+  }, d)
+  ticker = window.setInterval(() => {
+    reloj.value = Math.max(0, (proximoEn - Date.now()) / 1000)
+  }, 100)
+}
+
+function pausarAuto() {
+  auto.value = false
+  detenerTimers()
+  reloj.value = 0
+}
+
+function reanudarAuto() {
+  if (!abierta.value) return
   auto.value = true
   reproducir('click')
-  timer = window.setInterval(() => {
-    if (!puedeCantar.value) {
-      detenerAuto()
-      return
-    }
-    void cantar()
-  }, 380)
+  programar()
+}
+
+async function cantoAutomatico() {
+  if (!auto.value || cargando.value || !puedeCantar.value) return
+  await cantar()
+  if (auto.value && abierta.value) programar()
 }
 
 async function empezar() {
@@ -95,10 +178,13 @@ async function empezar() {
       monto: props.monto,
       cartones: cartonesQty.value,
       client_seed: props.clientSeed,
+      variante: props.variante ?? 'bingo',
     })
     ronda.value = data
+    if (auth.user) auth.user.saldo = data.saldo
     reproducir('tambor')
-    await auth.cargar()
+    auto.value = true
+    programar()
   } catch (e: any) {
     error.value = e?.response?.data?.error ?? e.message
   } finally {
@@ -106,26 +192,33 @@ async function empezar() {
   }
 }
 
-async function cantar() {
-  if (!ronda.value || cargando.value) return
+async function cantar(manual = false) {
+  if (!ronda.value || cargando.value || !puedeCantar.value) return
+  // Si el jugador canta a mano, se respeta su ritmo: se pausa el automático.
+  if (manual) pausarAuto()
   error.value = ''
   cargando.value = true
   const antes = marcadas.value.flat(2).filter(Boolean).length
   try {
-    const { data } = await api.post<BingoEstado>(`/casino/bingo/${ronda.value.ronda_id}/hit`)
+    const { data } = await api.post<BingoEstado>(
+      `/casino/bingo/${ronda.value.ronda_id}/hit`,
+      {},
+    )
     ronda.value = data
+    if (auth.user) auth.user.saldo = data.saldo
     reproducir('bolilla')
     const despues = marcadas.value.flat(2).filter(Boolean).length
     if (despues > antes) reproducir('acierto')
     if (data.estado !== 'abierta') {
-      detenerAuto()
+      detenerTimers()
+      auto.value = false
       if (data.premio_pagado > 0) reproducir(data.lleno ? 'bingo' : 'ganar')
       else reproducir('perder')
     }
-    await auth.cargar()
   } catch (e: any) {
     error.value = e?.response?.data?.error ?? e.message
-    detenerAuto()
+    detenerTimers()
+    auto.value = false
   } finally {
     cargando.value = false
   }
@@ -138,10 +231,11 @@ async function cerrar() {
   try {
     const { data } = await api.post<BingoEstado>(`/casino/bingo/${ronda.value.ronda_id}/close`)
     ronda.value = data
-    detenerAuto()
+    detenerTimers()
+    auto.value = false
+    if (auth.user) auth.user.saldo = data.saldo
     if (data.premio_pagado > 0) reproducir(data.lleno ? 'bingo' : 'ganar')
     else reproducir('perder')
-    await auth.cargar()
   } catch (e: any) {
     error.value = e?.response?.data?.error ?? e.message
   } finally {
@@ -150,36 +244,56 @@ async function cerrar() {
 }
 
 function nueva() {
-  detenerAuto()
+  detenerTimers()
   ronda.value = null
   error.value = ''
+  auto.value = true
 }
 
-onUnmounted(detenerAuto)
+onUnmounted(detenerTimers)
 </script>
 
 <template>
   <div class="bingo">
     <div class="bingo-head">
-      <div class="bolillero">
-        <span class="etq">Bolilla</span>
-        <strong class="bolilla">{{ bolilla || '—' }}</strong>
-        <span class="cantadas">{{ cantadas.length }}/{{ CANTADAS }}</span>
+      <div class="tombola" aria-hidden="true">
+        <div class="tambor">
+          <span v-for="(b, i) in bolitas" :key="i" class="bolita" :style="b"></span>
+        </div>
+        <div :key="bolilla" class="bola-grande">{{ etiqueta(bolilla) }}</div>
       </div>
       <div class="info">
+        <span class="nombre">{{ cfg.nombre }}</span>
         <span>Saldo <b>{{ colones(saldo) }}</b></span>
         <span>Apuesta <b>{{ colones(totalApuesta) }}</b></span>
         <span>Premio <b>{{ colones(premio) }}</b></span>
+        <span v-if="auto && abierta" class="reloj">
+          Próxima en <b>{{ reloj.toFixed(1) }} s</b>
+        </span>
+        <span v-else-if="abierta" class="reloj pausa">Automático en pausa</span>
       </div>
     </div>
 
-    <div class="bolas">
-      <span
-        v-for="b in cantadas"
-        :key="b"
-        class="bola"
-        :class="{ ultima: b === bolilla }"
-      >{{ b }}</span>
+    <div
+      class="tablero"
+      :style="{ gridTemplateColumns: `repeat(${cfg.columnas}, minmax(0, 1fr))` }"
+    >
+      <button
+        v-for="n in bolitasTablero"
+        :key="n"
+        type="button"
+        class="casilla"
+        :class="{ 'resalta-ganador': cantadasSet.has(n), ultima: n === bolilla }"
+        disabled
+      >
+        {{ n }}
+      </button>
+    </div>
+
+    <div class="registro">
+      <span v-for="b in cantadas" :key="b" class="bola" :class="{ ultima: b === bolilla }">
+        {{ b }}
+      </span>
       <span v-if="!cantadas.length" class="vacio">Todavía no se cantó ninguna bolilla</span>
     </div>
 
@@ -194,10 +308,15 @@ onUnmounted(detenerAuto)
           <span>Cartón {{ n + 1 }}</span>
           <b v-if="tiers[n]">x{{ tiers[n] }}</b>
         </div>
-        <div class="cab">
-          <span v-for="l in LETRAS" :key="l">{{ l }}</span>
+        <div class="cab" :style="{ gridTemplateColumns: `repeat(${cfg.columnas}, 1fr)` }">
+          <span v-for="l in cfg.letras" :key="l">{{ l }}</span>
         </div>
-        <div v-for="(fila, r) in grid" :key="r" class="fila">
+        <div
+          v-for="(fila, r) in grid"
+          :key="r"
+          class="fila"
+          :style="{ gridTemplateColumns: `repeat(${cfg.columnas}, 1fr)` }"
+        >
           <div
             v-for="(num, c) in fila"
             :key="c"
@@ -205,7 +324,7 @@ onUnmounted(detenerAuto)
             :class="{
               libre: num === 0,
               marcada: marcadas[n]?.[r]?.[c],
-              'resalta-ganador': marcadas[n]?.[r]?.[c],
+              'resalta-ganador': ganadoras[n]?.has(r + ',' + c),
             }"
           >
             <span v-if="num === 0">★</span>
@@ -236,16 +355,18 @@ onUnmounted(detenerAuto)
       <button class="btn btn-primary btn-block" :disabled="cargando" @click="empezar">
         {{ cargando ? 'Abriendo…' : 'Empezar por ' + colones(totalApuesta) }}
       </button>
-      <p class="paytable">1 línea x1 · 2 o más líneas x3 · cartón lleno x25</p>
+      <p class="paytable">{{ cfg.descripcion }}</p>
     </div>
 
     <div v-else-if="abierta" class="controles">
-      <button class="btn btn-primary" :disabled="!puedeCantar" @click="cantar">Cantar</button>
+      <button class="btn btn-primary" :disabled="!puedeCantar" @click="cantar(true)">
+        Cantar ahora
+      </button>
       <button class="btn btn-ghost" :disabled="cargando || cantadas.length === 0" @click="cerrar">
         Cobrar {{ colones(premio) }}
       </button>
-      <button class="btn btn-ghost" :disabled="cargando" @click="alternarAuto">
-        {{ auto ? 'Detener' : 'Automático' }}
+      <button class="btn btn-ghost" :disabled="cargando" @click="auto ? pausarAuto() : reanudarAuto()">
+        {{ auto ? 'Pausar automático' : 'Reanudar automático' }}
       </button>
     </div>
 
@@ -260,22 +381,61 @@ onUnmounted(detenerAuto)
 <style scoped>
 .bingo { display: flex; flex-direction: column; gap: 10px; }
 .bingo-head {
-  display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+  display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
   padding: 10px 12px; border-radius: 12px;
   background: rgba(3, 16, 12, .75); border: 1px solid rgba(232, 206, 122, .35);
 }
-.bolillero { display: flex; align-items: center; gap: 10px; }
-.bolillero .etq { font-size: 11px; letter-spacing: .16em; text-transform: uppercase; color: var(--faint); }
-.bolilla {
-  min-width: 44px; height: 44px; padding: 0 8px; border-radius: 999px; display: grid; place-items: center;
-  background: linear-gradient(180deg, #f5dd9a, #c9a227); color: #3a2a05;
-  font-size: 20px; font-weight: 800; box-shadow: 0 4px 12px rgba(0, 0, 0, .4);
-}
-.cantadas { font-size: 12px; color: var(--muted); }
-.info { display: flex; gap: 14px; font-size: 12px; color: var(--faint); flex-wrap: wrap; }
-.info b { color: var(--text); margin-left: 4px; }
 
-.bolas { display: flex; flex-wrap: wrap; gap: 5px; min-height: 28px; align-items: center; }
+/* Tómbola: tambor que gira con bolitas mezclándose y la bola cantada afuera. */
+.tombola {
+  position: relative; width: 132px; height: 132px; flex: 0 0 auto;
+  border-radius: 50%; overflow: hidden;
+  background: radial-gradient(circle at 35% 30%, #1d3b2a, #0a1a12 70%);
+  border: 3px solid rgba(232, 206, 122, .55);
+  box-shadow: inset 0 0 24px rgba(0, 0, 0, .6), 0 6px 18px rgba(0, 0, 0, .4);
+}
+.tombola::after {
+  content: ''; position: absolute; inset: 0; border-radius: 50%;
+  background: radial-gradient(circle at 50% 45%, rgba(255, 255, 255, .12), transparent 55%);
+  pointer-events: none;
+}
+.tambor { position: absolute; inset: 0; animation: girar 7s linear infinite; }
+.bolita {
+  position: absolute; width: 16px; height: 16px; border-radius: 50%;
+  transform: translate(-50%, -50%); box-shadow: inset -2px -2px 4px rgba(0, 0, 0, .35);
+}
+.bola-grande {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  min-width: 74px; height: 74px; padding: 0 10px; border-radius: 50%;
+  display: grid; place-items: center; text-align: center;
+  background: linear-gradient(180deg, #f5dd9a, #c9a227); color: #3a2a05;
+  font-size: 22px; font-weight: 800; letter-spacing: .02em;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, .5), inset 0 -6px 10px rgba(0, 0, 0, .15);
+  animation: pop .35s ease;
+}
+@keyframes girar { to { transform: rotate(360deg); } }
+@keyframes pop {
+  0% { transform: translate(-50%, -50%) scale(.2); opacity: 0; }
+  70% { transform: translate(-50%, -50%) scale(1.12); opacity: 1; }
+  100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+}
+
+.info { display: flex; flex-direction: column; gap: 3px; font-size: 12px; color: var(--faint); flex: 1 1 160px; }
+.info b { color: var(--text); margin-left: 4px; }
+.info .nombre { font-size: 13px; font-weight: 700; color: var(--gold); }
+.reloj b { color: var(--prim-2); }
+.reloj.pausa { color: var(--muted); font-style: italic; }
+
+.tablero { display: grid; gap: 3px; }
+.casilla {
+  height: 24px; border-radius: 6px; border: 1px solid var(--border-soft);
+  background: var(--surface); color: var(--muted); font-size: 11px; font-weight: 600;
+  cursor: default; padding: 0;
+}
+.casilla:disabled { opacity: 1; }
+.casilla.ultima { border-color: var(--gold); color: var(--gold); }
+
+.registro { display: flex; flex-wrap: wrap; gap: 5px; min-height: 28px; align-items: center; }
 .bola {
   min-width: 28px; height: 28px; padding: 0 6px; border-radius: 999px; display: grid; place-items: center;
   background: var(--surface); border: 1px solid var(--border-soft); font-size: 12px; color: var(--muted);
@@ -285,6 +445,7 @@ onUnmounted(detenerAuto)
 
 .cartones { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); }
 .cartones.n1 { grid-template-columns: minmax(210px, 260px); justify-content: center; }
+.cartones.n1.columnas9 { grid-template-columns: minmax(260px, 340px); }
 .carton {
   padding: 10px; border-radius: 14px; background: rgba(255, 255, 255, .03);
   border: 1px solid var(--border-soft);
@@ -292,9 +453,9 @@ onUnmounted(detenerAuto)
 .carton.lleno { border-color: var(--gold); box-shadow: 0 0 0 1px var(--gold), 0 0 24px rgba(245, 185, 66, .35); }
 .carton-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; font-size: 12px; color: var(--faint); }
 .carton-head b { color: var(--gold); font-size: 15px; }
-.cab, .fila { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; }
-.cab { margin-bottom: 4px; }
+.cab { display: grid; gap: 4px; margin-bottom: 4px; }
 .cab span { text-align: center; font-size: 11px; font-weight: 800; letter-spacing: .1em; color: var(--gold); }
+.fila { display: grid; gap: 4px; }
 .celda {
   height: 34px; border-radius: 8px; display: grid; place-items: center;
   background: var(--surface); border: 1px solid var(--border-soft);

@@ -54,12 +54,16 @@ func Open(cfg *config.Config) (*gorm.DB, error) {
 		&models.CasinoRound{},
 		&models.BlackjackMano{},
 		&models.BingoRonda{},
+		&models.GemasRonda{},
 		&models.PokerMano{},
 		&models.AuditLog{},
 		&models.LimitesJugador{},
 		&models.Rifa{},
 		&models.RifaNumero{},
 		&models.Ajuste{},
+		&models.GrupoJugadores{},
+		&models.JugadorGrupo{},
+		&models.AccesoContenido{},
 	); err != nil {
 		return nil, fmt.Errorf("automigrate: %w", err)
 	}

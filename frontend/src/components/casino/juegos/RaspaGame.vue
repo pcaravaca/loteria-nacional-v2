@@ -2,6 +2,7 @@
 import { computed, ref, watch } from 'vue'
 import { colones } from '@/utils/formato'
 import { simbolos } from '@/assets/casino'
+import { reproducir } from '@/utils/sfx'
 
 const props = defineProps<{
   resultado: any
@@ -28,11 +29,16 @@ watch(
     r.simbolos.forEach((_: string, i: number) => {
       window.setTimeout(() => (reveladas.value[i] = true), 500 + i * 450)
     })
+    // Al terminar de revelar, el acierto se acompana con su propio tono.
+    window.setTimeout(() => {
+      if (props.premio > 0) reproducir('acierto')
+    }, 500 + r.simbolos.length * 450)
   },
 )
 
 function rascar() {
   reveladas.value = [false, false, false]
+  reproducir('rodillo')
   emit('jugar', {})
 }
 </script>

@@ -23,15 +23,15 @@ func TestSeedCasino(t *testing.T) {
 	if err := db.Table("casino_juegos").Count(&total).Error; err != nil {
 		t.Fatalf("contar: %v", err)
 	}
-	if total != 35 {
-		t.Fatalf("se esperaban 35 juegos, hay %d", total)
+	if total != 40 {
+		t.Fatalf("se esperaban 40 juegos, hay %d", total)
 	}
 
 	var activos int64
 	if err := db.Table("casino_juegos").Where("activo = ?", true).Count(&activos).Error; err != nil {
 		t.Fatalf("contar activos: %v", err)
 	}
-	if activos != 35 {
+	if activos != 40 {
 		t.Fatalf("los juegos deberian quedar activos, hay %d", activos)
 	}
 
@@ -46,6 +46,20 @@ func TestSeedCasino(t *testing.T) {
 	}
 	if maximo := casino.ApuestaMaxima(bingo.MaxApuesta, bingo.MaxMultipl, bingo.MaxPremio, bingo.Codigo); maximo != 10000 {
 		t.Errorf("apuesta máxima del bingo = %d, esperaba 10000", maximo)
+	}
+
+	// Las cinco variantes de bingo quedan como entradas propias, activas.
+	for _, codigo := range []string{
+		models.CasinoBingo, models.CasinoBingo90, models.CasinoBingoEsquinas,
+		models.CasinoBingoDiamante, models.CasinoBingoRelampago,
+	} {
+		var juego models.CasinoGame
+		if err := db.Where("codigo = ?", codigo).First(&juego).Error; err != nil {
+			t.Fatalf("%s: %v", codigo, err)
+		}
+		if !juego.Activo {
+			t.Errorf("%s debería quedar activo", codigo)
+		}
 	}
 
 	var techo int64

@@ -11,37 +11,59 @@ import (
 	"loteria-backend/internal/models"
 )
 
-// Bingo 75: la apuesta se descuenta al abrir la ronda y las bolillas se cantan
-// de a una. El premio se calcula por las líneas completadas en los cartones; el
+// Bingo: la apuesta se descuenta al abrir la ronda y las bolillas se cantan de a
+// una. El premio depende de la variante (patrones y multiplicadores propios); el
 // orden de las bolillas y los cartones salen de las semillas (provably fair).
 
 type bingoRequest struct {
 	Monto      int64  `json:"monto" binding:"required,min=1"`
 	Cartones   int    `json:"cartones"`
 	ClientSeed string `json:"client_seed"`
+	Variante   string `json:"variante"`
 }
 
-// bingoJuego carga la configuración del juego y verifica que esté activo.
-func (h *CasinoHandler) bingoJuego(c *gin.Context) (models.CasinoGame, bool) {
+// bingoJuego carga la configuración de la variante y verifica que esté activa.
+func (h *CasinoHandler) bingoJuego(c *gin.Context, codigo string) (models.CasinoGame, bool) {
 	var juego models.CasinoGame
-	if err := h.db.Where("codigo = ?", models.CasinoBingo).First(&juego).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "el juego no esta configurado"})
+	if err := h.db.Where("codigo = ?", codigo).First(&juego).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "la variante no está configurada"})
 		return juego, false
 	}
 	if !juego.Activo {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "el juego esta desactivado"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "la variante está desactivada"})
 		return juego, false
 	}
 	return juego, true
+}
+
+// bingoTabla deja la tabla de pagos de la variante en el formato que espera el
+// frontend.
+func bingoTabla(v casino.BingoVariante) []gin.H {
+	out := make([]gin.H, 0, len(v.Pagos))
+	for _, p := range v.Pagos {
+		out = append(out, gin.H{"nombre": p.Nombre, "mult": p.Mult})
+	}
+	return out
 }
 
 // bingoResumen arma la respuesta del estado de la ronda. `premio` es lo que se
 // pagaría con las bolillas ya cantadas; `premio_pagado` es lo que ya se acreditó
 // al cerrar.
 func bingoResumen(ronda models.BingoRonda, saldo int64, bolilla int) gin.H {
-	premio, lineas, lleno, tiers := casino.BingoPremio(ronda.MontoPorCarton, ronda.Grids, ronda.Cantadas)
+	codigo := ronda.Variante
+	if codigo == "" {
+		codigo = models.CasinoBingo
+	}
+	v, ok := casino.BingoVariantePorCodigo(codigo)
+	if !ok {
+		v, _ = casino.BingoVariantePorCodigo(models.CasinoBingo)
+		codigo = models.CasinoBingo
+	}
+	premio, lineas, lleno, tiers, patron := casino.BingoPremioVariante(ronda.MontoPorCarton, ronda.Grids, ronda.Cantadas, codigo)
 	return gin.H{
 		"ronda_id":          ronda.ID,
+		"variante":          codigo,
+		"nombre_variante":   v.Nombre,
 		"monto":             ronda.Monto,
 		"monto_por_carton":  ronda.MontoPorCarton,
 		"cartones":          ronda.Cartones,
@@ -49,10 +71,17 @@ func bingoResumen(ronda models.BingoRonda, saldo int64, bolilla int) gin.H {
 		"orden":             ronda.Orden,
 		"cantadas":          ronda.Cantadas,
 		"bolilla":           bolilla,
-		"cantidad_cantadas": casino.BingoCantadas,
+		"cantidad_cantadas": v.TopeCantadas,
+		"tope_cantadas":     v.TopeCantadas,
+		"bolillas":          v.Bolillas,
+		"filas":             v.Filas,
+		"columnas":          v.Columnas,
+		"centro_libre":      v.CentroLibre,
+		"paytable":          bingoTabla(v),
 		"estado":            ronda.Estado,
 		"lineas":            lineas,
 		"lleno":             lleno,
+		"patron":            patron,
 		"tiers":             tiers,
 		"premio":            premio,
 		"premio_pagado":     ronda.Premio,
@@ -64,7 +93,7 @@ func bingoResumen(ronda models.BingoRonda, saldo int64, bolilla int) gin.H {
 }
 
 // BingoStart cobra la apuesta, genera los cartones y devuelve el orden de las
-// bolillas (que el cliente no necesita Mostrar: las revela `hit` de a una).
+// bolillas (que el cliente no necesita mostrar: las revela `hit` de a una).
 func (h *CasinoHandler) BingoStart(c *gin.Context) {
 	var req bingoRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -78,15 +107,27 @@ func (h *CasinoHandler) BingoStart(c *gin.Context) {
 	if !GuardJugada(c, h.cfg, user) {
 		return
 	}
-	juego, ok := h.bingoJuego(c)
+	variante := req.Variante
+	if variante == "" {
+		variante = models.CasinoBingo
+	}
+	if _, ok := casino.BingoVariantePorCodigo(variante); !ok {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "variante de bingo invalida: " + variante})
+		return
+	}
+	juego, ok := h.bingoJuego(c, variante)
 	if !ok {
 		return
 	}
+	if !ExigirAcceso(c, h.db, user.ID, models.ContenidoJuego, variante) {
+		return
+	}
+	v, _ := casino.BingoVariantePorCodigo(variante)
 	if req.Cartones < 1 {
 		req.Cartones = 1
 	}
-	if req.Cartones > casino.BingoMaxCartones {
-		req.Cartones = casino.BingoMaxCartones
+	if req.Cartones > v.MaxCartones {
+		req.Cartones = v.MaxCartones
 	}
 	if req.Monto < juego.MinApuesta {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "la apuesta debe ser de al menos " + strconv.FormatInt(juego.MinApuesta, 10)})
@@ -102,7 +143,7 @@ func (h *CasinoHandler) BingoStart(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "saldo insuficiente"})
 		return
 	}
-	if !h.verificarLimite(c, user, models.CasinoBingo, total) {
+	if !h.verificarLimite(c, user, variante, total) {
 		return
 	}
 	if excede, disponible, motivo := EvaluarGasto(h.db, user.ID, total); excede {
@@ -115,10 +156,11 @@ func (h *CasinoHandler) BingoStart(c *gin.Context) {
 
 	clientSeed := h.semillaCliente(c, req.ClientSeed)
 	nonce := user.CasinoNonce
-	orden, grids := casino.BingoSorteo(clientSeed, user.CasinoSeed, nonce, req.Cartones)
+	orden, grids := casino.BingoSorteoVariante(clientSeed, user.CasinoSeed, nonce, req.Cartones, variante)
 
 	ronda := models.BingoRonda{
 		UserID:         user.ID,
+		Variante:       variante,
 		Monto:          total,
 		MontoPorCarton: req.Monto,
 		Cartones:       req.Cartones,
@@ -171,7 +213,16 @@ func (h *CasinoHandler) BingoHit(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "la jugada ya esta cerrada"})
 		return
 	}
-	if len(ronda.Cantadas) >= casino.BingoCantadas {
+	codigo := ronda.Variante
+	if codigo == "" {
+		codigo = models.CasinoBingo
+	}
+	v, ok := casino.BingoVariantePorCodigo(codigo)
+	if !ok {
+		v, _ = casino.BingoVariantePorCodigo(models.CasinoBingo)
+		codigo = models.CasinoBingo
+	}
+	if len(ronda.Cantadas) >= v.TopeCantadas {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "ya se cantaron todas las bolillas"})
 		return
 	}
@@ -183,8 +234,8 @@ func (h *CasinoHandler) BingoHit(c *gin.Context) {
 	bolilla := ronda.Orden[len(ronda.Cantadas)]
 	ronda.Cantadas = append(ronda.Cantadas, bolilla)
 
-	_, _, lleno, _ := casino.BingoPremio(ronda.MontoPorCarton, ronda.Grids, ronda.Cantadas)
-	if lleno || len(ronda.Cantadas) >= casino.BingoCantadas {
+	_, _, lleno, _, _ := casino.BingoPremioVariante(ronda.MontoPorCarton, ronda.Grids, ronda.Cantadas, codigo)
+	if lleno || len(ronda.Cantadas) >= v.TopeCantadas {
 		h.cerrarBingo(c, &ronda, userID, bolilla)
 		return
 	}
@@ -198,7 +249,7 @@ func (h *CasinoHandler) BingoHit(c *gin.Context) {
 	c.JSON(http.StatusOK, bingoResumen(ronda, user.Saldo, bolilla))
 }
 
-// BingoClose cobra las líneas completadas hasta el momento.
+// BingoClose cobra el patrón logrado hasta el momento.
 func (h *CasinoHandler) BingoClose(c *gin.Context) {
 	userID := c.GetUint("userID")
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
@@ -225,7 +276,11 @@ func (h *CasinoHandler) BingoClose(c *gin.Context) {
 // cerrarBingo acredita el premio, marca la ronda como pagada y registra el
 // movimiento en el mismo saldo.
 func (h *CasinoHandler) cerrarBingo(c *gin.Context, ronda *models.BingoRonda, userID uint, bolilla int) {
-	premio, lineas, _, _ := casino.BingoPremio(ronda.MontoPorCarton, ronda.Grids, ronda.Cantadas)
+	codigo := ronda.Variante
+	if codigo == "" {
+		codigo = models.CasinoBingo
+	}
+	premio, lineas, _, _, _ := casino.BingoPremioVariante(ronda.MontoPorCarton, ronda.Grids, ronda.Cantadas, codigo)
 	ronda.Estado = "pagada"
 	ronda.Premio = premio
 	ronda.Lineas = lineas
@@ -242,7 +297,8 @@ func (h *CasinoHandler) cerrarBingo(c *gin.Context, ronda *models.BingoRonda, us
 				Update("saldo", gorm.Expr("saldo + ?", premio)).Error; err != nil {
 				return err
 			}
-			mov := models.Movimiento{UserID: userID, Tipo: models.MovCasinoPremio, Monto: premio, Descripcion: "Premio casino Bingo 75"}
+			v, _ := casino.BingoVariantePorCodigo(codigo)
+			mov := models.Movimiento{UserID: userID, Tipo: models.MovCasinoPremio, Monto: premio, Descripcion: "Premio casino " + v.Nombre}
 			if err := tx.Create(&mov).Error; err != nil {
 				return err
 			}

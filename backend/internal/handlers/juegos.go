@@ -24,8 +24,20 @@ func (h *JuegosHandler) ListLoterias(c *gin.Context) {
 	if c.Query("tipo") != "" {
 		q = q.Where("tipo = ?", c.Query("tipo"))
 	}
-	if c.Query("todas") != "1" {
-		q = q.Where("activa = ?", true)
+	// El panel pide el catalogo completo con todas=1; el resto solo ve las
+	// loterias con acceso activo (global, paquete o jugador).
+	verTodas := c.Query("todas") == "1" && rolOperador(c)
+	if !verTodas {
+		ids, err := LoteriasVisibles(h.db, c.GetUint("userID"))
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "no se pudieron cargar las loterias"})
+			return
+		}
+		if len(ids) == 0 {
+			c.JSON(http.StatusOK, []models.Loteria{})
+			return
+		}
+		q = q.Where("id IN ?", ids)
 	}
 
 	var loterias []models.Loteria
@@ -47,6 +59,9 @@ func (h *JuegosHandler) GetLoteria(c *gin.Context) {
 		c.JSON(http.StatusNotFound, gin.H{"error": "loteria no encontrada"})
 		return
 	}
+	if !rolOperador(c) && !ExigirAcceso(c, h.db, c.GetUint("userID"), models.ContenidoLoteria, loteria.Codigo) {
+		return
+	}
 	c.JSON(http.StatusOK, loteria)
 }
 
@@ -57,6 +72,18 @@ func (h *JuegosHandler) ListSorteos(c *gin.Context) {
 	}
 	if v := c.Query("estado"); v != "" {
 		q = q.Where("estado = ?", v)
+	}
+	if !rolOperador(c) {
+		ids, err := LoteriasVisibles(h.db, c.GetUint("userID"))
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "no se pudieron cargar los sorteos"})
+			return
+		}
+		if len(ids) == 0 {
+			c.JSON(http.StatusOK, []models.Sorteo{})
+			return
+		}
+		q = q.Where("loteria_id IN ?", ids)
 	}
 
 	var sorteos []models.Sorteo
@@ -82,10 +109,22 @@ func (h *JuegosHandler) GetSorteo(c *gin.Context) {
 }
 
 func (h *JuegosHandler) ProximosSorteos(c *gin.Context) {
+	q := h.db.Model(&models.Sorteo{}).
+		Where("estado = ? AND fecha >= ?", models.SorteoAbierto, time.Now())
+	if !rolOperador(c) {
+		ids, err := LoteriasVisibles(h.db, c.GetUint("userID"))
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "no se pudieron cargar los sorteos"})
+			return
+		}
+		if len(ids) == 0 {
+			c.JSON(http.StatusOK, []models.Sorteo{})
+			return
+		}
+		q = q.Where("loteria_id IN ?", ids)
+	}
 	var sorteos []models.Sorteo
-	if err := h.db.Preload("Loteria").
-		Where("estado = ? AND fecha >= ?", models.SorteoAbierto, time.Now()).
-		Order("fecha asc").Limit(10).Find(&sorteos).Error; err != nil {
+	if err := q.Preload("Loteria").Order("fecha asc").Limit(10).Find(&sorteos).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "no se pudieron cargar los sorteos"})
 		return
 	}

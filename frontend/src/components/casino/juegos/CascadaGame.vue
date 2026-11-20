@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
 import { colones } from '@/utils/formato'
+import { reproducir } from '@/utils/sfx'
 
 const props = defineProps<{
   resultado: any
@@ -29,6 +30,7 @@ watch(
 
 function animar() {
   animando.value = true
+  reproducir('caida')
   paso.value = 0
   xPct.value = 50
   const destino = ((posicion.value ?? 4.5) + 0.5) * 10 // 5%..95%
@@ -72,6 +74,7 @@ function soltar() {
           class="casilla"
           :class="{
             ganadora: resultado && !animando && posicion === i && m > 0,
+            'resalta-ganador': resultado && !animando && posicion === i && m > 0,
             cero: m === 0,
           }"
         >

@@ -74,6 +74,9 @@ async function enviar() {
           ¿No tienes cuenta? <router-link to="/registro">Regístrate</router-link>
         </p>
         <p class="auth-alt" style="margin-top: 10px">
+          <router-link to="/transparencia">Cómo verificamos · Provably Fair</router-link>
+        </p>
+        <p class="auth-alt" style="margin-top: 10px">
           <router-link to="/">← Volver al inicio</router-link>
         </p>
 

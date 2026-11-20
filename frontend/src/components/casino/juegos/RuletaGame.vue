@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { nextTick, onMounted, ref, watch } from 'vue'
 import { colones } from '@/utils/formato'
+import { reproducir } from '@/utils/sfx'
 
 const props = defineProps<{
   resultado: any
@@ -138,6 +139,7 @@ watch(
   async (r) => {
     if (!r) return
     await nextTick()
+    reproducir('giro')
     animar(anguloFinal(r.numero))
   },
 )
@@ -155,7 +157,7 @@ function jugar() {
     <div class="lienzo">
       <canvas ref="canvas" width="260" height="260" />
       <div v-if="resultado" class="resultado" :class="{ gana: premio > 0 }">
-        <span class="n" :style="{ background: resultado.color === 'verde' ? '#10b981' : resultado.color === 'rojo' ? '#b3242f' : '#14181f' }">
+        <span class="n" :class="{ 'resalta-ganador': premio > 0 }" :style="{ background: resultado.color === 'verde' ? '#10b981' : resultado.color === 'rojo' ? '#b3242f' : '#14181f' }">
           {{ resultado.numero }}
         </span>
         <span class="c">{{ resultado.color }}</span>
@@ -165,18 +167,18 @@ function jugar() {
     </div>
 
     <div class="modo">
-      <button class="chip" :class="{ activa: tipo === 'pleno' }" @click="tipo = 'pleno'">Pleno x35</button>
-      <button class="chip" :class="{ activa: tipo === 'color' }" @click="tipo = 'color'">Color x2</button>
+      <button class="chip" :class="{ activa: tipo === 'pleno' }" @click="tipo = 'pleno'; reproducir('tecla')">Pleno x35</button>
+      <button class="chip" :class="{ activa: tipo === 'color' }" @click="tipo = 'color'; reproducir('tecla')">Color x2</button>
     </div>
 
     <div v-if="tipo === 'pleno'" class="selector">
-      <button class="step" @click="numero = (numero + 36) % 37">−</button>
+      <button class="step" @click="numero = (numero + 36) % 37; reproducir('tecla')">−</button>
       <div class="valor">{{ numero }}</div>
-      <button class="step" @click="numero = (numero + 1) % 37">+</button>
+      <button class="step" @click="numero = (numero + 1) % 37; reproducir('tecla')">+</button>
     </div>
     <div v-else class="selector">
-      <button class="color-btn rojo" :class="{ activa: color === 'rojo' }" @click="color = 'rojo'">Rojo</button>
-      <button class="color-btn negro" :class="{ activa: color === 'negro' }" @click="color = 'negro'">Negro</button>
+      <button class="color-btn rojo" :class="{ activa: color === 'rojo' }" @click="color = 'rojo'; reproducir('tecla')">Rojo</button>
+      <button class="color-btn negro" :class="{ activa: color === 'negro' }" @click="color = 'negro'; reproducir('tecla')">Negro</button>
     </div>
 
     <button class="btn btn-primary btn-block" :disabled="cargando || girando" @click="jugar">

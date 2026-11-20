@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { colones } from '@/utils/formato'
+import { reproducir } from '@/utils/sfx'
 
 const props = defineProps<{
   resultado: any
@@ -42,6 +43,7 @@ watch(
     if (!r) return
     posicion.value = r.posicion
     rotando.value = true
+    reproducir('giro')
     // 3 vueltas completas + caer en el segmento ganador (puntoeiro arriba).
     const salto = 360 / SEGMENTOS
     const centro = (r.posicion + 0.5) * salto
@@ -64,7 +66,7 @@ function girar() {
         :class="{ girando: rotando }"
         :style="{ background: conico, transform: `rotate(${rotacion}deg)` }"
       />
-      <div class="centro">
+      <div class="centro" :class="{ 'resalta-ganador': premio > 0 }">
         <span v-if="resultado && !rotando" class="n" :class="{ gana: premio > 0 }">
           x{{ TABLA[posicion ?? 0] }}
         </span>

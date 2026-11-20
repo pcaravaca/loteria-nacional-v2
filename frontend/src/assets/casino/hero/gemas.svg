@@ -1,0 +1,115 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 400" width="800" height="400" role="img" aria-label="Gemas">
+  <defs>
+    <radialGradient id="hglow" cx="30%" cy="25%" r="90%">
+      <stop offset="0%" stop-color="#123f31"/>
+      <stop offset="55%" stop-color="#0a100d"/>
+      <stop offset="100%" stop-color="#05080c"/>
+    </radialGradient>
+    <linearGradient id="hgold" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#f5dd9a"/>
+      <stop offset="100%" stop-color="#c9a227"/>
+    </linearGradient>
+    <linearGradient id="hgreen" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#7cf7c4"/>
+      <stop offset="100%" stop-color="#0f9d6b"/>
+    </linearGradient>
+    <linearGradient id="hblue" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#9fd8ff"/>
+      <stop offset="100%" stop-color="#2277cc"/>
+    </linearGradient>
+    <linearGradient id="hpurple" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#d9b8ff"/>
+      <stop offset="100%" stop-color="#7b3fd1"/>
+    </linearGradient>
+    <linearGradient id="hred" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#ffb3b3"/>
+      <stop offset="100%" stop-color="#d62839"/>
+    </linearGradient>
+    <linearGradient id="hyellow" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#fff3b0"/>
+      <stop offset="100%" stop-color="#e0a200"/>
+    </linearGradient>
+    <linearGradient id="horange" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#ffd29b"/>
+      <stop offset="100%" stop-color="#e2680a"/>
+    </linearGradient>
+    <linearGradient id="hray" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#7cf7c4"/>
+      <stop offset="35%" stop-color="#38bdf8"/>
+      <stop offset="65%" stop-color="#a78bfa"/>
+      <stop offset="100%" stop-color="#f5b942"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="800" height="400" rx="22" fill="url(#hglow)"/>
+  <rect x="10" y="10" width="780" height="380" rx="18" fill="none" stroke="url(#hgold)" stroke-width="2" opacity=".5"/>
+
+  <!-- tablero izquierdo -->
+  <g transform="translate(70,70)">
+    <rect width="420" height="260" rx="14" fill="#080b10" stroke="#243448"/>
+    <g stroke="#0b1118" stroke-width="3">
+      <rect x="10" y="10" width="46" height="46" rx="12" fill="url(#hpurple)"/>
+      <circle cx="90" cy="33" r="23" fill="url(#hblue)"/>
+      <rect x="122" y="10" width="46" height="46" rx="12" fill="url(#hred)"/>
+      <rect x="184" y="10" width="46" height="46" rx="12" fill="url(#hgreen)" transform="rotate(45 207 33)"/>
+      <circle cx="266" cy="33" r="23" fill="url(#hyellow)"/>
+      <rect x="292" y="10" width="46" height="46" rx="12" fill="url(#horange)"/>
+      <rect x="354" y="10" width="46" height="46" rx="12" fill="url(#hred)"/>
+
+      <circle cx="33" cy="105" r="23" fill="url(#horange)"/>
+      <rect x="60" y="82" width="46" height="46" rx="12" fill="url(#hgreen)"/>
+      <rect x="122" y="82" width="46" height="46" rx="12" fill="url(#hpurple)"/>
+      <circle cx="207" cy="105" r="23" fill="url(#hblue)"/>
+      <rect x="234" y="82" width="46" height="46" rx="12" fill="url(#hred)" transform="rotate(45 257 105)"/>
+      <circle cx="319" cy="105" r="23" fill="url(#hyellow)"/>
+      <rect x="346" y="82" width="46" height="46" rx="12" fill="url(#hgreen)"/>
+
+      <rect x="10" y="154" width="46" height="46" rx="12" fill="url(#hred)"/>
+      <circle cx="90" cy="177" r="23" fill="url(#hyellow)"/>
+      <rect x="122" y="154" width="46" height="46" rx="12" fill="url(#horange)"/>
+      <rect x="184" y="154" width="46" height="46" rx="12" fill="url(#hgreen)"/>
+      <circle cx="266" cy="177" r="23" fill="url(#hpurple)"/>
+      <rect x="292" y="154" width="46" height="46" rx="12" fill="url(#hblue)"/>
+      <rect x="354" y="154" width="46" height="46" rx="12" fill="url(#hred)"/>
+
+      <circle cx="33" cy="229" r="23" fill="url(#hblue)"/>
+      <rect x="60" y="206" width="46" height="46" rx="12" fill="url(#hyellow)" transform="rotate(45 83 229)"/>
+      <rect x="122" y="206" width="46" height="46" rx="12" fill="url(#hpurple)"/>
+      <circle cx="207" cy="229" r="23" fill="url(#horange)"/>
+      <rect x="234" y="206" width="46" height="46" rx="12" fill="url(#hgreen)"/>
+      <circle cx="319" cy="229" r="23" fill="url(#hred)"/>
+      <rect x="346" y="206" width="46" height="46" rx="12" fill="url(#hpurple)"/>
+    </g>
+    <g fill="#ffffff" opacity=".5">
+      <ellipse cx="24" cy="22" rx="9" ry="5"/>
+      <ellipse cx="80" cy="22" rx="9" ry="5"/>
+      <ellipse cx="136" cy="22" rx="9" ry="5"/>
+      <ellipse cx="24" cy="94" rx="9" ry="5"/>
+      <ellipse cx="136" cy="94" rx="9" ry="5"/>
+      <ellipse cx="24" cy="166" rx="9" ry="5"/>
+      <ellipse cx="136" cy="166" rx="9" ry="5"/>
+      <ellipse cx="24" cy="218" rx="9" ry="5"/>
+      <ellipse cx="136" cy="218" rx="9" ry="5"/>
+    </g>
+  </g>
+
+  <!-- gema rayo grande -->
+  <g transform="translate(560,110)">
+    <circle cx="90" cy="90" r="86" fill="url(#hray)"/>
+    <circle cx="90" cy="90" r="86" fill="none" stroke="#ffffff" stroke-width="3" opacity=".7"/>
+    <circle cx="90" cy="90" r="34" fill="#fff7d6"/>
+    <g fill="#ffffff" opacity=".92">
+      <path d="M90 6 L104 62 L90 52 L76 62 Z"/>
+      <path d="M90 174 L104 118 L90 128 L76 118 Z"/>
+      <path d="M6 90 L62 76 L52 90 L62 104 Z"/>
+      <path d="M174 90 L118 76 L128 90 L118 104 Z"/>
+    </g>
+  </g>
+  <g stroke="#f5dd9a" stroke-width="4" fill="none" stroke-linecap="round" opacity=".9">
+    <path d="M520 90 L470 130 L496 136 L452 178"/>
+    <path d="M690 250 L640 210 L664 204 L620 162"/>
+  </g>
+
+  <text x="600" y="330" text-anchor="middle" font-family="Space Grotesk, Inter, sans-serif" font-size="40" font-weight="700" fill="url(#hgold)">GEMAS</text>
+  <text x="600" y="360" text-anchor="middle" font-family="Inter, sans-serif" font-size="18" fill="#8ea2b6">Match-3 con apuesta</text>
+</svg>

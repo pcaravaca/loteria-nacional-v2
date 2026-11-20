@@ -15,7 +15,7 @@ export const GRUPOS_CASINO: GrupoCasino[] = [
     id: 'bingo',
     titulo: 'Bingo',
     descripcion: 'Cantá bolillas, armá línea y buscá el cartón lleno.',
-    codigos: ['bingo'],
+    codigos: ['bingo', 'bingo90', 'bingo-esquinas', 'bingo-diamante', 'bingo-relampago'],
   },
   {
     id: 'mesa',
@@ -27,7 +27,7 @@ export const GRUPOS_CASINO: GrupoCasino[] = [
     id: 'clasicos',
     titulo: 'Clásicos',
     descripcion: 'Los juegos de siempre, con pago inmediato.',
-    codigos: ['slots', 'dados', 'raspa', 'keno'],
+    codigos: ['slots', 'dados', 'raspa', 'keno', 'gemas'],
   },
   {
     id: 'rapidos',

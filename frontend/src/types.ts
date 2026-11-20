@@ -156,10 +156,19 @@ export interface CasinoStats {
 
 export interface CasinoRound {
   id: number
+  // Fuente de la jugada: casino_rondas, bingo_rondas o gemas_rondas. Define a
+  // que endpoint de verificacion se despacha.
+  source?: string
   game: string
+  nombre?: string
   monto: number
   multiplicador: number
   premio: number
+  puntos?: number // gemas
+  lineas?: number // bingo
+  cartones?: number // bingo
+  movimientos?: number // gemas
+  estado?: string
   client_seed: string
   server_seed_hash: string
   nonce: number
@@ -181,4 +190,29 @@ export interface SemillaResponse {
   hash: string
   nonce: number
   client_seed: string
+}
+
+// ---------------- Accesos por paquete y por jugador ----------------
+
+export type AmbitoAcceso = 'global' | 'grupo' | 'usuario'
+export type TipoContenido = 'juego' | 'loteria' | 'rifa'
+
+export interface GrupoJugadores {
+  id: number
+  nombre: string
+  descripcion: string
+  miembros?: number
+  created_at: string
+}
+
+export interface AccesoContenido {
+  id: number
+  ambito: AmbitoAcceso
+  ambito_id: number
+  tipo: TipoContenido
+  codigo: string
+  activo: boolean
+  ambito_nombre?: string
+  contenido_nombre?: string
+  created_at: string
 }

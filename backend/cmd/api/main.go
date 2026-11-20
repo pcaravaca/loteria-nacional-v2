@@ -63,6 +63,9 @@ func main() {
 	r.Use(cors())
 
 	api := r.Group("/api")
+	// Las rutas publicas de contenido identifican al usuario si trae token,
+	// para resolver el acceso por paquete o por jugador sin exigir sesion.
+	api.Use(middleware.OpcionalAuth(cfg))
 	api.GET("/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"status": "ok", "time": time.Now().Format(time.RFC3339)})
 	})
@@ -80,6 +83,7 @@ func main() {
 	limitesH := handlers.NewLimitesHandler(db)
 	rifasH := handlers.NewRifasHandler(db)
 	adminRifasH := handlers.NewAdminRifasHandler(db)
+	accesosH := handlers.NewAdminAccesosHandler(db)
 
 	api.POST("/auth/register", authH.Register)
 	api.GET("/config", cfgH.Config)
@@ -137,6 +141,18 @@ func main() {
 	admin.POST("/rifas", adminRifasH.Crear)
 	admin.POST("/rifas/:id/sortear", adminRifasH.Sortear)
 	admin.POST("/rifas/:id/cancelar", adminRifasH.Cancelar)
+	// Accesos por paquete de jugadores o por jugador individual.
+	admin.GET("/grupos", accesosH.ListarGrupos)
+	admin.POST("/grupos", accesosH.CrearGrupo)
+	admin.PUT("/grupos/:id", accesosH.ActualizarGrupo)
+	admin.DELETE("/grupos/:id", accesosH.EliminarGrupo)
+	admin.GET("/grupos/:id/jugadores", accesosH.ListarMiembros)
+	admin.POST("/grupos/:id/jugadores", accesosH.AsignarJugadores)
+	admin.DELETE("/grupos/:id/jugadores/:user_id", accesosH.QuitarJugador)
+	admin.GET("/accesos", accesosH.ListarAccesos)
+	admin.POST("/accesos", accesosH.CrearAcceso)
+	admin.PUT("/accesos/:id", accesosH.ActualizarAcceso)
+	admin.DELETE("/accesos/:id", accesosH.EliminarAcceso)
 	admin.GET("/reportes/csv/:tipo", func(c *gin.Context) {
 		switch c.Param("tipo") {
 		case "apuestas":
@@ -189,6 +205,15 @@ func main() {
 	bg.POST("/casino/bingo/start", casinoH.BingoStart)
 	bg.POST("/casino/bingo/:id/hit", casinoH.BingoHit)
 	bg.POST("/casino/bingo/:id/close", casinoH.BingoClose)
+
+	// Gemas (match-3): se apuesta al abrir el tablero y se liquida al tope de
+	// movimientos o al tocar "Reventar".
+	gm := authed.Group("")
+	gm.Use(middleware.GeoBlock(cfg))
+	gm.POST("/casino/gemas/start", casinoH.GemasStart)
+	gm.POST("/casino/gemas/:id/move", casinoH.GemasMove)
+	gm.POST("/casino/gemas/:id/reventar", casinoH.GemasReventar)
+	gm.GET("/casino/gemas/:id/verificar", casinoH.GemasVerificar)
 
 	// Video poker: se apostó al repartir y el jugador elige qué cartas sostiene.
 	pk := authed.Group("")

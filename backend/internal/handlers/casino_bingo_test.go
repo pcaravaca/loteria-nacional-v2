@@ -89,6 +89,8 @@ func (e *bingoTestEnv) saldo() int64 {
 
 type bingoRespuesta struct {
 	RondaID          uint      `json:"ronda_id"`
+	Variante         string    `json:"variante"`
+	NombreVariante   string    `json:"nombre_variante"`
 	Monto            int64     `json:"monto"`
 	MontoPorCarton   int64     `json:"monto_por_carton"`
 	Cartones         int       `json:"cartones"`
@@ -97,9 +99,15 @@ type bingoRespuesta struct {
 	Cantadas         []int     `json:"cantadas"`
 	Bolilla          int       `json:"bolilla"`
 	CantidadCantadas int       `json:"cantidad_cantadas"`
+	TopeCantadas     int       `json:"tope_cantadas"`
+	Bolillas         int       `json:"bolillas"`
+	Filas            int       `json:"filas"`
+	Columnas         int       `json:"columnas"`
+	CentroLibre      bool      `json:"centro_libre"`
 	Estado           string    `json:"estado"`
 	Lineas           int       `json:"lineas"`
 	Lleno            bool      `json:"lleno"`
+	Patron           string    `json:"patron"`
 	Tiers            []int64   `json:"tiers"`
 	Premio           int64     `json:"premio"`
 	PremioPagado     int64     `json:"premio_pagado"`
@@ -291,5 +299,134 @@ func TestBingoSemillasQuedanGuardadas(t *testing.T) {
 	}
 	if ronda.ClientSeed != "cli-bingo" {
 		t.Errorf("client seed %q", ronda.ClientSeed)
+	}
+	if ronda.Variante != models.CasinoBingo {
+		t.Errorf("variante %q, esperaba %q", ronda.Variante, models.CasinoBingo)
+	}
+}
+
+// TestBingoStartVariantes abre una jugada por cada variante y verifica que el
+// sorteo y el tope respeten la geometría declarada.
+func TestBingoStartVariantes(t *testing.T) {
+	casos := []struct {
+		codigo   string
+		bolillas int
+		filas    int
+		columnas int
+		tope     int
+		centro   bool
+	}{
+		{"bingo", 75, 5, 5, 42, true},
+		{"bingo90", 90, 3, 9, 60, false},
+		{"bingo-esquinas", 75, 5, 5, 42, true},
+		{"bingo-diamante", 75, 5, 5, 42, true},
+		{"bingo-relampago", 75, 5, 5, 20, true},
+	}
+	for _, c := range casos {
+		env := nuevoBingoTestEnv(t)
+		w := env.start(map[string]any{"monto": 500, "cartones": 1, "variante": c.codigo})
+		if w.Code != http.StatusCreated {
+			t.Fatalf("%s: start respondio %d: %s", c.codigo, w.Code, w.Body.String())
+		}
+		res := decodearBingo(t, w)
+		if res.Variante != c.codigo || res.Bolillas != c.bolillas || res.Filas != c.filas || res.Columnas != c.columnas {
+			t.Errorf("%s: geometria %+v", c.codigo, res)
+		}
+		if res.TopeCantadas != c.tope || res.CantidadCantadas != c.tope {
+			t.Errorf("%s: tope %d/%d, esperaba %d", c.codigo, res.TopeCantadas, res.CantidadCantadas, c.tope)
+		}
+		if res.CentroLibre != c.centro {
+			t.Errorf("%s: centro libre %v", c.codigo, res.CentroLibre)
+		}
+		if len(res.Grids) != 1 || len(res.Grids[0]) != c.filas || len(res.Grids[0][0]) != c.columnas {
+			t.Errorf("%s: ticket %+v", c.codigo, res.Grids)
+		}
+		if len(res.Orden) != c.bolillas {
+			t.Errorf("%s: orden de %d bolillas", c.codigo, len(res.Orden))
+		}
+		var ronda models.BingoRonda
+		if err := env.db.First(&ronda, res.RondaID).Error; err != nil {
+			t.Fatalf("%s: ronda: %v", c.codigo, err)
+		}
+		if ronda.Variante != c.codigo {
+			t.Errorf("%s: la ronda guardo la variante %q", c.codigo, ronda.Variante)
+		}
+	}
+}
+
+// TestBingoVarianteInvalida verifica que una variante desconocida no abra ronda.
+func TestBingoVarianteInvalida(t *testing.T) {
+	env := nuevoBingoTestEnv(t)
+	w := env.start(map[string]any{"monto": 500, "variante": "bingo-no-existe"})
+	if w.Code != http.StatusBadRequest {
+		t.Fatalf("start con variante invalida respondio %d, esperaba 400", w.Code)
+	}
+	if env.saldo() != 50000 {
+		t.Errorf("la apuesta no deberia descontarse: saldo %d", env.saldo())
+	}
+}
+
+// TestBingoCierrePorVariante crea rondas con patrones armados y verifica que el
+// cierre pague según la variante.
+func TestBingoCierrePorVariante(t *testing.T) {
+	env := nuevoBingoTestEnv(t)
+	grid75 := [][]int{
+		{1, 16, 31, 46, 61},
+		{2, 17, 32, 47, 62},
+		{3, 18, 0, 48, 63},
+		{4, 19, 33, 49, 64},
+		{5, 20, 34, 50, 65},
+	}
+	grid90 := [][]int{
+		{1, 10, 20, 30, 0, 0, 60, 0, 0},
+		{2, 11, 21, 31, 0, 0, 0, 70, 0},
+		{3, 12, 0, 0, 40, 50, 0, 0, 80},
+	}
+	casos := []struct {
+		variante string
+		grid     [][]int
+		cantadas []int
+		premio   int64
+		patron   string
+	}{
+		{"bingo-esquinas", grid75, []int{1, 61, 5, 65}, 9000, "Cuatro esquinas"},
+		{"bingo-diamante", grid75, []int{32, 18, 48, 33}, 9000, "Diamante"},
+		{"bingo90", grid90, []int{1, 10, 20, 30, 60}, 2000, "Una linea"},
+	}
+	for _, c := range casos {
+		ronda := models.BingoRonda{
+			UserID:         env.user.ID,
+			Variante:       c.variante,
+			Monto:          1000,
+			MontoPorCarton: 1000,
+			Cartones:       1,
+			Grids:          [][][]int{c.grid},
+			Orden:          []int{1, 2, 3},
+			Cantadas:       c.cantadas,
+			Estado:         "abierta",
+			ClientSeed:     "x",
+			ServerSeedHash: "y",
+		}
+		if err := env.db.Create(&ronda).Error; err != nil {
+			t.Fatalf("%s: crear ronda: %v", c.variante, err)
+		}
+		w := env.close(ronda.ID)
+		if w.Code != http.StatusOK {
+			t.Fatalf("%s: close respondio %d: %s", c.variante, w.Code, w.Body.String())
+		}
+		res := decodearBingo(t, w)
+		if res.Premio != c.premio || res.PremioPagado != c.premio {
+			t.Errorf("%s: premio %d pagado %d, esperaba %d", c.variante, res.Premio, res.PremioPagado, c.premio)
+		}
+		if res.Patron != c.patron {
+			t.Errorf("%s: patron %q, esperaba %q", c.variante, res.Patron, c.patron)
+		}
+		var guardada models.BingoRonda
+		if err := env.db.First(&guardada, ronda.ID).Error; err != nil {
+			t.Fatalf("%s: ronda: %v", c.variante, err)
+		}
+		if guardada.Estado != "pagada" || guardada.Premio != c.premio {
+			t.Errorf("%s: ronda guardada estado %q premio %d", c.variante, guardada.Estado, guardada.Premio)
+		}
 	}
 }

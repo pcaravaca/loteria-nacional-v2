@@ -3,6 +3,7 @@ import { computed, ref } from 'vue'
 import { api } from '@/api/client'
 import { useAuthStore } from '@/stores/auth'
 import { colones } from '@/utils/formato'
+import { reproducir } from '@/utils/sfx'
 
 const props = defineProps<{ monto: number; clientSeed: string }>()
 
@@ -73,6 +74,14 @@ async function llamar(path: string, body: any = {}) {
     estado.value = data.estado
     premio.value = data.premio ?? 0
     seguro.value = data.seguro ?? 0
+    // Reparto/pedida: tono de carta; al cerrar, el arpegio del resultado.
+    if (data.estado && data.estado !== 'abierta') {
+      if (data.estado === 'blackjack' || data.estado === 'ganada') reproducir('ganar')
+      else if (data.estado === 'perdida' || data.estado === 'rendida') reproducir('perder')
+      else reproducir('acierto')
+    } else {
+      reproducir('carta')
+    }
     await auth.cargar()
   } catch (e: any) {
     error.value = e.message
@@ -110,7 +119,7 @@ const listaParaJugar = computed(() => !mano.value.length && !cargando.value)
         <p class="reglas">Paga 3 a 2 · La casa se planta en 17 y pide hasta 16</p>
       </div>
 
-      <div class="zona">
+      <div class="zona" :class="{ 'resalta-ganador': estado === 'perdida' }">
         <div class="zona-head"><b>Casa</b><span class="valor" v-if="crupier.length">{{ cerrada ? valorCrupier : valor(crupier.slice(0,1)) }}</span></div>
         <div class="cartas">
           <div v-for="(c, i) in crupier" :key="i" class="carta"
@@ -124,7 +133,7 @@ const listaParaJugar = computed(() => !mano.value.length && !cargando.value)
 
       <div class="separador"><span>♠</span><i></i><span>♥</span></div>
 
-      <div class="zona">
+      <div class="zona" :class="{ 'resalta-ganador': estado === 'blackjack' || estado === 'ganada' }">
         <div class="zona-head"><b>Vos</b><span class="valor" v-if="mano.length">{{ valorJugador }}</span></div>
         <div class="cartas">
           <div v-for="(c, i) in mano" :key="i" class="carta" :class="roja(c) ? 'roja' : 'negra'">

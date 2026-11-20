@@ -109,7 +109,7 @@ func Seed(db *gorm.DB) error {
 // seed no toca las filas, asi que el techo queda en 0 hasta que se configure.
 func SeedCasino(db *gorm.DB) error {
 	juegos := []models.CasinoGame{
-		{Codigo: models.CasinoDados, Nombre: "Dados del Sur", Descripcion: "Acerta la suma de dos dados.", MinApuesta: 200, MaxApuesta: 50000, RTP: 88.0, MaxMultipl: 30, MaxPremio: 1000000, Orden: 1, LimiteDiario: 200000, Activo: true},
+		{Codigo: models.CasinoDados, Nombre: "Dados del Sur", Descripcion: "Acerta la suma de dos dados.", MinApuesta: 200, MaxApuesta: 50000, RTP: 80.0, MaxMultipl: 27, MaxPremio: 1000000, Orden: 1, LimiteDiario: 200000, Activo: true},
 		{Codigo: models.CasinoSlots, Nombre: "Fortuna CR", Descripcion: "Tragamonedas de 3 rodillos y 6 simbolos.", MinApuesta: 500, MaxApuesta: 50000, RTP: 94.7, MaxMultipl: 50, MaxPremio: 1000000, Orden: 2, LimiteDiario: 200000, Activo: true},
 		{Codigo: models.CasinoRuleta, Nombre: "Rueda Fortuna", Descripcion: "Ruleta de 37 casillas: pleno o color.", MinApuesta: 500, MaxApuesta: 50000, RTP: 94.4, MaxMultipl: 35, MaxPremio: 1000000, Orden: 3, LimiteDiario: 200000, Activo: true},
 		{Codigo: models.CasinoRaspa, Nombre: "Raspa y Gana", Descripcion: "Tres casillas: si coinciden, ganaste.", MinApuesta: 200, MaxApuesta: 50000, RTP: 92.1, MaxMultipl: 18, MaxPremio: 1000000, Orden: 4, LimiteDiario: 200000, Activo: true},
@@ -123,12 +123,17 @@ func SeedCasino(db *gorm.DB) error {
 		{Codigo: models.CasinoSuertudo, Nombre: "Número de la Suerte", Descripcion: "Elegí un número del 00 al 99: si sale, pagás x75.", MinApuesta: 200, MaxApuesta: 50000, RTP: 75.0, MaxMultipl: 75, MaxPremio: 1000000, Orden: 12, LimiteDiario: 200000, Activo: true},
 		{Codigo: models.CasinoParley, Nombre: "Parley de 2", Descripcion: "Marcá 2 números de 20 y ganá si salen en las 4 bolillas.", MinApuesta: 200, MaxApuesta: 50000, RTP: 91.0, MaxMultipl: 18, MaxPremio: 1000000, Orden: 13, LimiteDiario: 200000, Activo: true},
 		{Codigo: models.CasinoBaccarat, Nombre: "Baccarat", Descripcion: "Jugador, banca o empate: el empate paga x8 y la banca cobra 5% de comisión.", MinApuesta: 500, MaxApuesta: 50000, RTP: 98.7, MaxMultipl: 8, MaxPremio: 1000000, Orden: 14, LimiteDiario: 200000, Activo: true},
-		{Codigo: models.CasinoBingo, Nombre: "Bingo 75", Descripcion: "Cantá bolillas y armá línea, dos líneas o cartón lleno. 1 a 4 cartones.", MinApuesta: 500, MaxApuesta: 50000, RTP: 88.3, MaxMultipl: 25, MaxPremio: 1000000, Orden: 15, LimiteDiario: 200000, Activo: true},
+		{Codigo: models.CasinoBingo, Nombre: "Bingo 75", Descripcion: "Cantá bolillas y armá línea, dos líneas o cartón lleno. 1 a 4 cartones.", MinApuesta: 500, MaxApuesta: 50000, RTP: 88.5, MaxMultipl: 25, MaxPremio: 1000000, Orden: 15, LimiteDiario: 200000, Activo: true},
+		{Codigo: models.CasinoBingo90, Nombre: "Bingo 90", Descripcion: "Ticket 3x9 de 90 bolillas: 1 línea x2, 2 líneas x5 y cartón lleno x40. 1 a 4 cartones.", MinApuesta: 500, MaxApuesta: 50000, RTP: 83.0, MaxMultipl: 40, MaxPremio: 1000000, Orden: 40, LimiteDiario: 200000, Activo: true},
+		{Codigo: models.CasinoBingoEsquinas, Nombre: "Cuatro Esquinas", Descripcion: "Bingo 75: completá las cuatro esquinas (x9) o el cartón lleno (x25).", MinApuesta: 500, MaxApuesta: 50000, RTP: 82.4, MaxMultipl: 25, MaxPremio: 1000000, Orden: 41, LimiteDiario: 200000, Activo: true},
+		{Codigo: models.CasinoBingoDiamante, Nombre: "Patrón Diamante", Descripcion: "Bingo 75: completá el diamante (x9) o el cartón lleno (x25).", MinApuesta: 500, MaxApuesta: 50000, RTP: 82.5, MaxMultipl: 25, MaxPremio: 1000000, Orden: 42, LimiteDiario: 200000, Activo: true},
+		{Codigo: models.CasinoBingoRelampago, Nombre: "Bingo Relámpago", Descripcion: "Bingo 75 con 20 cantadas: pago fijo por aciertos (6-8 x1, 9 x2, 10 x3, 11 x4, 12+ x5).", MinApuesta: 500, MaxApuesta: 50000, RTP: 86.1, MaxMultipl: 5, MaxPremio: 1000000, Orden: 43, LimiteDiario: 200000, Activo: true},
+		{Codigo: models.CasinoGemas, Nombre: "Gemas", Descripcion: "Match-3 de 8x8: intercambiá gemas, armá grupos de 3+ y reventá en cascada.", MinApuesta: 200, MaxApuesta: 50000, RTP: 91.83, MaxMultipl: 100, MaxPremio: 100000, Orden: 16, LimiteDiario: 200000, Activo: true},
 	}
 	// Catalogo AST Casino: tragamonedas y video poker. Sin techo de premio
 	// (MaxPremio 0) porque la volatilidad de las lineas hace que el techo recorte
 	// demasiado la apuesta maxima; los limites diarios siguen aplicando.
-	orden := 16
+	orden := 17
 	for _, spec := range casino.SpecsAST() {
 		juegos = append(juegos, models.CasinoGame{
 			Codigo:       spec.Codigo,

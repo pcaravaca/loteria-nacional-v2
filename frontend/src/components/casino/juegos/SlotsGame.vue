@@ -2,6 +2,7 @@
 import { computed, onUnmounted, ref, watch } from 'vue'
 import { colones } from '@/utils/formato'
 import { ordenSimbolos, paytable, simbolos } from '@/assets/casino'
+import { reproducir } from '@/utils/sfx'
 
 const props = defineProps<{
   resultado: any
@@ -37,6 +38,7 @@ function aleatorio() {
 
 function girar() {
   girando.value = true
+  reproducir('rodillo')
   visibles.value = [aleatorio(), aleatorio(), aleatorio()]
   timer = window.setInterval(() => {
     visibles.value = [aleatorio(), aleatorio(), aleatorio()]

@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { nextTick, ref, watch } from 'vue'
 import { colones } from '@/utils/formato'
+import { reproducir } from '@/utils/sfx'
 
 const props = defineProps<{
   resultado: any
@@ -41,6 +42,7 @@ watch(
   async () => {
     if (!props.resultado) return
     await nextTick()
+    reproducir('carta')
     limpiar.value++
   },
 )
@@ -53,7 +55,7 @@ function jugar() {
 <template>
   <div class="baccarat">
     <div class="manos">
-      <div class="mano">
+      <div class="mano" :class="{ 'resalta-ganador': resultado?.resultado === 'jugador' }">
         <span class="etiqueta">Jugador</span>
         <div class="cartas" :key="'j' + limpiar">
           <span
@@ -72,7 +74,7 @@ function jugar() {
 
       <div class="vs">VS</div>
 
-      <div class="mano">
+      <div class="mano" :class="{ 'resalta-ganador': resultado?.resultado === 'banca' }">
         <span class="etiqueta">Banca</span>
         <div class="cartas" :key="'b' + limpiar">
           <span
@@ -103,7 +105,7 @@ function jugar() {
         :key="o.t"
         class="chip"
         :class="{ activa: tipo === o.t }"
-        @click="tipo = o.t"
+        @click="tipo = o.t; reproducir('tecla')"
       >
         {{ o.etiqueta }}
         <small>{{ o.nota }}</small>

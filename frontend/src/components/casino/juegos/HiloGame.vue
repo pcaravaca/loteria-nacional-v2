@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
 import { colones } from '@/utils/formato'
+import { reproducir } from '@/utils/sfx'
 
 const props = defineProps<{
   resultado: any
@@ -20,6 +21,7 @@ watch(
   (r) => {
     if (!r) return
     vuelta.value = false
+    reproducir('carta')
     setTimeout(() => (vuelta.value = true), 400)
   },
 )
@@ -38,7 +40,7 @@ function apostar(d: 'mayor' | 'menor') {
         <small>Base</small>
       </div>
       <div class="vs">→</div>
-      <div class="carta" :class="[vuelta ? '' : 'dorso', rojas.has(resultado?.siguiente ?? 0) ? 'roja' : '']">
+      <div class="carta" :class="[vuelta ? 'revelada' : 'dorso', rojas.has(resultado?.siguiente ?? 0) ? 'roja' : '']">
         <span v-if="vuelta && resultado">{{ resultado.figura_siguiente }}</span>
         <span v-else>?</span>
         <small>{{ vuelta && resultado ? 'Salió' : 'Tapada' }}</small>
@@ -56,7 +58,7 @@ function apostar(d: 'mayor' | 'menor') {
     <div class="opciones">
       <button
         class="btn btn-dir"
-        :class="{ activa: direccion === 'mayor' }"
+        :class="{ activa: direccion === 'mayor', 'resalta-ganador': premio > 0 && resultado?.direccion === 'mayor' }"
         :disabled="cargando"
         @click="apostar('mayor')"
       >
@@ -64,7 +66,7 @@ function apostar(d: 'mayor' | 'menor') {
       </button>
       <button
         class="btn btn-dir"
-        :class="{ activa: direccion === 'menor' }"
+        :class="{ activa: direccion === 'menor', 'resalta-ganador': premio > 0 && resultado?.direccion === 'menor' }"
         :disabled="cargando"
         @click="apostar('menor')"
       >
@@ -87,6 +89,8 @@ function apostar(d: 'mayor' | 'menor') {
 }
 .carta small { font-size: 10px; font-weight: 500; color: var(--faint); text-transform: uppercase; letter-spacing: .08em; }
 .carta.roja { color: #ff7b72; }
+.carta.revelada { animation: aparecer .35s ease; }
+@keyframes aparecer { from { transform: rotateY(90deg) scale(.9); opacity: .4; } to { transform: none; opacity: 1; } }
 .carta.dorso {
   background: repeating-linear-gradient(45deg, #0f2a20, #0f2a20 6px, #12362a 6px, #12362a 12px);
   color: var(--prim-2);

@@ -63,11 +63,31 @@ onMounted(cargar)
 
 async function verificar(ronda: CasinoRound) {
   try {
-    const { data } = await api.get(`/casino/rounds/${ronda.id}/verify`)
+    // Cada fuente (casino_rondas, bingo_rondas, gemas_rondas) se verifica con
+    // su propio metodo; el endpoint unificado despacha segun `source`.
+    const source = ronda.source || 'casino'
+    const { data } = await api.get(`/casino/rounds/${ronda.id}/verify?source=${source}`)
     verificando.value = data
   } catch (e: any) {
     error.value = e.message
   }
+}
+
+// El multiplicador puede ser entero (dados x30), decimal (bingo x2.5, gemas
+// x0.5) o cero (ronda abierta o perdedora): se muestra con unidades claras y
+// sin "xundefined".
+function fmtMult(valor: number | undefined): string {
+  if (valor === undefined || valor === null || valor <= 0) return '—'
+  const redondeado = Math.round(valor * 100) / 100
+  if (Number.isInteger(redondeado)) return 'x' + redondeado
+  return 'x' + redondeado.toFixed(2).replace(/0+$/, '').replace(/\.$/, '')
+}
+
+function detalleMultiplicador(r: CasinoRound): string {
+  const mult = fmtMult(r.multiplicador)
+  if (r.source === 'gemas' && r.puntos) return `${mult} · ${r.puntos} pts`
+  if (r.source === 'bingo' && r.lineas) return `${mult} · ${r.lineas} línea${r.lineas === 1 ? '' : 's'}`
+  return mult
 }
 </script>
 
@@ -83,6 +103,7 @@ async function verificar(ronda: CasinoRound) {
       <p class="hash-line">
         Semilla del servidor: <span class="hash">{{ semillaHash.slice(0, 24) }}</span>
         · <button class="link" @click="cargar">Rotar semilla</button>
+        · <router-link class="link" to="/transparencia">Cómo verificamos · Provably Fair</router-link>
         · <button class="link" @click="sonido = alternarSfx()">{{ sonido ? '🔊 Sonido' : '🔇 Mudo' }}</button>
       </p>
     </div>
@@ -118,10 +139,10 @@ async function verificar(ronda: CasinoRound) {
             <tr><th>Juego</th><th>Monto</th><th>Multipl</th><th>Premio</th><th>Fecha</th><th></th></tr>
           </thead>
           <tbody>
-            <tr v-for="r in rondasRecientes" :key="r.id">
-              <td class="fuerte">{{ r.game }}</td>
+            <tr v-for="r in rondasRecientes" :key="(r.source || 'casino') + '-' + r.id">
+              <td class="fuerte">{{ r.nombre || r.game }}</td>
               <td class="mono">{{ colones(r.monto) }}</td>
-              <td class="mono">x{{ r.multiplicador }}</td>
+              <td class="mono">{{ detalleMultiplicador(r) }}</td>
               <td class="mono" :style="{ color: r.premio > 0 ? 'var(--gold)' : 'var(--muted)' }">
                 {{ r.premio ? colones(r.premio) : '—' }}
               </td>
@@ -169,7 +190,7 @@ async function verificar(ronda: CasinoRound) {
             :class="{ apagada: !j.activo }"
           >
             <div class="arte">
-              <img :src="cartas[j.codigo as CodigoJuego]" :alt="j.nombre" draggable="false" />
+              <img :src="cartas[j.codigo as CodigoJuego] ?? cartas.bingo" :alt="j.nombre" draggable="false" />
               <span v-if="!j.activo" class="proximamente">Proximamente</span>
             </div>
             <h3>{{ j.nombre }}</h3>
@@ -200,7 +221,9 @@ async function verificar(ronda: CasinoRound) {
     <Modal v-if="verificando" titulo="Verificacion provably fair" @cerrar="verificando = null">
       <div class="verif">
         <p class="linea"><span>Ronda</span><b>#{{ verificando.ronda_id }}</b></p>
-        <p class="linea"><span>Juego</span><b>{{ verificando.juego }}</b></p>
+        <p class="linea"><span>Juego</span><b>{{ verificando.nombre || verificando.juego }}</b></p>
+        <p v-if="verificando.puntos" class="linea"><span>Puntos</span><b>{{ verificando.puntos }}</b></p>
+        <p v-if="verificando.lineas" class="linea"><span>Líneas</span><b>{{ verificando.lineas }}</b></p>
         <p class="linea"><span>Nonce</span><b>{{ verificando.nonce }}</b></p>
         <p class="linea"><span>Client seed</span><b class="mono">{{ verificando.client_seed }}</b></p>
         <p class="linea"><span>Server seed</span><b class="mono">{{ verificando.server_seed }}</b></p>

@@ -54,6 +54,9 @@ func (h *CasinoHandler) PokerRepartir(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "el juego esta desactivado"})
 		return
 	}
+	if !ExigirAcceso(c, h.db, user.ID, models.ContenidoJuego, juego.Codigo) {
+		return
+	}
 	if req.Monto < juego.MinApuesta {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "el minimo es " + strconv.FormatInt(juego.MinApuesta, 10)})
 		return

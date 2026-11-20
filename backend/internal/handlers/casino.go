@@ -36,15 +36,29 @@ type juegoResponse struct {
 
 // Games lista los juegos con la apuesta maxima real: si hay techo de premio, es
 // menor que max_apuesta. El cliente usa este valor para no ofrecer apuestas que
-// el backend rechazaria.
+// el backend rechazaria. Los admin/agentes pueden pedir el catalogo completo
+// con ?todas=1; el resto solo ve los juegos con acceso activo.
 func (h *CasinoHandler) Games(c *gin.Context) {
+	verTodas := c.Query("todas") == "1" && rolOperador(c)
 	var juegos []models.CasinoGame
 	if err := h.db.Order("orden").Find(&juegos).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "no se pudieron cargar los juegos"})
 		return
 	}
+	visibles := map[string]bool{}
+	if !verTodas {
+		v, err := JuegosVisibles(h.db, c.GetUint("userID"))
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "no se pudieron cargar los juegos"})
+			return
+		}
+		visibles = v
+	}
 	salida := make([]juegoResponse, 0, len(juegos))
 	for _, j := range juegos {
+		if !verTodas && !visibles[j.Codigo] {
+			continue
+		}
 		salida = append(salida, juegoResponse{
 			CasinoGame: j,
 			ApuestaMax: casino.ApuestaMaxima(j.MaxApuesta, j.MaxMultipl, j.MaxPremio, j.Codigo),
@@ -116,6 +130,11 @@ func (h *CasinoHandler) RotarSemilla(c *gin.Context) {
 		c.JSON(http.StatusConflict, gin.H{"error": "tenes una jugada de bingo abierta: cobrala antes de rotar la semilla"})
 		return
 	}
+	if err := h.db.Model(&models.GemasRonda{}).
+		Where("user_id = ? AND estado = ?", userID, "abierta").Count(&abiertas).Error; err == nil && abiertas > 0 {
+		c.JSON(http.StatusConflict, gin.H{"error": "tenes una jugada de gemas abierta: reventala antes de rotar la semilla"})
+		return
+	}
 
 	semilla, hash, err := casino.NuevaSemilla()
 	if err != nil {
@@ -155,6 +174,11 @@ func (h *CasinoHandler) Play(c *gin.Context) {
 	}
 	if !juego.Activo {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "el juego esta desactivado"})
+		return
+	}
+	// El acceso por paquete o por jugador puede apagar el juego sin tocar el
+	// interruptor global: la jugada se rechaza igual (403 claro).
+	if !ExigirAcceso(c, h.db, userID, models.ContenidoJuego, juego.Codigo) {
 		return
 	}
 	if req.Monto < juego.MinApuesta {
@@ -285,52 +309,11 @@ func (h *CasinoHandler) Play(c *gin.Context) {
 	})
 }
 
-// Rounds devuelve el historial de jugadas del usuario.
+// Rounds devuelve el historial de jugadas del usuario, unificado: las de
+// casino_rondas, bingo_rondas y gemas_rondas. Ver casino_historial.go.
 func (h *CasinoHandler) Rounds(c *gin.Context) {
 	userID := c.GetUint("userID")
-	var rondas []models.CasinoRound
-	if err := h.db.Where("user_id = ?", userID).
-		Order("created_at desc").Limit(100).Find(&rondas).Error; err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "no se pudieron cargar las jugadas"})
-		return
-	}
-	c.JSON(http.StatusOK, rondas)
-}
-
-// Verify revela la semilla del servidor de una ronda y reproduce el sorteo,
-// para que el jugador pueda auditar el resultado.
-func (h *CasinoHandler) Verify(c *gin.Context) {
-	userID := c.GetUint("userID")
-	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "id invalido"})
-		return
-	}
-
-	var ronda models.CasinoRound
-	if err := h.db.Where("id = ? AND user_id = ?", id, userID).First(&ronda).Error; err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "ronda no encontrada"})
-		return
-	}
-
-	var user models.User
-	_ = h.db.First(&user, userID)
-
-	draws := casino.Sortear(user.CasinoSeed, ronda.ClientSeed, ronda.Nonce, casino.Draws(ronda.GameCodigo), 1<<31-1)
-	c.JSON(http.StatusOK, gin.H{
-		"ronda_id":         ronda.ID,
-		"juego":            ronda.GameCodigo,
-		"monto":            ronda.Monto,
-		"multiplicador":    ronda.Multiplicador,
-		"premio":           ronda.Premio,
-		"client_seed":      ronda.ClientSeed,
-		"server_seed_hash": ronda.ServerSeedHash,
-		"server_seed":      user.CasinoSeed,
-		"nonce":            ronda.Nonce,
-		"sorteo":           draws,
-		"resultado":        ronda.Resultado,
-		"verificado":       casino.HashSemilla(user.CasinoSeed) == ronda.ServerSeedHash,
-	})
+	c.JSON(http.StatusOK, h.historialRondas(userID, 100))
 }
 
 // Stats devuelve totales por juego (solo admin).
@@ -378,6 +361,12 @@ func (h *CasinoHandler) Stats(c *gin.Context) {
 		Select("count(*) as jugadas, COALESCE(sum(monto),0) as apostado, COALESCE(sum(premio),0) as premios, COALESCE(sum(monto - premio),0) as beneficio").
 		Scan(&bgTotal)
 	sumar(models.CasinoBingo, bgTotal)
+
+	var gmTotal fila
+	h.db.Model(&models.GemasRonda{}).
+		Select("count(*) as jugadas, COALESCE(sum(monto),0) as apostado, COALESCE(sum(premio),0) as premios, COALESCE(sum(monto - premio),0) as beneficio").
+		Scan(&gmTotal)
+	sumar(models.CasinoGemas, gmTotal)
 
 	c.JSON(http.StatusOK, filas)
 }
@@ -534,6 +523,14 @@ func (h *CasinoHandler) apostadoHoy(userID uint, codigo string, desde time.Time)
 			total += bg
 		}
 	}
+	if codigo == models.CasinoGemas {
+		var gm int64
+		if err := h.db.Model(&models.GemasRonda{}).
+			Where("user_id = ? AND created_at >= ?", userID, desde).
+			Select("COALESCE(SUM(monto),0)").Scan(&gm).Error; err == nil {
+			total += gm
+		}
+	}
 	return total
 }
 
@@ -581,6 +578,13 @@ func (h *CasinoHandler) BlackjackStart(c *gin.Context) {
 	var bjJuego models.CasinoGame
 	if err := h.db.Where("codigo = ?", models.CasinoBlackjack).First(&bjJuego).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "el juego no esta configurado"})
+		return
+	}
+	if !bjJuego.Activo {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "el juego esta desactivado"})
+		return
+	}
+	if !ExigirAcceso(c, h.db, user.ID, models.ContenidoJuego, models.CasinoBlackjack) {
 		return
 	}
 	if req.Monto < bjJuego.MinApuesta {

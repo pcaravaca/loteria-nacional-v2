@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch } from 'vue'
 import { colones } from '@/utils/formato'
+import { reproducir } from '@/utils/sfx'
 
 const props = defineProps<{
   resultado: any
@@ -18,6 +19,7 @@ function toggle(n: number) {
   const i = elegidos.value.indexOf(n)
   if (i >= 0) elegidos.value.splice(i, 1)
   else if (elegidos.value.length < 5) elegidos.value.push(n)
+  reproducir('tecla')
 }
 
 const bolillas = computed(() => props.resultado?.bolillas ?? [])
@@ -27,6 +29,7 @@ watch(
   () => props.resultado,
   (r) => {
     if (r?.tus_numeros) elegidos.value = [...r.tus_numeros]
+    reproducir('bolilla')
   },
 )
 
@@ -58,7 +61,7 @@ function jugar() {
         v-for="n in numeros"
         :key="n"
         class="num"
-        :class="{ activa: elegidos.includes(n), salida: bolillas.includes(n), 'resalta-ganador': premio > 0 && (resultado?.aciertos ?? []).includes(n) }"
+        :class="{ activa: elegidos.includes(n), salida: bolillas.includes(n), 'resalta-ganador': premio > 0 && bolillas.includes(n) && elegidos.includes(n) }"
         @click="toggle(n)">{{ n }}</button>
     </div>
 
@@ -79,15 +82,17 @@ function jugar() {
 .bolilla {
   min-width: 30px; height: 30px; padding: 0 6px; border-radius: 999px; display: grid; place-items: center;
   background: var(--surface); border: 1px solid var(--border); font-size: 12px; color: var(--muted);
+  animation: aparecer .3s ease both;
 }
+@keyframes aparecer { from { transform: scale(.4); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 .bolilla.mia { background: var(--prim-dim); border-color: var(--prim); color: var(--prim-2); font-weight: 700; }
 .estado { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 10px; border-radius: 10px; background: rgba(255,255,255,.02); border: 1px solid var(--border-soft); color: var(--muted); }
 .estado.gana { background: var(--prim-dim); border-color: rgba(16,185,129,.35); color: var(--prim-2); }
 .estado strong { color: var(--gold); font-size: 18px; }
 .neutro { font-size: 12px; }
-.grilla { display: grid; grid-template-columns: repeat(10, 1fr); gap: 5px; }
+.grilla { display: grid; grid-template-columns: repeat(10, minmax(0, 1fr)); gap: 5px; }
 .num {
-  height: 30px; border-radius: 8px; border: 1px solid var(--border-soft); background: var(--surface);
+  min-width: 0; padding: 0; height: 30px; border-radius: 8px; border: 1px solid var(--border-soft); background: var(--surface);
   color: var(--muted); font-size: 12px; cursor: pointer;
 }
 .num.activa { background: var(--prim-dim); border-color: var(--prim); color: var(--prim-2); font-weight: 700; }
@@ -98,7 +103,7 @@ function jugar() {
 
 <style scoped>
 @media (max-width: 380px) {
-  .grilla { grid-template-columns: repeat(5, 1fr); gap: 4px; }
+  .grilla { grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 4px; }
   .premios { flex-wrap: wrap; }
 }
 </style>

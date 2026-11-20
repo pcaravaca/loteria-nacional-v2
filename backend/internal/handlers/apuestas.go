@@ -48,6 +48,12 @@ func (h *ApuestasHandler) Crear(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "el sorteo no esta abierto"})
 		return
 	}
+	// El acceso por paquete o por jugador manda sobre el sorteo: si la loteria
+	// esta apagada para esta cuenta, no se puede apostar aunque el sorteo siga
+	// abierto (403 claro, no alcanza con ocultarlo en la web).
+	if !ExigirAcceso(c, h.db, userID, models.ContenidoLoteria, sorteo.Loteria.Codigo) {
+		return
+	}
 
 	max := 1
 	for i := 0; i < sorteo.Loteria.LongitudNum; i++ {

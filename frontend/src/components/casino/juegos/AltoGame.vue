@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { ref, watch } from 'vue'
 import { colones } from '@/utils/formato'
+import { reproducir } from '@/utils/sfx'
 
 const props = defineProps<{
   resultado: any
@@ -30,6 +31,7 @@ watch(
   (r) => {
     if (!r) return
     tirando.value = true
+    reproducir('giro')
     setTimeout(() => (tirando.value = false), 800)
   },
 )
@@ -54,10 +56,10 @@ function jugar() {
     </div>
 
     <div class="direcciones">
-      <button class="btn-dir" :class="{ activa: direccion === 'bajo' }" @click="direccion = 'bajo'">
+      <button class="btn-dir" :class="{ activa: direccion === 'bajo', 'resalta-ganador': premio > 0 && resultado?.direccion === 'bajo' }" @click="direccion = 'bajo'; reproducir('tecla')">
         Bajo
       </button>
-      <button class="btn-dir" :class="{ activa: direccion === 'sobre' }" @click="direccion = 'sobre'">
+      <button class="btn-dir" :class="{ activa: direccion === 'sobre', 'resalta-ganador': premio > 0 && resultado?.direccion === 'sobre' }" @click="direccion = 'sobre'; reproducir('tecla')">
         Sobre
       </button>
     </div>
@@ -68,7 +70,7 @@ function jugar() {
         :key="t.tope"
         class="opcion"
         :class="{ activa: tope === t.tope }"
-        @click="tope = t.tope"
+        @click="tope = t.tope; reproducir('tecla')"
       >
         {{ t.tope }}%
         <small>x{{ t.mult }}</small>
