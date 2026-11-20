@@ -25,6 +25,15 @@ const auth = useAuthStore()
 const tema = computed(() => auth.temaCasino)
 const grupos = computed(() => agruparJuegos(juegos.value))
 const rondasRecientes = computed(() => rondas.value.slice(0, 6))
+// Filtro por tipo de juego: evita tener que scrollear toda la lista.
+const filtro = ref('todos')
+const gruposVisibles = computed(() =>
+  filtro.value === 'todos' ? grupos.value : grupos.value.filter((g) => g.id === filtro.value),
+)
+function elegirFiltro(id: string) {
+  filtro.value = id
+  document.getElementById('lista-juegos')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+}
 
 async function elegirTema(codigo: TemaCasino) {
   await auth.fijarTema(codigo)
@@ -132,7 +141,22 @@ async function verificar(ronda: CasinoRound) {
         texto="Elegi un juego, hacé una apuesta y tu historial aparecera aqui."
       />
 
-      <section v-for="g in grupos" :key="g.id" class="grupo-casino">
+      <div id="lista-juegos" class="chips-filtro" role="navigation" aria-label="Tipos de juego">
+        <button
+          class="chip"
+          :class="{ activo: filtro === 'todos' }"
+          @click="elegirFiltro('todos')"
+        >Todos</button>
+        <button
+          v-for="g in grupos"
+          :key="g.id"
+          class="chip"
+          :class="{ activo: filtro === g.id }"
+          @click="elegirFiltro(g.id)"
+        >{{ g.titulo }}</button>
+      </div>
+
+      <section v-for="g in gruposVisibles" :key="g.id" class="grupo-casino">
         <div class="grupo-head">
           <h2>{{ g.titulo }}</h2>
           <p v-if="g.descripcion">{{ g.descripcion }}</p>
@@ -198,7 +222,35 @@ async function verificar(ronda: CasinoRound) {
   </div>
 </template>
 
-<style scoped>
+<style scoped>.chips-filtro {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 10px 2px 12px;
+  background: var(--bg);
+  scrollbar-width: none;
+}
+.chips-filtro::-webkit-scrollbar { display: none; }
+.chip {
+  flex: 0 0 auto;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--muted);
+  border-radius: 999px;
+  padding: 7px 14px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.chip.activo {
+  background: var(--prim);
+  border-color: var(--prim);
+  color: #fff;
+  font-weight: 600;
+}
+
 .ambiente {
   display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
   background: var(--bg-2); border: 1px solid var(--border-soft);
