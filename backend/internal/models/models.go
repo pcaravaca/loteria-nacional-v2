@@ -86,6 +86,30 @@ var temasCasino = []string{
 	TemaClasico, TemaNeon, TemaPremium, TemaTropical, TemaMedianoche, TemaRubi,
 }
 
+// Temas de la aplicacion completa (no solo el casino).
+const (
+	TemaAppEsmeralda = "esmeralda"
+	TemaAppZafiro    = "zafiro"
+	TemaAppRubi      = "rubi"
+	TemaAppAmatista  = "amatista"
+	TemaAppGrafito   = "grafito"
+)
+
+var temasApp = []string{
+	TemaAppEsmeralda, TemaAppZafiro, TemaAppRubi, TemaAppAmatista, TemaAppGrafito,
+}
+
+func TemaAppValido(tema string) bool {
+	for _, t := range temasApp {
+		if t == tema {
+			return true
+		}
+	}
+	return false
+}
+
+func TemasApp() []string { return append([]string(nil), temasApp...) }
+
 func TemaCasinoValido(tema string) bool {
 	for _, t := range temasCasino {
 		if t == tema {
@@ -113,6 +137,8 @@ type User struct {
 	// Ambiente visual del casino elegido por el usuario (clasico, neon, premium,
 	// tropical, medianoche, rubi). Default: premium.
 	TemaCasino string `gorm:"size:32;not null;default:'premium'" json:"tema_casino"`
+	// Tema visual de toda la aplicacion (esmeralda, zafiro, rubi, amatista, grafito).
+	TemaApp string `gorm:"size:32;not null;default:'esmeralda'" json:"tema_app"`
 	CasinoSeed  string `gorm:"size:64" json:"-"`
 	CasinoNonce int64  `json:"-"`
 	// Juego responsable: autoexclusion voluntaria. Es NULL si no aplica y, si

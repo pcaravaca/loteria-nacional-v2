@@ -18,6 +18,7 @@ export interface User {
   autoexcluido_hasta?: string | null
   tiene_foto?: boolean
   tema_casino?: string
+  tema_app?: string
   created_at: string
 }
 

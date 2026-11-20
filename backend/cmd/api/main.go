@@ -99,6 +99,7 @@ func main() {
 
 	authed.GET("/auth/me", authH.Me)
 	authed.PUT("/auth/tema", authH.GuardarTema)
+	authed.PUT("/auth/tema-app", authH.GuardarTemaApp)
 	authed.GET("/dashboard", reportesH.Dashboard)
 	authed.GET("/movimientos", reportesH.Movimientos)
 	authed.GET("/resultados", reportesH.Resultados)

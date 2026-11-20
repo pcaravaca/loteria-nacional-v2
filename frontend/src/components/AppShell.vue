@@ -7,6 +7,7 @@ import { useMarcaStore } from '@/stores/marca'
 import AppAndroidBanner from '@/components/AppAndroidBanner.vue'
 import { esDispositivoAndroid } from '@/utils/dispositivo'
 import AudioControl from '@/components/AudioControl.vue'
+import TemaAppControl from '@/components/TemaAppControl.vue'
 
 const marca = useMarcaStore()
 
@@ -59,7 +60,13 @@ const nav = computed(() => {
 
 function salir() {
   auth.logout()
-  router.push({ name: 'inicio' })
+  // Al cerrar sesion se vuelve a la landing, no al login.
+  router.push({ name: 'inicio' }).catch(() => {
+    window.location.hash = '#/'
+  })
+  window.setTimeout(() => {
+    if (!auth.isAutenticado && location.hash.startsWith('#/login')) window.location.hash = '#/'
+  }, 250)
 }
 </script>
 
@@ -112,6 +119,7 @@ function salir() {
         <h2>{{ titulo }}</h2>
         <div class="spacer"></div>
         <AudioControl />
+        <TemaAppControl />
         <div class="saldo-chip">
           <span class="etq">Saldo</span>
           <span class="valor">{{ colones(auth.user?.saldo ?? 0) }}</span>

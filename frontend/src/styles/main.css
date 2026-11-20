@@ -297,6 +297,33 @@ input, select, textarea, button { font-size: 16px; } /* evita el zoom automatico
 }
 .modal.modal-lg { width: min(100%, 720px); }
 
+
+/* ---------- temas de toda la aplicacion (elegidos por el usuario) ---------- */
+[data-tema-app="zafiro"] {
+  --bg: #070d16; --bg-2: #0a1424; --surface: #0f1c31; --surface-2: #15253f;
+  --surface-3: #1c3153; --border: #25405f; --border-soft: #182c46;
+  --prim: #3b82f6; --prim-2: #60a5fa; --prim-dim: rgba(59, 130, 246, .16);
+  --gold: #f5b942; --gold-dim: rgba(245, 185, 66, .14); --info: #38bdf8;
+}
+[data-tema-app="rubi"] {
+  --bg: #14070b; --bg-2: #1e0a11; --surface: #2a1019; --surface-2: #381522;
+  --surface-3: #4a1c2c; --border: #5c2438; --border-soft: #3d1626;
+  --prim: #e11d48; --prim-2: #fb7185; --prim-dim: rgba(225, 29, 72, .16);
+  --gold: #f5b942; --gold-dim: rgba(245, 185, 66, .14); --danger: #ef4444;
+}
+[data-tema-app="amatista"] {
+  --bg: #0d0817; --bg-2: #140e24; --surface: #1d1533; --surface-2: #271d45;
+  --surface-3: #332761; --border: #443479; --border-soft: #2b2050;
+  --prim: #a78bfa; --prim-2: #c4b5fd; --prim-dim: rgba(167, 139, 250, .16);
+  --gold: #f5b942; --gold-dim: rgba(245, 185, 66, .14); --violet: #c4b5fd;
+}
+[data-tema-app="grafito"] {
+  --bg: #0b0d10; --bg-2: #121519; --surface: #1a1f26; --surface-2: #232a33;
+  --surface-3: #2e3742; --border: #3c4753; --border-soft: #272f38;
+  --prim: #94a3b8; --prim-2: #cbd5e1; --prim-dim: rgba(148, 163, 184, .14);
+  --gold: #d4a437; --gold-dim: rgba(212, 164, 55, .14);
+}
+
 /* ---------- modal ---------- */
 .modal-backdrop {
   position: fixed; inset: 0; background: rgba(3, 6, 10, .7);

@@ -48,7 +48,8 @@ const casinoJuegos = [
   <div>
     <nav class="nav-publica">
       <div class="brand">
-        <div class="brand-mark">LN</div>
+        <img v-if="marca.icono" class="brand-logo" :src="marca.icono" alt="" />
+        <div v-else class="brand-mark">LN</div>
         <div>
           <div class="brand-name">{{ marca.nombre }}</div>
           <div class="brand-sub">Costa Rica</div>
@@ -167,7 +168,8 @@ const casinoJuegos = [
 
     <footer class="footer">
       <div class="brand" style="justify-content: center; margin-bottom: 10px">
-        <div class="brand-mark">LN</div>
+        <img v-if="marca.icono" class="brand-logo" :src="marca.icono" alt="" />
+        <div v-else class="brand-mark">LN</div>
         <div class="brand-name">{{ marca.nombre }}</div>
       </div>
       <p>Juega con responsabilidad. +18. Aserrí, San José, Costa Rica.</p>
@@ -176,7 +178,8 @@ const casinoJuegos = [
   </div>
 </template>
 
-<style scoped>
+<style scoped>.brand-logo { width: 40px; height: 40px; border-radius: 12px; object-fit: cover; display: block; }
+
 /* Hero a dos columnas: texto a la izquierda, arte generado a la derecha. */
 .hero {
   text-align: left;

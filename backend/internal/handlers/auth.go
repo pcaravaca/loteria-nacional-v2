@@ -105,6 +105,7 @@ func (h *AuthHandler) Login(c *gin.Context) {
 			"saldo":      user.Saldo,
 			"bono":       user.Bono,
 			"tema_casino": user.TemaCasino,
+			"tema_app":     user.TemaApp,
 		},
 	})
 }
@@ -131,6 +132,26 @@ func (h *AuthHandler) GuardarTema(c *gin.Context) {
 		return
 	}
 	c.JSON(http.StatusOK, gin.H{"tema_casino": req.Tema})
+}
+
+// GuardarTemaApp guarda el tema visual de toda la aplicacion.
+func (h *AuthHandler) GuardarTemaApp(c *gin.Context) {
+	var req temaRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "datos invalidos"})
+		return
+	}
+	if !models.TemaAppValido(req.Tema) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "tema no disponible"})
+		return
+	}
+	userID := c.GetUint("userID")
+	if err := h.db.Model(&models.User{}).Where("id = ?", userID).
+		Update("tema_app", req.Tema).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "no se pudo guardar el tema"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"tema_app": req.Tema})
 }
 
 func (h *AuthHandler) Me(c *gin.Context) {
