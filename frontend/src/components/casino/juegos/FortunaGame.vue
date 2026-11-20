@@ -101,7 +101,7 @@ function girar() {
   color: var(--gold); font-size: 22px; z-index: 2;
 }
 .rueda {
-  width: 190px; height: 190px; border-radius: 50%;
+  width: min(190px, 56vw); aspect-ratio: 1 / 1; height: auto; border-radius: 50%;
   border: 4px solid var(--border);
   transition: transform 2.2s cubic-bezier(.15,.85,.25,1);
   position: relative;

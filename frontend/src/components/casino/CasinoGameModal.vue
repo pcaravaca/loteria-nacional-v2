@@ -32,6 +32,34 @@ const cargando = ref(false)
 const error = ref('')
 const respuesta = ref<PlayResponse | null>(null)
 const rondaKey = ref(0)
+const pantallaCompleta = ref(false)
+
+// Los juegos se sienten mejor a pantalla completa: en tablets y telefonos el modal
+// con marco obliga a hacer scroll vertical sin necesidad.
+function alternarPantalla() {
+  const modal = document.querySelector('.modal.modal-lg') as HTMLElement | null
+  if (!modal) return
+  if (document.fullscreenElement) {
+    document.exitFullscreen?.()
+    return
+  }
+  const forzar = () => modal.classList.add('pantalla-forzada')
+  try {
+    const p = modal.requestFullscreen?.()
+    if (p && typeof p.then === 'function') {
+      p.catch(forzar).then(() => setTimeout(() => { if (!document.fullscreenElement) forzar() }, 350))
+    } else {
+      forzar()
+    }
+  } catch {
+    forzar()
+  }
+}
+if (typeof document !== 'undefined') {
+  document.addEventListener('fullscreenchange', () => {
+    pantallaCompleta.value = !!document.fullscreenElement
+  })
+}
 
 const rapidos = [500, 1000, 5000, 10000]
 // Guía por juego (aprobada por Peter: se muestra arriba del tablero).
@@ -235,6 +263,10 @@ function repetir() {
       <div class="tema-marquesina">
         <b>{{ juego.nombre }}</b>
         <span>Min {{ colones(juego.min_apuesta) }} · Max x{{ juego.max_multiplicador }}</span>
+        <button type="button" class="btn-pantalla" :title="pantallaCompleta ? 'Salir de pantalla completa' : 'Pantalla completa'"
+                @click="alternarPantalla">
+          {{ pantallaCompleta ? '⤡' : '⤢' }}
+        </button>
       </div>
 
       <div class="apuesta">
@@ -391,7 +423,7 @@ function repetir() {
 
 <style scoped>
 
-.guia-detalle { border-radius: 12px; border: 1px solid var(--tm-reel-border); background: color-mix(in srgb, var(--tm-shell) 12%, transparent); }
+.guia-detalle { border-radius: 12px; border: 1px solid var(--tm-reel-border); background: rgba(255, 255, 255, .04); background: color-mix(in srgb, var(--tm-shell) 12%, transparent); }
 .guia-detalle > summary {
   cursor: pointer; padding: 9px 12px; font-size: 11px; letter-spacing: .14em;
   text-transform: uppercase; color: var(--tm-accent); list-style: none;
@@ -405,7 +437,20 @@ function repetir() {
 .step { width: 34px; height: 34px; font-size: 16px; }
 .monto strong { font-size: 17px; }
 
-.casino-modal { display: flex; flex-direction: column; gap: 10px; }
+.casino-modal { display: flex; flex-direction: column; gap: 10px; min-width: 0; max-width: 100%; }
+.casino-modal > div { min-width: 0; }
+.rapidos { flex-wrap: wrap; }
+.btn-pantalla {
+  margin-left: auto; flex: none; width: 30px; height: 26px; border-radius: 8px;
+  border: 1px solid var(--tm-reel-border); background: color-mix(in srgb, var(--tm-shell) 40%, transparent);
+  background: rgba(255, 255, 255, .06); color: var(--tm-marquee-text, #e8ce7a);
+  cursor: pointer; font-size: 14px; line-height: 1; display: grid; place-items: center;
+}
+.modal.pantalla-forzada {
+  width: 100%; max-width: none; height: 100%; max-height: 100%;
+  border-radius: 0; border: 0; padding: 14px;
+}
+.apuesta { flex-wrap: wrap; }
 .tema-marquesina {
   border-radius: 12px; padding: 10px 14px; display: flex; align-items: center; gap: 10px;
   text-transform: uppercase; letter-spacing: .18em; font-size: 13px; font-weight: 800;

@@ -96,3 +96,10 @@ function jugar() {
 .ayuda { font-size: 12px; color: var(--faint); text-align: center; }
 .paytable { display: flex; justify-content: center; gap: 12px; font-size: 11px; color: var(--faint); }
 </style>
+
+<style scoped>
+@media (max-width: 380px) {
+  .grilla { grid-template-columns: repeat(5, 1fr); gap: 4px; }
+  .premios { flex-wrap: wrap; }
+}
+</style>

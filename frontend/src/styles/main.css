@@ -274,6 +274,29 @@ table.table { width: 100%; border-collapse: collapse; font-size: 14px; }
 .auth-alt { text-align: center; color: var(--muted); font-size: 13px; margin-top: 16px; }
 .auth-alt a { color: var(--prim-2); font-weight: 600; }
 
+
+/* ---------- soporte multi-dispositivo / multi-browser ---------- */
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+body { overflow-x: hidden; overflow-x: clip; }
+img, canvas, svg, video { max-width: 100%; }
+button, a, select, input, textarea { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+input, select, textarea, button { font-size: 16px; } /* evita el zoom automatico de iOS en inputs */
+
+.modal-backdrop {
+  padding: max(12px, env(safe-area-inset-top)) max(12px, env(safe-area-inset-right))
+           max(12px, env(safe-area-inset-bottom)) max(12px, env(safe-area-inset-left));
+  -webkit-backdrop-filter: blur(4px);
+}
+.modal {
+  width: min(100%, 480px);
+  max-height: calc(100vh - 24px);
+  max-height: calc(100dvh - 24px);
+  margin: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+}
+.modal.modal-lg { width: min(100%, 720px); }
+
 /* ---------- modal ---------- */
 .modal-backdrop {
   position: fixed; inset: 0; background: rgba(3, 6, 10, .7);
@@ -282,7 +305,7 @@ table.table { width: 100%; border-collapse: collapse; font-size: 14px; }
 .modal {
   width: 100%; max-width: 480px; background: var(--surface);
   border: 1px solid var(--border); border-radius: 18px; padding: 22px;
-  box-shadow: var(--shadow); max-height: 90vh; overflow-y: auto;
+  box-shadow: var(--shadow); overflow-y: auto;
 }
 .modal h3 { font-size: 19px; margin-bottom: 4px; }
 .modal .modal-sub { color: var(--muted); font-size: 13px; margin-bottom: 16px; }
@@ -297,6 +320,19 @@ table.table { width: 100%; border-collapse: collapse; font-size: 14px; }
 }
 .modal-x:hover { border-color: var(--prim); color: var(--prim-2); }
 .modal { position: relative; }
+
+
+/* Juegos del casino en pantalla completa */
+.modal:fullscreen,
+.modal:-webkit-full-screen {
+  width: 100%; max-width: none; height: 100%; max-height: 100%;
+  border-radius: 0; border: 0; padding: 16px;
+  background: var(--bg);
+}
+.modal:fullscreen .casino-modal,
+.modal:-webkit-full-screen .casino-modal {
+  height: 100%; max-height: 100%; overflow-y: auto; overscroll-behavior: contain;
+}
 
 /* ---------- selector de numeros ---------- */
 .numpad { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin: 14px 0; }
@@ -368,6 +404,24 @@ table.table { width: 100%; border-collapse: collapse; font-size: 14px; }
   flex-wrap: wrap; padding: 16px 18px;
 }
 
+@media (max-height: 900px) and (orientation: landscape) {
+  /* Tablets/moviles en horizontal: el marco del modal no deja lugar para el tablero. */
+  .modal.modal-lg {
+    width: 100%; max-width: none; height: 100%; max-height: 100%;
+    border-radius: 0; border: 0; padding: 12px;
+  }
+  /* Aprovecha cada fila: los juegos entran sin scroll en tablets apaisadas. */
+  .modal.modal-lg .casino-modal { gap: 6px; }
+  .modal.modal-lg .tema-marquesina { padding: 6px 10px; font-size: 11px; letter-spacing: .12em; }
+  .modal.modal-lg .apuesta { gap: 6px; }
+  .modal.modal-lg .rapidos { gap: 5px; }
+  .modal.modal-lg .guia-detalle > summary { padding: 6px 10px; }
+}
+
 @media (max-width: 760px) {
   .form-grid { grid-template-columns: 1fr; }
+  .modal.modal-lg {
+    width: 100%; max-width: none; height: 100%; max-height: 100%;
+    border-radius: 0; border: 0; padding: 14px;
+  }
 }

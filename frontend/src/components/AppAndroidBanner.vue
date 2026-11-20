@@ -27,6 +27,7 @@ function cerrar() {
 <style scoped>
 .app-banner {
   display: flex; align-items: center; gap: 12px; padding: 10px 14px;
+  background: linear-gradient(180deg, rgba(232, 206, 122, .14), transparent);
   background: linear-gradient(180deg, color-mix(in srgb, var(--tm-accent, #e8ce7a) 16%, transparent), transparent);
   border: 1px solid var(--line, rgba(232, 206, 122, .3));
   border-radius: 14px; margin-bottom: 14px;

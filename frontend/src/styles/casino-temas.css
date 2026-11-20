@@ -154,6 +154,7 @@
 .casino-modal[data-tema] .saldo b { color: var(--tm-accent); }
 
 .casino-modal[data-tema] .guia {
+  background: rgba(255, 255, 255, .05);
   background: color-mix(in srgb, var(--tm-shell) 14%, transparent);
   border-color: var(--tm-shell);
 }
@@ -178,15 +179,19 @@
   background: var(--tm-marquee);
   border-color: var(--tm-marquee-border);
   color: var(--tm-marquee-text);
+  box-shadow: 0 0 24px rgba(232, 206, 122, .22);
   box-shadow: 0 0 24px color-mix(in srgb, var(--tm-accent) 26%, transparent);
 }
 .casino-modal[data-tema] .tema-arena {
   position: relative;
   background:
+    radial-gradient(ellipse at 50% 18%, rgba(232, 206, 122, .22), transparent 62%),
     radial-gradient(ellipse at 50% 18%, color-mix(in srgb, var(--tm-accent) 26%, transparent), transparent 62%),
     linear-gradient(180deg,
+      var(--tm-reel-border) 0%,
       color-mix(in srgb, var(--tm-reel-border) 55%, #0a3d2c) 0%,
       var(--tm-reel) 45%,
+      #04150f 100%,
       color-mix(in srgb, #000 30%, var(--tm-reel)) 100%);
   border: 2px solid var(--tm-accent);
   border-radius: 24px 24px 30px 30px;
@@ -194,6 +199,7 @@
 }
 .casino-modal[data-tema] .tema-arena::before {
   content: ""; position: absolute; inset: 8px; border-radius: 18px;
+  border: 1px dashed rgba(232, 206, 122, .45);
   border: 1px dashed color-mix(in srgb, var(--tm-accent) 55%, transparent);
   pointer-events: none;
 }

@@ -210,3 +210,21 @@ const listaParaJugar = computed(() => !mano.value.length && !cargando.value)
 .acciones { display: flex; gap: 8px; flex-wrap: wrap; }
 .acciones .btn { flex: 1 1 90px; }
 </style>
+
+<style scoped>
+/* En horizontal (tablets/telefonos apaisados) la mesa se compacta para no exigir scroll. */
+@media (max-height: 900px) {
+  .mesa { padding: 8px 12px; border-radius: 14px; }
+  .mesa-head h3 { font-size: 17px; letter-spacing: .2em; }
+  .reglas { font-size: 9.5px; }
+  .placa { top: 7px; left: 8px; font-size: 8px; padding: 3px 5px; }
+  .zona { gap: 4px; }
+  .cartas { min-height: 52px; gap: 5px; }
+  .carta { width: 42px; height: 58px; border-radius: 7px; }
+  .carta .fig { font-size: 17px; }
+  .carta .palo { font-size: 12px; }
+  .separador { margin: 6px 4px; }
+  .barra { margin-top: 6px; padding: 5px 8px; }
+  .blackjack { gap: 8px; }
+}
+</style>

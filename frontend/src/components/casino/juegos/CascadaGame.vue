@@ -94,7 +94,7 @@ function soltar() {
 <style scoped>
 .cascada { display: flex; flex-direction: column; gap: 14px; }
 .tablero {
-  position: relative; height: 340px; overflow: hidden;
+  position: relative; height: min(340px, 58vh); overflow: hidden;
   border: 1px solid var(--border-soft); border-radius: 14px;
   background: linear-gradient(180deg, rgba(16, 185, 129, 0.06), transparent 60%);
 }

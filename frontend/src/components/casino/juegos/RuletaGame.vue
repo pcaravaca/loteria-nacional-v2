@@ -31,6 +31,15 @@ function dibujar() {
   const cv = canvas.value
   if (!cv) return
   const ctx = cv.getContext('2d')!
+  // El canvas se adapta al ancho real (moviles) y usa la densidad de pixeles
+  // del dispositivo para que la rueda no se vea borrosa.
+  const css = cv.clientWidth || 260
+  const dpr = window.devicePixelRatio || 1
+  const want = Math.round(css * dpr)
+  if (cv.width !== want || cv.height !== want) {
+    cv.width = want
+    cv.height = want
+  }
   const size = cv.width
   const centro = size / 2
   const radio = centro - 6
@@ -178,8 +187,8 @@ function jugar() {
 
 <style scoped>
 .ruleta { display: flex; flex-direction: column; gap: 12px; align-items: center; }
-.lienzo { position: relative; width: 260px; height: 260px; }
-.canvas { display: block; }
+.lienzo { position: relative; width: min(260px, 74vw); aspect-ratio: 1 / 1; margin: 0 auto; }
+.lienzo canvas { display: block; width: 100%; height: 100%; }
 .resultado {
   position: absolute; inset: auto 0 -8px 0; display: flex; align-items: center; justify-content: center;
   gap: 8px; font-size: 13px; color: var(--muted);
