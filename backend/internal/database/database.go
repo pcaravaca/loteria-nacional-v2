@@ -58,6 +58,7 @@ func Open(cfg *config.Config) (*gorm.DB, error) {
 		&models.LimitesJugador{},
 		&models.Rifa{},
 		&models.RifaNumero{},
+		&models.Ajuste{},
 	); err != nil {
 		return nil, fmt.Errorf("automigrate: %w", err)
 	}

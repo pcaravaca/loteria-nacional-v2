@@ -10,6 +10,7 @@ import (
 	"loteria-backend/internal/config"
 	"loteria-backend/internal/database"
 	"loteria-backend/internal/handlers"
+	"loteria-backend/internal/resultados"
 	"loteria-backend/internal/middleware"
 	"loteria-backend/internal/models"
 )
@@ -71,6 +72,7 @@ func main() {
 	apuestasH := handlers.NewApuestasHandler(db, cfg)
 	reportesH := handlers.NewReportesHandler(db)
 	adminH := handlers.NewAdminHandler(db)
+	cfgH := handlers.NewConfigHandler(db)
 	casinoH := handlers.NewCasinoHandler(db, cfg)
 	cuentaH := handlers.NewCuentaHandler(db, cfg)
 	auditoriaH := handlers.NewAuditoriaHandler(db)
@@ -80,6 +82,7 @@ func main() {
 	adminRifasH := handlers.NewAdminRifasHandler(db)
 
 	api.POST("/auth/register", authH.Register)
+	api.GET("/config", cfgH.Config)
 	api.POST("/auth/login", authH.Login)
 
 	api.GET("/loterias", juegosH.ListLoterias)
@@ -95,6 +98,7 @@ func main() {
 	authed.Use(middleware.AuthRequired(cfg))
 
 	authed.GET("/auth/me", authH.Me)
+	authed.PUT("/auth/tema", authH.GuardarTema)
 	authed.GET("/dashboard", reportesH.Dashboard)
 	authed.GET("/movimientos", reportesH.Movimientos)
 	authed.GET("/resultados", reportesH.Resultados)
@@ -122,6 +126,10 @@ func main() {
 	admin.POST("/usuarios/:id/saldo", adminH.AjustarSaldo)
 	admin.POST("/loterias", adminH.CreateLoteria)
 	admin.PUT("/loterias/:id", adminH.UpdateLoteria)
+	admin.PUT("/config", cfgH.Guardar)
+	admin.POST("/resultados/importar", adminH.ImportarResultados)
+	admin.GET("/resultados/estado", adminH.EstadoResultados)
+	admin.POST("/sorteos/calendario", adminH.GenerarCalendario)
 	admin.POST("/sorteos", adminH.CreateSorteo)
 	admin.GET("/auditoria", auditoriaH.Listar)
 	admin.GET("/rifas", adminRifasH.Listar)
@@ -184,6 +192,21 @@ func main() {
 		handlers.IniciarSweepSorteos(db, true, time.Duration(cfg.SorteosSweepMin)*time.Minute, 15*time.Minute)
 		log.Printf("cierre automatico de sorteos vencidos activado (cada %d min, gracia 15 min)", cfg.SorteosSweepMin)
 	}
+
+	// Resultados automáticos: los espejos en texto son la fuente; la JPS queda
+	// como referencia oficial de verificación (publica PDF escaneados).
+	if err := database.AsegurarLoterias(db); err != nil {
+		log.Printf("asegurar loterias: %v", err)
+	}
+
+	impResultados := resultados.NuevoImportador(db,
+		[]resultados.Proveedor{resultados.NuevoNacionAlloteria(nil)}, nil)
+	if n, err := resultados.GenerarSorteos(db, nil, 21); err != nil {
+		log.Printf("calendario de sorteos: %v", err)
+	} else if n > 0 {
+		log.Printf("calendario de sorteos: se crearon %d sorteos futuros", n)
+	}
+	handlers.IniciarImportador(impResultados, cfg.ResultadosAuto, time.Duration(cfg.ResultadosMin)*time.Minute)
 
 	if cfg.DatabaseURL != "" {
 		log.Printf("Loteria CR API escuchando en :%s (postgres dbname=%s)", cfg.Port, cfg.DatabaseName())

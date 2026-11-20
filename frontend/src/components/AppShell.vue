@@ -1,7 +1,12 @@
-<script setup lang="ts">
+
+.brand-img { width: 40px; height: 40px; border-radius: 12px; object-fit: cover; display: block; }<script setup lang="ts">
 import { ref, computed } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
+import { useMarcaStore } from '@/stores/marca'
+import AppAndroidBanner from '@/components/AppAndroidBanner.vue'
+
+const marca = useMarcaStore()
 import { colones } from '@/utils/formato'
 
 const route = useRoute()
@@ -22,7 +27,7 @@ const titulos: Record<string, string> = {
   agente: 'Panel de agente',
 }
 
-const titulo = computed(() => titulos[route.name as string] ?? 'Lotería Nacional CR')
+const titulo = computed(() => titulos[route.name as string] ?? marca.nombre)
 
 const nav = computed(() => {
   const items: { to: any; label: string; ico: string; query?: Record<string, unknown> }[] = [
@@ -60,9 +65,10 @@ function salir() {
   <div class="app-shell">
     <aside class="sidebar" :class="{ abierta: abierto }">
       <div class="brand">
-        <div class="brand-mark">LN</div>
+        <img v-if="marca.icono" class="brand-img" :src="marca.icono" alt="" />
+        <div v-else class="brand-mark">LN</div>
         <div>
-          <div class="brand-name">Lotería Nacional</div>
+          <div class="brand-name">{{ marca.nombre }}</div>
           <div class="brand-sub">Costa Rica</div>
         </div>
       </div>
@@ -105,6 +111,7 @@ function salir() {
       </header>
 
       <main class="content">
+        <AppAndroidBanner />
         <slot />
       </main>
     </div>

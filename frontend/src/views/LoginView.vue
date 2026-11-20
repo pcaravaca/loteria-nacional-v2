@@ -1,4 +1,8 @@
-<script setup lang="ts">
+
+.brand-img { width: 40px; height: 40px; border-radius: 12px; object-fit: cover; display: block; }<script setup lang="ts">
+import { useMarcaStore } from '@/stores/marca'
+
+const marca = useMarcaStore()
 import { ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
@@ -27,9 +31,10 @@ async function enviar() {
   <div class="auth-layout">
     <aside class="auth-side">
       <div class="brand">
-        <div class="brand-mark">LN</div>
+        <img v-if="marca.icono" class="brand-img" :src="marca.icono" alt="" />
+        <div v-else class="brand-mark">LN</div>
         <div>
-          <div class="brand-name">Lotería Nacional</div>
+          <div class="brand-name">{{ marca.nombre }}</div>
           <div class="brand-sub">Costa Rica</div>
         </div>
       </div>

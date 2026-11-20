@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Descargar la app · Lotería Nacional</title>
+<style>
+  :root{--bg:#04150f;--gold:#e8ce7a;--txt:#eef6f1;--muted:#9db8ac}
+  *{box-sizing:border-box}
+  body{margin:0;font-family:system-ui,-apple-system,"Segoe UI",sans-serif;background:radial-gradient(1200px 700px at 50% -10%,#0c3b2b,var(--bg));color:var(--txt);min-height:100vh;display:flex;flex-direction:column;align-items:center;padding:32px 18px}
+  .card{width:min(560px,100%);background:linear-gradient(180deg,#0c2c21,#071b14);border:1px solid rgba(232,206,122,.35);border-radius:20px;padding:26px;text-align:center;box-shadow:0 24px 60px rgba(0,0,0,.5)}
+  img{width:112px;height:112px;border-radius:26px;display:block;margin:0 auto 14px}
+  h1{margin:0 0 6px;font-size:22px;letter-spacing:.02em}
+  p{margin:6px 0;color:var(--muted);font-size:14px;line-height:1.5}
+  .btn{display:inline-block;margin-top:18px;padding:14px 26px;border-radius:12px;background:linear-gradient(180deg,#f0d98a,#c9a227);color:#2b1d05;font-weight:800;text-decoration:none;font-size:16px}
+  .ver{font-size:12px;color:var(--gold);margin-top:10px;letter-spacing:.08em;text-transform:uppercase}
+  ol{text-align:left;color:var(--muted);font-size:13px;line-height:1.7;padding-left:18px;margin:14px 0 0}
+</style>
+</head>
+<body>
+  <div class="card">
+    <img src="../logo.png" alt="Ícono de la app">
+    <h1>App para Android</h1>
+    <p>Instalá la app nativa para apostar sin navegador. Usa el mismo usuario y saldo.</p>
+    <a class="btn" href="./LoteriaNacional.apk">Descargar APK</a>
+    <div class="ver" id="ver">·</div>
+    <ol>
+      <li>Descargá el archivo <b>LoteriaNacional.apk</b>.</li>
+      <li>Abrilo con el botón «Instalar».</li>
+      <li>Si te lo pide, habilitá «Instalar apps desconocidas» para este navegador o gestor de archivos.</li>
+      <li>Entrá con tu correo y clave de siempre.</li>
+    </ol>
+    <p style="margin-top:14px;font-size:12px">La app se actualiza sola: avisa cuando hay una versión nueva.</p>
+  </div>
+  <script>
+    fetch('./version.json').then(r=>r.json()).then(j=>{
+      document.getElementById('ver').textContent = 'Versión ' + j.versionName + ' · build ' + j.versionCode;
+    }).catch(()=>{});
+  </script>
+</body>
+</html>

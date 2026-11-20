@@ -72,6 +72,32 @@ func (Sorteo) TableName() string     { return "sorteos" }
 func (Apuesta) TableName() string    { return "apuestas" }
 func (Movimiento) TableName() string { return "movimientos" }
 
+// Ambientes visuales del casino. El orden es el del selector en la web.
+const (
+	TemaClasico    = "clasico"
+	TemaNeon       = "neon"
+	TemaPremium    = "premium"
+	TemaTropical   = "tropical"
+	TemaMedianoche = "medianoche"
+	TemaRubi       = "rubi"
+)
+
+var temasCasino = []string{
+	TemaClasico, TemaNeon, TemaPremium, TemaTropical, TemaMedianoche, TemaRubi,
+}
+
+func TemaCasinoValido(tema string) bool {
+	for _, t := range temasCasino {
+		if t == tema {
+			return true
+		}
+	}
+	return false
+}
+
+// TemasCasino devuelve los ambientes disponibles (para el catalogo de la web).
+func TemasCasino() []string { return append([]string(nil), temasCasino...) }
+
 // User es un jugador, agente o administrador.
 type User struct {
 	ID           uint   `gorm:"primaryKey" json:"id"`
@@ -84,6 +110,9 @@ type User struct {
 	Bono         int64  `gorm:"not null;default:0" json:"bono"`
 	// Semilla del casino (provably fair): el hash se publica antes de jugar y
 	// la semilla se revela al verificar la ronda.
+	// Ambiente visual del casino elegido por el usuario (clasico, neon, premium,
+	// tropical, medianoche, rubi). Default: premium.
+	TemaCasino string `gorm:"size:32;not null;default:'premium'" json:"tema_casino"`
 	CasinoSeed  string `gorm:"size:64" json:"-"`
 	CasinoNonce int64  `json:"-"`
 	// Juego responsable: autoexclusion voluntaria. Es NULL si no aplica y, si

@@ -1,10 +1,13 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { api } from '@/api/client'
 import type { CasinoGame, CasinoRound, SemillaResponse } from '@/types'
 import { colones } from '@/utils/formato'
 import { alternarSfx, sfxHabilitado } from '@/utils/sfx'
 import { cartas, type CodigoJuego } from '@/assets/casino'
+import { TEMAS, type TemaCasino } from '@/assets/casino/temas'
+import { agruparJuegos } from '@/utils/casinoGrupos'
+import { useAuthStore } from '@/stores/auth'
 import Modal from '@/components/Modal.vue'
 import EmptyState from '@/components/EmptyState.vue'
 import CasinoGameModal from '@/components/casino/CasinoGameModal.vue'
@@ -18,6 +21,14 @@ const abierto = ref<CasinoGame | null>(null)
 const clientSeed = ref('')
 const semillaHash = ref('')
 const verificando = ref<any | null>(null)
+const auth = useAuthStore()
+const tema = computed(() => auth.temaCasino)
+const grupos = computed(() => agruparJuegos(juegos.value))
+const rondasRecientes = computed(() => rondas.value.slice(0, 6))
+
+async function elegirTema(codigo: TemaCasino) {
+  await auth.fijarTema(codigo)
+}
 
 async function cargar() {
   cargando.value = true
@@ -52,12 +63,12 @@ async function verificar(ronda: CasinoRound) {
 </script>
 
 <template>
-  <div>
+  <div class="casino-page" :data-tema="tema">
     <div class="page-head">
       <div class="eyebrow">Mini casino</div>
       <h1>La suerte, en miniatura</h1>
       <p>
-        Catorce juegos rapidos con resultado generado en el servidor y pago inmediato al mismo saldo.
+        {{ juegos.length }} juegos rapidos con resultado generado en el servidor y pago inmediato al mismo saldo.
         Cada jugada queda comprometida por un hash y puedes auditarla.
       </p>
       <p class="hash-line">
@@ -65,6 +76,22 @@ async function verificar(ronda: CasinoRound) {
         · <button class="link" @click="cargar">Rotar semilla</button>
         · <button class="link" @click="sonido = alternarSfx()">{{ sonido ? '🔊 Sonido' : '🔇 Mudo' }}</button>
       </p>
+    </div>
+
+    <div class="ambiente">
+      <span class="ambiente-etq">Ambiente</span>
+      <button
+        v-for="t in TEMAS"
+        :key="t.codigo"
+        class="ambiente-chip"
+        :class="{ on: tema === t.codigo }"
+        :title="t.descripcion"
+        @click="elegirTema(t.codigo)"
+      >
+        <i class="punto" :style="{ background: t.muestra }"></i>
+        {{ t.nombre }}
+      </button>
+      <span class="ambiente-nota">Se aplica a todos los juegos y queda guardado en tu perfil.</span>
     </div>
 
     <p class="juego-responsable">
@@ -75,41 +102,14 @@ async function verificar(ronda: CasinoRound) {
     <div v-if="cargando" class="cargando"><span class="spinner"></span> Cargando casino…</div>
 
     <template v-else>
-      <div class="grid grid-3">
-        <div
-          v-for="j in juegos"
-          :key="j.codigo"
-          class="card juego"
-          :class="{ apagada: !j.activo }"
-        >
-          <div class="arte">
-            <img :src="cartas[j.codigo as CodigoJuego]" :alt="j.nombre" draggable="false" />
-            <span v-if="!j.activo" class="proximamente">Proximamente</span>
-          </div>
-          <h3>{{ j.nombre }}</h3>
-          <p class="desc">{{ j.descripcion }}</p>
-          <div class="meta">
-            <div>Min<b>{{ colones(j.min_apuesta) }}</b></div>
-            <div>RTP<b>{{ j.rtp }}%</b></div>
-            <div>Max<b>x{{ j.max_multiplicador }}</b></div>
-          </div>
-          <div v-if="j.max_premio > 0" class="techo">
-            Premio maximo por jugada: <b>{{ colones(j.max_premio) }}</b>
-          </div>
-          <button class="btn btn-primary btn-block" :disabled="!j.activo" @click="abierto = j">
-            Jugar
-          </button>
-        </div>
-      </div>
-
       <div class="section-title">Tus ultimas jugadas</div>
-      <div v-if="rondas.length" class="table-wrap">
+      <div v-if="rondasRecientes.length" class="table-wrap historial-arriba">
         <table class="table">
           <thead>
             <tr><th>Juego</th><th>Monto</th><th>Multipl</th><th>Premio</th><th>Fecha</th><th></th></tr>
           </thead>
           <tbody>
-            <tr v-for="r in rondas" :key="r.id">
+            <tr v-for="r in rondasRecientes" :key="r.id">
               <td class="fuerte">{{ r.game }}</td>
               <td class="mono">{{ colones(r.monto) }}</td>
               <td class="mono">x{{ r.multiplicador }}</td>
@@ -121,6 +121,9 @@ async function verificar(ronda: CasinoRound) {
             </tr>
           </tbody>
         </table>
+        <p v-if="rondas.length > rondasRecientes.length" class="mas-jugadas">
+          y {{ rondas.length - rondasRecientes.length }} jugadas mas en tu historial.
+        </p>
       </div>
       <EmptyState
         v-else
@@ -128,6 +131,39 @@ async function verificar(ronda: CasinoRound) {
         titulo="Aun no jugaste en el casino"
         texto="Elegi un juego, hacé una apuesta y tu historial aparecera aqui."
       />
+
+      <section v-for="g in grupos" :key="g.id" class="grupo-casino">
+        <div class="grupo-head">
+          <h2>{{ g.titulo }}</h2>
+          <p v-if="g.descripcion">{{ g.descripcion }}</p>
+        </div>
+        <div class="grid grid-3">
+          <div
+            v-for="j in g.juegos"
+            :key="j.codigo"
+            class="card juego"
+            :class="{ apagada: !j.activo }"
+          >
+            <div class="arte">
+              <img :src="cartas[j.codigo as CodigoJuego]" :alt="j.nombre" draggable="false" />
+              <span v-if="!j.activo" class="proximamente">Proximamente</span>
+            </div>
+            <h3>{{ j.nombre }}</h3>
+            <p class="desc">{{ j.descripcion }}</p>
+            <div class="meta">
+              <div>Min<b>{{ colones(j.min_apuesta) }}</b></div>
+              <div>RTP<b>{{ j.rtp }}%</b></div>
+              <div>Max<b>x{{ j.max_multiplicador }}</b></div>
+            </div>
+            <div v-if="j.max_premio > 0" class="techo">
+              Premio maximo por jugada: <b>{{ colones(j.max_premio) }}</b>
+            </div>
+            <button class="btn btn-primary btn-block" :disabled="!j.activo" @click="abierto = j">
+              Jugar
+            </button>
+          </div>
+        </div>
+      </section>
     </template>
 
     <CasinoGameModal
@@ -163,9 +199,29 @@ async function verificar(ronda: CasinoRound) {
 </template>
 
 <style scoped>
+.ambiente {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  background: var(--bg-2); border: 1px solid var(--border-soft);
+  border-radius: 12px; padding: 10px 12px; margin-bottom: 14px;
+}
+.ambiente-etq { font-size: 11px; letter-spacing: .16em; text-transform: uppercase; color: var(--faint); }
+.ambiente-chip {
+  display: inline-flex; align-items: center; gap: 7px;
+  border: 1px solid var(--border-soft); background: var(--surface); color: var(--muted);
+  border-radius: 999px; padding: 7px 13px; font-size: 12.5px; cursor: pointer;
+}
+.ambiente-chip:hover { color: var(--text); border-color: var(--border); }
+.ambiente-chip.on { border-color: var(--gold); color: var(--gold); font-weight: 600; }
+.ambiente-chip .punto { width: 12px; height: 12px; border-radius: 50%; display: inline-block; }
+.ambiente-nota { margin-left: auto; font-size: 11.5px; color: var(--faint); }
 .hash-line { font-size: 12px; color: var(--faint); margin-top: 8px; }
 .hash { font-family: ui-monospace, monospace; color: var(--muted); }
 .link { background: none; border: 0; color: var(--prim-2); cursor: pointer; font-size: 12px; padding: 0; }
+.grupo-casino { margin-top: 26px; }
+.grupo-head h2 { margin: 0; font-size: 18px; letter-spacing: .02em; }
+.grupo-head p { margin: 4px 0 12px; color: var(--muted); font-size: 13px; }
+.historial-arriba { margin-bottom: 26px; }
+.mas-jugadas { margin: 8px 0 0; font-size: 12px; color: var(--faint); }
 .juego-responsable {
   margin: 0 0 18px; font-size: 12px; color: var(--faint);
   border: 1px solid var(--border-soft); border-radius: 10px; padding: 8px 12px;

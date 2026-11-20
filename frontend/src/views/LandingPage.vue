@@ -1,4 +1,8 @@
 <script setup lang="ts">
+import AppAndroidBanner from '@/components/AppAndroidBanner.vue'
+import { useMarcaStore } from '@/stores/marca'
+
+const marca = useMarcaStore()
 import { onMounted, ref } from 'vue'
 import { api } from '@/api/client'
 import type { Loteria, Sorteo } from '@/types'
@@ -46,7 +50,7 @@ const casinoJuegos = [
       <div class="brand">
         <div class="brand-mark">LN</div>
         <div>
-          <div class="brand-name">Lotería Nacional</div>
+          <div class="brand-name">{{ marca.nombre }}</div>
           <div class="brand-sub">Costa Rica</div>
         </div>
       </div>
@@ -93,6 +97,10 @@ const casinoJuegos = [
           <img :src="heroArt" alt="Bolas de lotería en tonos esmeralda y dorado" />
         </div>
       </div>
+    </section>
+
+    <section class="wrap" style="padding-top: 18px; padding-bottom: 0">
+      <AppAndroidBanner />
     </section>
 
     <section class="wrap" style="padding-top: 48px">
@@ -160,7 +168,7 @@ const casinoJuegos = [
     <footer class="footer">
       <div class="brand" style="justify-content: center; margin-bottom: 10px">
         <div class="brand-mark">LN</div>
-        <div class="brand-name">Lotería Nacional CR</div>
+        <div class="brand-name">{{ marca.nombre }}</div>
       </div>
       <p>Juega con responsabilidad. +18. Aserrí, San José, Costa Rica.</p>
       <p style="margin-top: 6px; font-size: 12px">Plataforma de demostración — no es la lotería oficial de Costa Rica.</p>
@@ -186,7 +194,7 @@ const casinoJuegos = [
 }
 .landing-art img {
   width: 100%;
-  height: 430px;
+  height: 300px;
   object-fit: cover;
   border-radius: 18px;
   border: 1px solid var(--border);
@@ -237,7 +245,7 @@ const casinoJuegos = [
     padding: 44px 26px 40px;
   }
   .landing-art img {
-    height: 320px;
+    height: 240px;
   }
   .landing-strip {
     grid-template-columns: repeat(3, 1fr);

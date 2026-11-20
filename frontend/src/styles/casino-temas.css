@@ -1,0 +1,215 @@
+// Ambientes del casino. Todo vive detrás de [data-tema="..."] para que agregar
+// un tema sea copiar un bloque y no tocar los componentes de juego.
+// 'premium' replica el estilo actual de la app: por eso es el default.
+
+.casino-modal[data-tema='premium'] {
+  --tm-bg: linear-gradient(180deg, #0a100d, #050806);
+  --tm-shell: rgba(201, 162, 39, 0.35);
+  --tm-marquee: transparent;
+  --tm-marquee-border: rgba(201, 162, 39, 0.4);
+  --tm-marquee-text: #ecd28a;
+  --tm-panel: #07110d;
+  --tm-panel-border: #234a3a;
+  --tm-reel: radial-gradient(circle at 50% 25%, #12211a, #060c0a);
+  --tm-reel-border: #2b3d33;
+  --tm-chip: #0a1410;
+  --tm-chip-border: #2f5747;
+  --tm-chip-text: #cfe3da;
+  --tm-chip-on: #c9a227;
+  --tm-chip-on-text: #1a1405;
+  --tm-accent: #ecd28a;
+  --tm-text: #eef3f0;
+}
+
+.casino-modal[data-tema='clasico'] {
+  --tm-bg: linear-gradient(180deg, #3a2508, #150c03);
+  --tm-shell: rgba(138, 101, 36, 0.9);
+  --tm-marquee: linear-gradient(180deg, #fff3c4, #f0c35a 55%, #a87c17);
+  --tm-marquee-border: transparent;
+  --tm-marquee-text: #2a1a05;
+  --tm-panel: #fdf8ea;
+  --tm-panel-border: #8a6524;
+  --tm-reel: #fffdf6;
+  --tm-reel-border: #dccb9c;
+  --tm-chip: #1c1306;
+  --tm-chip-border: #7a5a1c;
+  --tm-chip-text: #ecd28a;
+  --tm-chip-on: #e0b93f;
+  --tm-chip-on-text: #1a1405;
+  --tm-accent: #2a1a05;
+  --tm-text: #2a1a05;
+}
+
+.casino-modal[data-tema='neon'] {
+  --tm-bg: linear-gradient(160deg, #0b1a2b, #05080f 70%);
+  --tm-shell: rgba(36, 81, 122, 0.9);
+  --tm-marquee: #04101c;
+  --tm-marquee-border: #38bdf8;
+  --tm-marquee-text: #8fdcff;
+  --tm-panel: #0c1522;
+  --tm-panel-border: #2b4a68;
+  --tm-reel: #04080f;
+  --tm-reel-border: #1f3a55;
+  --tm-chip: #04080f;
+  --tm-chip-border: #24445f;
+  --tm-chip-text: #8fdcff;
+  --tm-chip-on: #38bdf8;
+  --tm-chip-on-text: #04202f;
+  --tm-accent: #8fdcff;
+  --tm-text: #eef3f0;
+}
+
+.casino-modal[data-tema='tropical'] {
+  --tm-bg: linear-gradient(180deg, #0f3a29, #062018);
+  --tm-shell: rgba(47, 122, 85, 0.9);
+  --tm-marquee: linear-gradient(180deg, #ffd98a, #f0a84a);
+  --tm-marquee-border: transparent;
+  --tm-marquee-text: #3a1c05;
+  --tm-panel: #f6efd8;
+  --tm-panel-border: #b98b3a;
+  --tm-reel: #fffaf0;
+  --tm-reel-border: #d9c48a;
+  --tm-chip: #0b2c20;
+  --tm-chip-border: #3f8a63;
+  --tm-chip-text: #ffd98a;
+  --tm-chip-on: #ffd98a;
+  --tm-chip-on-text: #3a1c05;
+  --tm-accent: #3a1c05;
+  --tm-text: #0b2c20;
+}
+
+.casino-modal[data-tema='medianoche'] {
+  --tm-bg: linear-gradient(180deg, #1a1436, #08060f);
+  --tm-shell: rgba(91, 74, 156, 0.9);
+  --tm-marquee: #120e26;
+  --tm-marquee-border: #7b68d8;
+  --tm-marquee-text: #c9b8ff;
+  --tm-panel: #161130;
+  --tm-panel-border: #4a3d86;
+  --tm-reel: #0a0716;
+  --tm-reel-border: #39306b;
+  --tm-chip: #0d0a1e;
+  --tm-chip-border: #4a3d86;
+  --tm-chip-text: #c9b8ff;
+  --tm-chip-on: #8f7ce0;
+  --tm-chip-on-text: #0d0a1e;
+  --tm-accent: #c9b8ff;
+  --tm-text: #eef3f0;
+}
+
+.casino-modal[data-tema='rubi'] {
+  --tm-bg: linear-gradient(180deg, #3a0a12, #12040a);
+  --tm-shell: rgba(138, 32, 48, 0.9);
+  --tm-marquee: linear-gradient(180deg, #ffb3bb, #e04a5c 55%, #8f1f2e);
+  --tm-marquee-border: transparent;
+  --tm-marquee-text: #2b050b;
+  --tm-panel: #1c060b;
+  --tm-panel-border: #6b1a26;
+  --tm-reel: #12040a;
+  --tm-reel-border: #5c1622;
+  --tm-chip: #1c060b;
+  --tm-chip-border: #6b1a26;
+  --tm-chip-text: #ffb3bb;
+  --tm-chip-on: #e04a5c;
+  --tm-chip-on-text: #2b050b;
+  --tm-accent: #ffb3bb;
+  --tm-text: #eef3f0;
+}
+
+/* La carcasa se aplica a las piezas existentes del modal: no hace falta cambiar
+   ningun componente de juego. */
+.casino-modal[data-tema] {
+  background: var(--tm-bg);
+  border: 1px solid var(--tm-shell);
+  border-radius: 18px;
+  padding: 14px;
+}
+
+.casino-modal[data-tema] .hero {
+  border: 1px solid var(--tm-shell);
+  background: var(--tm-reel);
+}
+
+.casino-modal[data-tema] .apuesta .monto {
+  background: var(--tm-reel);
+  border-color: var(--tm-reel-border);
+  color: var(--tm-text);
+}
+.casino-modal[data-tema] .apuesta .step {
+  background: var(--tm-chip);
+  border-color: var(--tm-chip-border);
+  color: var(--tm-chip-text);
+}
+
+.casino-modal[data-tema] .rapidos .chip {
+  background: var(--tm-chip);
+  border-color: var(--tm-chip-border);
+  color: var(--tm-chip-text);
+}
+.casino-modal[data-tema] .rapidos .chip.activa {
+  background: var(--tm-chip-on);
+  border-color: var(--tm-chip-on);
+  color: var(--tm-chip-on-text);
+}
+.casino-modal[data-tema] .saldo b { color: var(--tm-accent); }
+
+.casino-modal[data-tema] .guia {
+  background: color-mix(in srgb, var(--tm-shell) 14%, transparent);
+  border-color: var(--tm-shell);
+}
+.casino-modal[data-tema] .guia h4 { color: var(--tm-accent); }
+.casino-modal[data-tema] .premio { background: var(--tm-panel); border-color: var(--tm-panel-border); }
+.casino-modal[data-tema] .premio b { color: var(--tm-accent); }
+
+.casino-modal[data-tema] .nota { color: var(--tm-chip-text); opacity: .8; }
+
+/* Ambiente del lobby: el fondo de la pagina toma el tono del tema. */
+.casino-page[data-tema='premium'] { --amb: radial-gradient(900px 500px at 50% -10%, rgba(201,162,39,.10), transparent 70%); }
+.casino-page[data-tema='clasico'] { --amb: radial-gradient(900px 500px at 50% -10%, rgba(240,195,90,.16), transparent 70%); }
+.casino-page[data-tema='neon']    { --amb: radial-gradient(900px 500px at 50% -10%, rgba(56,189,248,.14), transparent 70%); }
+.casino-page[data-tema='tropical']{ --amb: radial-gradient(900px 500px at 50% -10%, rgba(94,232,165,.14), transparent 70%); }
+.casino-page[data-tema='medianoche']{ --amb: radial-gradient(900px 500px at 50% -10%, rgba(143,124,224,.14), transparent 70%); }
+.casino-page[data-tema='rubi']    { --amb: radial-gradient(900px 500px at 50% -10%, rgba(224,74,92,.14), transparent 70%); }
+.casino-page[data-tema] { background-image: var(--amb); background-repeat: no-repeat; }
+
+/* Marquesina y arena: aca esta el cambio visible por tema. La marquesina lleva el
+   nombre del juego con los colores del ambiente y la arena enmarca el tablero. */
+.casino-modal[data-tema] .tema-marquesina {
+  background: var(--tm-marquee);
+  border-color: var(--tm-marquee-border);
+  color: var(--tm-marquee-text);
+  box-shadow: 0 0 24px color-mix(in srgb, var(--tm-accent) 26%, transparent);
+}
+.casino-modal[data-tema] .tema-arena {
+  position: relative;
+  background:
+    radial-gradient(ellipse at 50% 18%, color-mix(in srgb, var(--tm-accent) 26%, transparent), transparent 62%),
+    linear-gradient(180deg,
+      color-mix(in srgb, var(--tm-reel-border) 55%, #0a3d2c) 0%,
+      var(--tm-reel) 45%,
+      color-mix(in srgb, #000 30%, var(--tm-reel)) 100%);
+  border: 2px solid var(--tm-accent);
+  border-radius: 24px 24px 30px 30px;
+  box-shadow: inset 0 20px 40px rgba(0,0,0,.5), 0 18px 40px rgba(0,0,0,.45);
+}
+.casino-modal[data-tema] .tema-arena::before {
+  content: ""; position: absolute; inset: 8px; border-radius: 18px;
+  border: 1px dashed color-mix(in srgb, var(--tm-accent) 55%, transparent);
+  pointer-events: none;
+}
+.casino-modal[data-tema] .hero { border-color: var(--tm-reel-border); }
+
+/* El boton de accion principal del juego tambien toma el color del ambiente. */
+.casino-modal[data-tema] .btn-primary,
+.casino-modal[data-tema] button.btn-primary {
+  background: var(--tm-chip-on);
+  border-color: var(--tm-chip-on);
+  color: var(--tm-chip-on-text);
+  font-weight: 800;
+  letter-spacing: .04em;
+}
+.casino-modal[data-tema] .btn-primary:disabled {
+  background: var(--tm-chip);
+  color: var(--tm-chip-text);
+  border-color: var(--tm-chip-border);
+}

@@ -56,6 +56,7 @@ func (h *AuthHandler) Register(c *gin.Context) {
 		Telefono:     req.Telefono,
 		Saldo:        0,
 		Bono:         0,
+		TemaCasino:   models.TemaPremium,
 	}
 	if err := h.db.Create(&user).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "no se pudo guardar la cuenta"})
@@ -97,14 +98,39 @@ func (h *AuthHandler) Login(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{
 		"token": token,
 		"user": gin.H{
-			"id":     user.ID,
-			"nombre": user.Nombre,
-			"email":  user.Email,
-			"rol":    user.Rol,
-			"saldo":  user.Saldo,
-			"bono":   user.Bono,
+			"id":         user.ID,
+			"nombre":     user.Nombre,
+			"email":      user.Email,
+			"rol":        user.Rol,
+			"saldo":      user.Saldo,
+			"bono":       user.Bono,
+			"tema_casino": user.TemaCasino,
 		},
 	})
+}
+
+type temaRequest struct {
+	Tema string `json:"tema"`
+}
+
+// GuardarTema guarda el ambiente visual del casino elegido por el usuario.
+func (h *AuthHandler) GuardarTema(c *gin.Context) {
+	var req temaRequest
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "datos invalidos"})
+		return
+	}
+	if !models.TemaCasinoValido(req.Tema) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "ambiente no disponible"})
+		return
+	}
+	userID := c.GetUint("userID")
+	if err := h.db.Model(&models.User{}).Where("id = ?", userID).
+		Update("tema_casino", req.Tema).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "no se pudo guardar el ambiente"})
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"tema_casino": req.Tema})
 }
 
 func (h *AuthHandler) Me(c *gin.Context) {

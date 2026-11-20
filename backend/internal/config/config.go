@@ -19,6 +19,11 @@ type Config struct {
 	// Cierre automatico de sorteos vencidos (reembolsa las apuestas pendientes).
 	SorteosCierreAuto bool
 	SorteosSweepMin   int // cada cuantos minutos corre el barrido
+	// Importación automática de resultados (espejos en texto; la JPS publica
+	// PDF escaneados y queda como referencia oficial de verificación).
+	ResultadosAuto     bool // importa y paga al detectar un sorteo cantado
+	ResultadosMin      int  // cada cuantos minutos se intenta importar
+	ResultadosCalAuto  bool // genera los sorteos futuros según el calendario
 	// Cumplimiento (el operador con licencia define sus politicas):
 	GeoBlockEnabled bool            // bloquea el juego desde paises no permitidos
 	GeoAllowed      map[string]bool // ISO 3166-1 alpha-2, en mayusculas
@@ -57,6 +62,9 @@ func Load() *Config {
 		Seed:            os.Getenv("SEED") != "false",
 		SorteosCierreAuto: envBool("SORTEOS_CIERRE_AUTO", false),
 		SorteosSweepMin:   envInt("SORTEOS_SWEEP_MIN", 60),
+		ResultadosAuto:    envBool("RESULTADOS_AUTO", false),
+		ResultadosMin:     envInt("RESULTADOS_MIN", 10),
+		ResultadosCalAuto: envBool("RESULTADOS_CALENDARIO_AUTO", false),
 		GeoBlockEnabled: envBool("GEO_BLOCK_ENABLED", false),
 		GeoAllowed:      envCountries(os.Getenv("GEO_ALLOWED_COUNTRIES")),
 		KYCRequired:     envBool("KYC_REQUIRED", false),

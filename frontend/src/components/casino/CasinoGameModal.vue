@@ -231,9 +231,10 @@ function repetir() {
 
 <template>
   <Modal :titulo="juego.nombre" :sub="juego.descripcion" ancho="lg" mostrar-cerrar @cerrar="emit('cerrar')">
-    <div class="casino-modal">
-      <div class="hero">
-        <img :src="heroes[juego.codigo as CodigoJuego]" alt="" />
+    <div class="casino-modal" :data-tema="auth.temaCasino">
+      <div class="tema-marquesina">
+        <b>{{ juego.nombre }}</b>
+        <span>Min {{ colones(juego.min_apuesta) }} · Max x{{ juego.max_multiplicador }}</span>
       </div>
 
       <div class="apuesta">
@@ -257,22 +258,7 @@ function repetir() {
 
       <p v-if="error" class="error-text">{{ error }}</p>
 
-      <div v-if="guia" class="guia">
-        <h4>Cómo jugar</h4>
-        <div class="pasos">
-          <div v-for="(p, i) in guia.pasos" :key="i" class="paso">
-            <b>{{ i + 1 }} · {{ p.t }}</b>
-            <span>{{ p.d }}</span>
-          </div>
-        </div>
-        <div class="premios">
-          <div v-for="(pr, i) in guia.premios" :key="i" class="premio">
-            <span>{{ pr.etq }}</span>
-            <b>{{ pr.mult }}</b>
-          </div>
-        </div>
-      </div>
-
+      <div class="tema-arena">
       <DadosGame
         v-if="juego.codigo === 'dados'"
         :resultado="respuesta?.resultado ?? null"
@@ -365,6 +351,27 @@ function repetir() {
         :monto="monto"
         :client-seed="clientSeed"
       />
+      </div>
+
+      <details v-if="guia" class="guia-detalle">
+        <summary>Cómo jugar y pagos</summary>
+      <div class="guia">
+        <h4>Cómo jugar</h4>
+        <div class="pasos">
+          <div v-for="(p, i) in guia.pasos" :key="i" class="paso">
+            <b>{{ i + 1 }} · {{ p.t }}</b>
+            <span>{{ p.d }}</span>
+          </div>
+        </div>
+        <div class="premios">
+          <div v-for="(pr, i) in guia.premios" :key="i" class="premio">
+            <span>{{ pr.etq }}</span>
+            <b>{{ pr.mult }}</b>
+          </div>
+        </div>
+      </div>
+
+      </details>
 
       <div v-if="respuesta" class="acciones-resultado">
         <button class="btn btn-ghost" @click="repetir">Jugar de nuevo</button>
@@ -383,8 +390,37 @@ function repetir() {
 </template>
 
 <style scoped>
-.casino-modal { display: flex; flex-direction: column; gap: 14px; }
-.hero { height: 120px; border-radius: 12px; overflow: hidden; border: 1px solid var(--border-soft);
+
+.guia-detalle { border-radius: 12px; border: 1px solid var(--tm-reel-border); background: color-mix(in srgb, var(--tm-shell) 12%, transparent); }
+.guia-detalle > summary {
+  cursor: pointer; padding: 9px 12px; font-size: 11px; letter-spacing: .14em;
+  text-transform: uppercase; color: var(--tm-accent); list-style: none;
+}
+.guia-detalle > summary::-webkit-details-marker { display: none; }
+.guia-detalle[open] > summary { border-bottom: 1px solid var(--tm-reel-border); }
+.guia-detalle .guia { border: 0; background: transparent; padding: 10px 12px; }
+.rapidos { gap: 6px; }
+.rapidos .chip { padding: 5px 9px; font-size: 11.5px; }
+.apuesta { gap: 8px; }
+.step { width: 34px; height: 34px; font-size: 16px; }
+.monto strong { font-size: 17px; }
+
+.casino-modal { display: flex; flex-direction: column; gap: 10px; }
+.tema-marquesina {
+  border-radius: 12px; padding: 10px 14px; display: flex; align-items: center; gap: 10px;
+  text-transform: uppercase; letter-spacing: .18em; font-size: 13px; font-weight: 800;
+  border: 1px solid transparent;
+}
+.tema-marquesina span {
+  margin-left: auto; text-transform: none; letter-spacing: .02em; font-weight: 400;
+  font-size: 11px; opacity: .8;
+}
+.tema-arena {
+  border-radius: 16px; border: 1px solid; padding: 10px;
+  box-shadow: inset 0 14px 30px rgba(0,0,0,.45);
+}
+
+.hero { height: 96px; border-radius: 12px; overflow: hidden; border: 1px solid var(--border-soft);
   background: linear-gradient(120deg, #0f2b22, #123f31 55%, #2a2410); }
 .hero img { width: 100%; height: 100%; object-fit: cover; }
 .guia { background: rgba(56, 189, 248, .06); border: 1px solid rgba(56, 189, 248, .22); border-radius: 14px; padding: 14px 16px; }

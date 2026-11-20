@@ -96,41 +96,48 @@ function doblar() { llamar(`/casino/blackjack/${manoId.value}/double`) }
 function rendirse() { llamar(`/casino/blackjack/${manoId.value}/surrender`) }
 function asegurar() { llamar(`/casino/blackjack/${manoId.value}/insurance`) }
 
-// Al montar se reparte sola la primera mano.
-empezar()
+// No se reparte al abrir la ventana: la apuesta solo se cobra cuando el jugador
+// toca "Repartir". Antes abría el modal y ya te descontaba una mano.
+const listaParaJugar = computed(() => !mano.value.length && !cargando.value)
 </script>
 
 <template>
   <div class="blackjack">
     <div class="mesa">
-      <div class="fila">
-        <span class="quien">Casa</span>
-        <div class="cartas">
-          <div
-            v-for="(c, i) in crupier"
-            :key="i"
-            class="carta"
-            :class="[roja(c) ? 'roja' : 'negra', { oculta: !cerrada && i === 1 }]"
-          >
-            <template v-if="cerrada || i !== 1">
-              <span class="fig">{{ figura(c) }}</span>
-              <span class="palo">{{ palo(c) }}</span>
-            </template>
-            <span v-else class="dorso">LN</span>
-          </div>
-        </div>
-        <span class="valor" v-if="crupier.length">{{ cerrada ? valorCrupier : valor(crupier.slice(0,1)) }}</span>
+      <span class="placa">Limites {{ colones(monto) }} - {{ colones(monto * 20) }}</span>
+      <div class="mesa-head">
+        <h3>Blackjack <span class="suits">♠ ♥</span></h3>
+        <p class="reglas">Paga 3 a 2 · La casa se planta en 17 y pide hasta 16</p>
       </div>
 
-      <div class="fila">
-        <span class="quien">Vos</span>
+      <div class="zona">
+        <div class="zona-head"><b>Casa</b><span class="valor" v-if="crupier.length">{{ cerrada ? valorCrupier : valor(crupier.slice(0,1)) }}</span></div>
+        <div class="cartas">
+          <div v-for="(c, i) in crupier" :key="i" class="carta"
+               :class="[roja(c) ? 'roja' : 'negra', { oculta: !cerrada && i === 1 }]">
+            <template v-if="cerrada || i !== 1"><span class="fig">{{ figura(c) }}</span><span class="palo">{{ palo(c) }}</span></template>
+            <span v-else class="dorso"></span>
+          </div>
+          <span v-if="!crupier.length" class="vacio">Esperando reparto</span>
+        </div>
+      </div>
+
+      <div class="separador"><span>♠</span><i></i><span>♥</span></div>
+
+      <div class="zona">
+        <div class="zona-head"><b>Vos</b><span class="valor" v-if="mano.length">{{ valorJugador }}</span></div>
         <div class="cartas">
           <div v-for="(c, i) in mano" :key="i" class="carta" :class="roja(c) ? 'roja' : 'negra'">
-            <span class="fig">{{ figura(c) }}</span>
-            <span class="palo">{{ palo(c) }}</span>
+            <span class="fig">{{ figura(c) }}</span><span class="palo">{{ palo(c) }}</span>
           </div>
+          <span v-if="!mano.length" class="vacio">Tu mano aparece aca</span>
         </div>
-        <span class="valor" v-if="mano.length">{{ valorJugador }}</span>
+      </div>
+
+      <div class="barra">
+        <span class="barra-item">Saldo <b>{{ colones(auth.user?.saldo ?? 0) }}</b></span>
+        <span class="barra-item">Apuesta <b>{{ colones(monto) }}</b></span>
+        <span class="barra-item aviso">{{ cerrada ? 'Mano terminada' : 'La casa juega en 17' }}</span>
       </div>
     </div>
 
@@ -141,13 +148,15 @@ empezar()
       <strong v-if="premio > 0">{{ colones(premio) }}</strong>
     </div>
 
-    <div v-if="!cerrada" class="acciones">
+    <button v-if="listaParaJugar" class="btn btn-primary btn-block" :disabled="cargando" @click="empezar">
+      {{ cargando ? 'Repartiendo…' : 'Repartir por ' + colones(monto) }}
+    </button>
+
+    <div v-else-if="!cerrada" class="acciones">
       <button class="btn btn-primary" :disabled="cargando" @click="pedir">Pedir</button>
       <button class="btn btn-ghost" :disabled="cargando" @click="plantarse">Plantarse</button>
       <button class="btn btn-gold" :disabled="cargando" @click="doblar">Doblar</button>
-      <button v-if="puedeAsegurar" class="btn btn-ghost" :disabled="cargando" title="Mitad de la apuesta; paga 2:1 si el crupier tiene blackjack" @click="asegurar">
-        Seguro {{ colones(Math.floor(monto / 2)) }}
-      </button>
+      <button v-if="puedeAsegurar" class="btn btn-ghost" :disabled="cargando" @click="asegurar">Seguro {{ colones(Math.floor(monto / 2)) }}</button>
       <button v-if="puedeRendirse" class="btn btn-ghost" :disabled="cargando" @click="rendirse">Rendirse</button>
     </div>
     <button v-else class="btn btn-primary btn-block" :disabled="cargando" @click="empezar">
@@ -157,36 +166,47 @@ empezar()
 </template>
 
 <style scoped>
-.blackjack { display: flex; flex-direction: column; gap: 14px; }
-.mesa {
-  background: linear-gradient(180deg, rgba(16,185,129,.10), rgba(16,185,129,.03));
-  border: 1px solid var(--border-soft); border-radius: 12px; padding: 14px;
-  display: flex; flex-direction: column; gap: 12px;
+.blackjack { display: flex; flex-direction: column; gap: 10px; }
+.placa {
+  position: absolute; top: 10px; left: 12px; z-index: 1;
+  background: linear-gradient(180deg, #f5dd9a, #c9a227); color: #3a2a05;
+  font-size: 9px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase;
+  padding: 4px 7px; border-radius: 4px; box-shadow: 0 3px 8px rgba(0,0,0,.4);
 }
-.fila { display: flex; align-items: center; gap: 10px; }
-.quien { width: 44px; font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--faint); }
-.cartas { display: flex; gap: 6px; flex: 1; flex-wrap: wrap; }
+.mesa-head { text-align: center; margin-bottom: 8px; padding-top: 6px; }
+.mesa-head h3 { margin: 0; font-size: 22px; letter-spacing: .3em; text-transform: uppercase; color: #f5d778; text-shadow: 0 2px 0 #6b4a12; }
+.mesa-head .suits { letter-spacing: .06em; }
+.reglas { margin: 3px 0 0; font-size: 10.5px; letter-spacing: .08em; color: #e8ce7a; opacity: .9; }
+.zona { display: flex; flex-direction: column; align-items: center; gap: 6px; }
+.zona-head { width: 100%; display: flex; align-items: center; justify-content: space-between; padding: 0 6px; }
+.zona-head b { font-size: 11px; text-transform: uppercase; letter-spacing: .24em; color: #e8ce7a; }
+.cartas { display: flex; gap: 8px; flex-wrap: wrap; min-height: 82px; align-items: center; justify-content: center; }
+.vacio { font-size: 12px; opacity: .55; font-style: italic; }
 .carta {
-  width: 44px; height: 60px; border-radius: 8px; background: #f4f6f8; color: #15181d;
-  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 1px;
-  font-weight: 800; box-shadow: 0 4px 10px rgba(0,0,0,.35); animation: aparecer .25s ease;
+  width: 56px; height: 78px; border-radius: 9px; background: #fdfaf0; color: #15181d;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+  font-weight: 800; box-shadow: 0 6px 12px rgba(0,0,0,.45); animation: aparecer .25s ease; border: 1px solid #d8c79a;
 }
-.carta .fig { font-size: 17px; line-height: 1; }
-.carta .palo { font-size: 13px; line-height: 1; }
+.carta .fig { font-size: 21px; line-height: 1; }
+.carta .palo { font-size: 15px; line-height: 1; }
 .carta.roja { color: #b3242f; }
-.carta.negra { color: #15181d; }
-.carta.oculta { background: linear-gradient(140deg, #0b8f68, #064e3b); color: #d1fae5; }
-.carta.oculta .dorso { font-size: 11px; letter-spacing: .12em; font-weight: 700; }
+.carta.oculta { background: repeating-linear-gradient(45deg,#0d4a35 0 8px,#0a3a29 8px 16px); border-color: #0a3a29; }
+.carta.oculta .dorso { width: 24px; height: 15px; border-radius: 3px; background: #e8ce7a; opacity: .85; }
 @keyframes aparecer { from { transform: translateY(-6px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
-.valor {
-  min-width: 28px; text-align: center; font-weight: 800; font-size: 18px;
-  background: #05080c; border: 1px solid var(--border); border-radius: 8px; padding: 5px 6px;
+.separador { display: flex; align-items: center; gap: 8px; margin: 8px 6px; opacity: .55; }
+.separador span { color: #e8ce7a; font-size: 11px; }
+.separador i { flex: 1; height: 1px; background: linear-gradient(90deg, transparent, #e8ce7a, transparent); }
+.valor { min-width: 30px; text-align: center; font-weight: 800; font-size: 16px; background: rgba(0,0,0,.35); border: 1px solid rgba(232,206,122,.5); border-radius: 8px; padding: 3px 7px; color: #f5d778; }
+.barra {
+  margin-top: 10px; padding: 8px 10px; display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  background: rgba(3,16,12,.75); border: 1px solid rgba(232,206,122,.35); border-radius: 10px;
 }
-.estado { text-align: center; padding: 10px; border-radius: 10px; background: rgba(255,255,255,.02); border: 1px solid var(--border-soft); }
-.estado.gana { background: var(--prim-dim); border-color: rgba(16,185,129,.35); color: var(--prim-2); }
-.estado.pierde { color: var(--muted); }
-.estado.empate { color: var(--gold); }
-.estado strong { color: var(--gold); font-size: 18px; margin-left: 6px; }
+.barra-item { font-size: 11px; color: #e8ce7a; opacity: .9; }
+.barra-item b { color: #fff; margin-left: 4px; }
+.barra-item.aviso { opacity: .55; font-style: italic; }
+.estado { text-align: center; padding: 9px; border-radius: 10px; background: rgba(0,0,0,.3); border: 1px solid rgba(232,206,122,.35); font-size: 13px; }
+.estado.gana { color: #f5d778; }
+.estado strong { color: #f5d778; font-size: 17px; margin-left: 6px; }
 .acciones { display: flex; gap: 8px; flex-wrap: wrap; }
-.acciones .btn { flex: 1 1 96px; }
+.acciones .btn { flex: 1 1 90px; }
 </style>

@@ -17,6 +17,7 @@ export interface User {
   fecha_nacimiento?: string | null
   autoexcluido_hasta?: string | null
   tiene_foto?: boolean
+  tema_casino?: string
   created_at: string
 }
 
