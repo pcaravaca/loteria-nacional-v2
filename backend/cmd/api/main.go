@@ -243,8 +243,8 @@ func main() {
 	mesa.GET("/casino/tetris/:id/verificar", casinoH.TetrisVerificar)
 
 	if cfg.SorteosCierreAuto {
-		handlers.IniciarSweepSorteos(db, true, time.Duration(cfg.SorteosSweepMin)*time.Minute, 15*time.Minute)
-		log.Printf("cierre automatico de sorteos vencidos activado (cada %d min, gracia 15 min)", cfg.SorteosSweepMin)
+		handlers.IniciarSweepSorteos(db, true, time.Duration(cfg.SorteosSweepMin)*time.Minute, time.Duration(cfg.SorteosSweepGraciaMin)*time.Minute)
+		log.Printf("cierre automatico de sorteos vencidos activado (cada %d min, gracia %d min)", cfg.SorteosSweepMin, cfg.SorteosSweepGraciaMin)
 	}
 
 	// Resultados automáticos: los espejos en texto son la fuente; la JPS queda
