@@ -74,28 +74,34 @@ func (h *AdminHandler) EstadoResultados(c *gin.Context) {
 		return
 	}
 	type fila struct {
-		Loteria  string `json:"loteria"`
-		Nombre   string `json:"nombre"`
-		Abiertos int64  `json:"abiertos"`
-		Pagados  int64  `json:"pagados"`
-		Ultimo   string `json:"ultimo_sorteo"`
+		Loteria    string `json:"loteria"`
+		Nombre     string `json:"nombre"`
+		Abiertos   int64  `json:"abiertos"`
+		Pagados    int64  `json:"pagados"`
+		Atrasados  int64  `json:"atrasados"`
+		Ultimo     string `json:"ultimo_sorteo"`
 	}
 	out := make([]fila, 0, len(loterias))
 	zona := time.FixedZone("CR", -6*3600)
+	ahora := time.Now().In(zona)
 	for _, l := range loterias {
-		var abiertos, pagados int64
+		var abiertos, pagados, atrasados int64
 		h.db.Model(&models.Sorteo{}).Where("loteria_id = ? AND estado = ?", l.ID, models.SorteoAbierto).Count(&abiertos)
 		h.db.Model(&models.Sorteo{}).Where("loteria_id = ? AND estado = ?", l.ID, models.SorteoPagado).Count(&pagados)
+		// Abiertos con la fecha ya pasada: si el importador no los cerró,
+		// quedan colgados (fuente caída o sorteo manual sin resultado).
+		h.db.Model(&models.Sorteo{}).Where("loteria_id = ? AND estado = ? AND fecha < ?", l.ID, models.SorteoAbierto, ahora).Count(&atrasados)
 		var ultimo models.Sorteo
 		if err := h.db.Where("loteria_id = ? AND estado = ?", l.ID, models.SorteoPagado).
 			Order("fecha desc").First(&ultimo).Error; err == nil {
 			out = append(out, fila{
 				Loteria: l.Codigo, Nombre: l.Nombre, Abiertos: abiertos, Pagados: pagados,
-				Ultimo: ultimo.Titulo + " · " + ultimo.Fecha.In(zona).Format("2006-01-02 15:04"),
+				Atrasados: atrasados,
+				Ultimo:    ultimo.Titulo + " · " + ultimo.Fecha.In(zona).Format("2006-01-02 15:04"),
 			})
 			continue
 		}
-		out = append(out, fila{Loteria: l.Codigo, Nombre: l.Nombre, Abiertos: abiertos, Pagados: pagados})
+		out = append(out, fila{Loteria: l.Codigo, Nombre: l.Nombre, Abiertos: abiertos, Pagados: pagados, Atrasados: atrasados})
 	}
 	c.JSON(http.StatusOK, gin.H{"loterias": out})
 }

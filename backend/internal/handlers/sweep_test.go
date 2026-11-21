@@ -60,3 +60,27 @@ func TestSweepDeshabilitadoNoHaceNada(t *testing.T) {
 		t.Fatalf("deshabilitado no debe procesar: (%d,%d)", p, r)
 	}
 }
+
+// El reembolso no deja la apuesta "pendiente": pasa a cancelada.
+func TestSweepMarcaApuestaCancelada(t *testing.T) {
+	db := nuevoSweepDB(t)
+	user := models.User{Nombre: "Test", Email: "t2@t.test", Rol: models.RolCliente, Saldo: 5000}
+	db.Create(&user)
+	loteria := models.Loteria{Codigo: "TST2", Nombre: "Prueba", Tipo: "loteria", CostoNumero: 1000,
+		LongitudNum: 2, MaxNumeros: 1, Multiplicador: 50, Activa: true}
+	db.Create(&loteria)
+	sorteo := models.Sorteo{LoteriaID: loteria.ID, Titulo: "Vencido", Fecha: time.Now().Add(-time.Hour),
+		Estado: models.SorteoAbierto}
+	db.Create(&sorteo)
+	apuesta := models.Apuesta{UserID: user.ID, SorteoID: sorteo.ID, Numeros: []int{7},
+		Monto: 1000, Estado: models.ApuestaPendiente}
+	db.Create(&apuesta)
+
+	SweepSorteosVencidos(db, true, 15*time.Minute)
+
+	var a models.Apuesta
+	db.First(&a, apuesta.ID)
+	if a.Estado != models.ApuestaCancelada {
+		t.Fatalf("estado de la apuesta: esperaba %s, dio %s", models.ApuestaCancelada, a.Estado)
+	}
+}

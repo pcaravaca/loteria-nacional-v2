@@ -380,6 +380,34 @@ func (h *AdminHandler) CerrarSorteo(c *gin.Context) {
 	c.JSON(http.StatusOK, actualizado)
 }
 
+// CancelarSorteo reembolsa las apuestas pendientes de un sorteo abierto que no
+// va a cerrarse (sorteo manual sin resultado, draw suspendido) y lo deja
+// "vencido". Usa el mismo camino que el barrido automatico.
+func (h *AdminHandler) CancelarSorteo(c *gin.Context) {
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "id invalido"})
+		return
+	}
+	var sorteo models.Sorteo
+	if err := h.db.First(&sorteo, id).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "sorteo no encontrado"})
+		return
+	}
+	if sorteo.Estado != models.SorteoAbierto {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "el sorteo no esta abierto"})
+		return
+	}
+	reembolsadas, err := VencerSorteo(h.db, &sorteo)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "no se pudo cancelar el sorteo"})
+		return
+	}
+	RegistrarAuditoria(h.db, c, c.GetUint("userID"), "sorteo.cancelar", "sorteo",
+		strconv.FormatUint(id, 10), fmt.Sprintf("reembolsadas=%d", reembolsadas))
+	c.JSON(http.StatusOK, gin.H{"id": sorteo.ID, "estado": models.SorteoVencido, "reembolsadas": reembolsadas})
+}
+
 func intersect(a, b []int) int {
 	set := make(map[int]bool, len(a))
 	for _, n := range a {

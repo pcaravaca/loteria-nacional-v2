@@ -43,24 +43,28 @@ type Resumen struct {
 	Errores    []string `json:"errores,omitempty"`
 }
 
-func (i *Importador) proveedorPara(juego string) Proveedor {
+// proveedoresPara devuelve todas las fuentes que cubren un juego, en orden: la
+// primera es la fuente principal y las siguientes son respaldo. Si la
+// principal falla o no publica una fecha, se intenta con la siguiente.
+func (i *Importador) proveedoresPara(juego string) []Proveedor {
+	var out []Proveedor
 	for _, p := range i.proveedores {
 		if p.Soporta(juego) {
-			return p
+			out = append(out, p)
 		}
 	}
-	return nil
+	return out
 }
 
 // ImportarLoteria importa los resultados de una lotería para todos sus sorteos
 // abiertos dentro de la ventana.
 func (i *Importador) ImportarLoteria(ctx context.Context, loteria models.Loteria) Resumen {
 	res := Resumen{Loteria: loteria.Codigo}
-	p := i.proveedorPara(loteria.Codigo)
-	if p == nil {
+	ps := i.proveedoresPara(loteria.Codigo)
+	if len(ps) == 0 {
 		return res
 	}
-	res.Fuente = p.Nombre()
+	res.Fuente = ps[0].Nombre()
 
 	var sorteos []models.Sorteo
 	corte := time.Now().In(i.zona).AddDate(0, 0, -i.ventanaDias)
@@ -72,8 +76,9 @@ func (i *Importador) ImportarLoteria(ctx context.Context, loteria models.Loteria
 	}
 
 	type cacheEntrada struct {
-		rs  []Resultado
-		err error
+		rs     []Resultado
+		err    error
+		fuente string
 	}
 	cache := map[string]cacheEntrada{}
 	erroresFecha := map[string]bool{}
@@ -85,7 +90,21 @@ func (i *Importador) ImportarLoteria(ctx context.Context, loteria models.Loteria
 		// comparten el resultado de la fuente: se pide una vez por fecha.
 		e, ok := cache[clave]
 		if !ok {
-			e.rs, e.err = p.Obtener(ctx, loteria.Codigo, fecha)
+			// Se prueba cada fuente en orden; la primera que publica algo
+			// para esa fecha gana. Si una falla, se intenta con la siguiente.
+			for _, p := range ps {
+				rs, err := p.Obtener(ctx, loteria.Codigo, fecha)
+				if err != nil {
+					e.err = err
+					continue
+				}
+				e.err = nil
+				if len(rs) > 0 {
+					e.rs = rs
+					e.fuente = p.Nombre()
+					break
+				}
+			}
 			cache[clave] = e
 		}
 		if e.err != nil {
@@ -94,6 +113,9 @@ func (i *Importador) ImportarLoteria(ctx context.Context, loteria models.Loteria
 				erroresFecha[clave] = true
 			}
 			continue
+		}
+		if e.fuente != "" {
+			res.Fuente = e.fuente
 		}
 		rs := e.rs
 		res.Encontrados += len(rs)
@@ -133,7 +155,7 @@ func (i *Importador) ImportarPendientes(ctx context.Context) []Resumen {
 	}
 	out := make([]Resumen, 0, len(loterias))
 	for _, l := range loterias {
-		if i.proveedorPara(l.Codigo) == nil {
+		if len(i.proveedoresPara(l.Codigo)) == 0 {
 			continue
 		}
 		out = append(out, i.ImportarLoteria(ctx, l))

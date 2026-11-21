@@ -178,6 +178,7 @@ func main() {
 	adminAgente := authed.Group("/admin")
 	adminAgente.Use(middleware.RoleRequired(models.RolAdmin, models.RolAgente))
 	adminAgente.POST("/sorteos/:id/cerrar", adminH.CerrarSorteo)
+	adminAgente.POST("/sorteos/:id/cancelar", adminH.CancelarSorteo)
 
 	// Mini casino: el resultado y el pago se resuelven en el servidor.
 	authed.GET("/casino/games", casinoH.Games)
@@ -253,7 +254,7 @@ func main() {
 	}
 
 	impResultados := resultados.NuevoImportador(db,
-		[]resultados.Proveedor{resultados.NuevoNacionAlloteria(nil)}, nil)
+		[]resultados.Proveedor{resultados.NuevoNacionAlloteria(nil), resultados.NuevoYelu(nil)}, nil)
 	if n, err := resultados.GenerarSorteosVentana(db, nil, 14, 21); err != nil {
 		log.Printf("calendario de sorteos: %v", err)
 	} else if n > 0 {

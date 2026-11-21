@@ -5,6 +5,7 @@ import { useAuthStore } from '@/stores/auth'
 import { colones } from '@/utils/formato'
 import { reproducir } from '@/utils/sfx'
 import { rtpDe, rtpTexto } from '@/utils/rtpCasino'
+import { PIEZAS_AJEDREZ } from '@/assets/casino/piezasAjedrez'
 
 const props = defineProps<{ monto: number; clientSeed: string }>()
 const auth = useAuthStore()
@@ -125,6 +126,11 @@ function piezaEn(fen: string, sq: string): string {
   const rank = sq.charCodeAt(1) - 49
   if (file < 0 || file > 7 || rank < 0 || rank > 7) return ''
   return fenFilas(fen)[7 - rank][file] ?? ''
+}
+
+// Mayuscula = pieza blanca, minuscula = negra (notacion FEN).
+function esNegra(ch: string): boolean {
+  return ch === ch.toLowerCase()
 }
 
 function etiqueta(fen: string, uci: string): string {
@@ -384,7 +390,14 @@ onMounted(() => {
           }"
           @click="tocarCasilla(r, c)"
         >
-          <span v-if="celda" class="pieza">{{ GLIFOS[celda] ?? celda }}</span>
+          <span v-if="c === 0" class="co co-rank">{{ 8 - r }}</span>
+          <span v-if="r === 7" class="co co-file">{{ String.fromCharCode(97 + c) }}</span>
+          <span
+            v-if="celda"
+            class="pieza"
+            :class="{ negra: esNegra(celda) }"
+            v-html="PIEZAS_AJEDREZ[celda]"
+          />
           <span
             v-if="destinos.has(nombreDe(r, c))"
             class="dot"
@@ -544,16 +557,34 @@ onMounted(() => {
 }
 .fila { display: grid; grid-template-columns: repeat(8, 1fr); }
 .celda { aspect-ratio: 1; display: grid; place-items: center; position: relative; }
-.celda.clara { background: #e8dcc0; }
-.celda.oscura { background: #0f9d6b; }
+/* El ambiente tiñe el tablero; el fallback es el verde/crema de siempre. */
+.celda.clara { background: var(--tm-board-light, #e8dcc0); }
+.celda.oscura { background: var(--tm-board-dark, #0f9d6b); }
 .celda.tactil { cursor: pointer; }
 .celda.seleccionada { box-shadow: inset 0 0 0 3px var(--gold); }
 .celda.ultimo { box-shadow: inset 0 0 0 3px rgba(232, 206, 122, .8); }
 .celda.resalta-ganador { box-shadow: inset 0 0 0 3px var(--gold), inset 0 0 18px rgba(245, 185, 66, .8); }
-.celda .pieza { font-size: clamp(20px, 6vw, 34px); line-height: 1; position: relative; z-index: 1; }
+/* Coordenadas a-h / 1-8: solo en la columna y la fila del borde, como un
+   tablero de torneo (el tablero no se carga con 64 etiquetas). */
+.co {
+  position: absolute; z-index: 2; pointer-events: none;
+  font-size: clamp(9px, 2.6vw, 13px); font-weight: 700;
+  font-family: var(--display); line-height: 1;
+}
+.co-rank { top: 2px; left: 3px; }
+.co-file { bottom: 2px; right: 3px; }
+.celda.clara .co { color: rgba(0, 0, 0, .5); }
+.celda.oscura .co { color: rgba(255, 255, 255, .62); }
+.celda .pieza {
+  display: grid; place-items: center; width: 88%; height: 88%;
+  position: relative; z-index: 1;
+}
+.celda .pieza svg { display: block; width: 100%; height: 100%; filter: drop-shadow(0 2px 2px rgba(0, 0, 0, .35)); }
+/* Las piezas negras llevan un halo claro: se leen aunque la casilla sea oscura. */
+.celda .pieza.negra svg { filter: drop-shadow(0 0 1.5px rgba(255, 255, 255, .9)) drop-shadow(0 2px 2px rgba(0, 0, 0, .5)); }
 .celda .dot {
   position: absolute; width: 28%; height: 28%; border-radius: 50%;
-  background: rgba(3, 16, 12, .45);
+  background: rgba(3, 16, 12, .45); z-index: 3;
 }
 .celda .dot.captura {
   background: transparent; border: 3px solid rgba(3, 16, 12, .5);

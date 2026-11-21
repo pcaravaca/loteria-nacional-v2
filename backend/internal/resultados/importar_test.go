@@ -2,6 +2,7 @@ package resultados
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -13,12 +14,18 @@ import (
 
 // fuenteFalsa devuelve lo que el test quiere, sin tocar la red.
 type fuenteFalsa struct {
-	juego    string
+	juego      string
+	nombre     string
 	resultados map[string][]Resultado // clave: fecha YYYY-MM-DD
-	err      error
+	err        error
 }
 
-func (f *fuenteFalsa) Nombre() string     { return "falsa" }
+func (f *fuenteFalsa) Nombre() string {
+	if f.nombre != "" {
+		return f.nombre
+	}
+	return "falsa"
+}
 func (f *fuenteFalsa) Soporta(j string) bool { return j == f.juego }
 func (f *fuenteFalsa) Obtener(_ context.Context, juego string, fecha time.Time) ([]Resultado, error) {
 	if f.err != nil {
@@ -26,7 +33,7 @@ func (f *fuenteFalsa) Obtener(_ context.Context, juego string, fecha time.Time) 
 	}
 	rs := f.resultados[fecha.Format("2006-01-02")]
 	for i := range rs {
-		rs[i].Fuente = "falsa"
+		rs[i].Fuente = f.Nombre()
 	}
 	return rs, nil
 }
@@ -142,6 +149,64 @@ func TestMismoTurno(t *testing.T) {
 		if got := mismoTurno(c.titulo, c.turno); got != c.want {
 			t.Errorf("mismoTurno(%q,%q)=%v, quería %v", c.titulo, c.turno, got, c.want)
 		}
+	}
+}
+
+// Si la fuente principal no publica una fecha, el importador prueba la
+// siguiente antes de dar el sorteo por perdido.
+func TestImportadorUsaElRespaldo(t *testing.T) {
+	db := abrirDB(t)
+	loteria := models.Loteria{Codigo: "NT1", Nombre: "Nuevos Tiempos", LongitudNum: 2,
+		MaxNumeros: 1, Multiplicador: 70, Activa: true}
+	db.Create(&loteria)
+	zona := time.FixedZone("CR", -6*3600)
+	fecha := time.Date(2026, 11, 20, 12, 55, 0, 0, zona)
+	sorteo := models.Sorteo{LoteriaID: loteria.ID, Titulo: "Nuevos Tiempos · Sorteo de el medio día",
+		Fecha: fecha, Estado: models.SorteoAbierto}
+	db.Create(&sorteo)
+
+	primaria := &fuenteFalsa{juego: "NT1", nombre: "principal", resultados: map[string][]Resultado{}}
+	respaldo := &fuenteFalsa{juego: "NT1", nombre: "respaldo", resultados: map[string][]Resultado{
+		"2026-11-20": {{Juego: "NT1", Turno: TurnoMedioDia, Numeros: []int{7}}},
+	}}
+	imp := NuevoImportador(db, []Proveedor{primaria, respaldo}, nil)
+	res := imp.ImportarLoteria(context.Background(), loteria)
+	if res.Aplicados != 1 {
+		t.Fatalf("aplicados=%d errores=%v", res.Aplicados, res.Errores)
+	}
+	if res.Fuente != "respaldo" {
+		t.Errorf("fuente=%s, quería respaldo", res.Fuente)
+	}
+	var s models.Sorteo
+	db.First(&s, sorteo.ID)
+	if s.Estado != models.SorteoPagado || len(s.NumerosGanadores) != 1 || s.NumerosGanadores[0] != 7 {
+		t.Errorf("sorteo=%+v", s)
+	}
+}
+
+// Si la fuente principal falla (red caida), tambien se prueba el respaldo.
+func TestImportadorRespaldoCuandoElPrimarioFalla(t *testing.T) {
+	db := abrirDB(t)
+	loteria := models.Loteria{Codigo: "NT2", Nombre: "Nuevos Tiempos", LongitudNum: 2,
+		MaxNumeros: 1, Multiplicador: 70, Activa: true}
+	db.Create(&loteria)
+	zona := time.FixedZone("CR", -6*3600)
+	fecha := time.Date(2026, 11, 20, 19, 30, 0, 0, zona)
+	sorteo := models.Sorteo{LoteriaID: loteria.ID, Titulo: "Nuevos Tiempos · Sorteo de la noche",
+		Fecha: fecha, Estado: models.SorteoAbierto}
+	db.Create(&sorteo)
+
+	primaria := &fuenteFalsa{juego: "NT2", nombre: "principal", err: errors.New("404")}
+	respaldo := &fuenteFalsa{juego: "NT2", nombre: "respaldo", resultados: map[string][]Resultado{
+		"2026-11-20": {{Juego: "NT2", Turno: TurnoNoche, Numeros: []int{33}}},
+	}}
+	imp := NuevoImportador(db, []Proveedor{primaria, respaldo}, nil)
+	res := imp.ImportarLoteria(context.Background(), loteria)
+	if res.Aplicados != 1 {
+		t.Fatalf("aplicados=%d errores=%v", res.Aplicados, res.Errores)
+	}
+	if res.Fuente != "respaldo" {
+		t.Errorf("fuente=%s, quería respaldo", res.Fuente)
 	}
 }
 

@@ -9,6 +9,41 @@ import (
 	"loteria-backend/internal/models"
 )
 
+// VencerSorteo reembolsa las apuestas pendientes de un sorteo y lo deja
+// "vencido". Las apuestas pasan a "cancelada": si quedaran "pendientes" el
+// dinero vuelve pero el jugador sigue viendo la jugada colgada. Devuelve
+// cuantas apuestas reembolso.
+func VencerSorteo(db *gorm.DB, s *models.Sorteo) (int, error) {
+	reembolsadas := 0
+	err := db.Transaction(func(tx *gorm.DB) error {
+		var apuestas []models.Apuesta
+		if err := tx.Where("sorteo_id = ? AND estado = ?", s.ID, models.ApuestaPendiente).
+			Find(&apuestas).Error; err != nil {
+			return err
+		}
+		for _, a := range apuestas {
+			if err := tx.Model(&models.User{}).Where("id = ?", a.UserID).
+				Update("saldo", gorm.Expr("saldo + ?", a.Monto)).Error; err != nil {
+				return err
+			}
+			if err := tx.Model(&models.Apuesta{}).Where("id = ?", a.ID).
+				Update("estado", models.ApuestaCancelada).Error; err != nil {
+				return err
+			}
+			if err := tx.Create(&models.Movimiento{
+				UserID: a.UserID, Tipo: models.MovSorteoReembolso, Monto: a.Monto,
+				Descripcion: "Reembolso sorteo vencido " + s.Titulo,
+			}).Error; err != nil {
+				return err
+			}
+			reembolsadas++
+		}
+		s.Estado = models.SorteoVencido
+		return tx.Save(s).Error
+	})
+	return reembolsadas, err
+}
+
 // SweepSorteosVencidos reembolsa las apuestas pendientes de los sorteos que ya
 // pasaron su fecha y quedaron abiertos, dejandolos en estado "vencido".
 //
@@ -28,35 +63,15 @@ func SweepSorteosVencidos(db *gorm.DB, habilitado bool, gracia time.Duration) (i
 	}
 
 	procesados, reembolsadas := 0, 0
-	for _, s := range sorteos {
-		err := db.Transaction(func(tx *gorm.DB) error {
-			var apuestas []models.Apuesta
-			if err := tx.Where("sorteo_id = ? AND estado = ?", s.ID, models.ApuestaPendiente).
-				Find(&apuestas).Error; err != nil {
-				return err
-			}
-			for _, a := range apuestas {
-				if err := tx.Model(&models.User{}).Where("id = ?", a.UserID).
-					Update("saldo", gorm.Expr("saldo + ?", a.Monto)).Error; err != nil {
-					return err
-				}
-				if err := tx.Create(&models.Movimiento{
-					UserID: a.UserID, Tipo: models.MovSorteoReembolso, Monto: a.Monto,
-					Descripcion: "Reembolso sorteo vencido " + s.Titulo,
-				}).Error; err != nil {
-					return err
-				}
-				reembolsadas++
-			}
-			s.Estado = models.SorteoVencido
-			return tx.Save(&s).Error
-		})
+	for i := range sorteos {
+		n, err := VencerSorteo(db, &sorteos[i])
 		if err != nil {
-			log.Printf("sweep sorteo %d: %v", s.ID, err)
+			log.Printf("sweep sorteo %d: %v", sorteos[i].ID, err)
 			continue
 		}
 		procesados++
-		log.Printf("sorteo %d vencido: %d apuesta(s) reembolsada(s)", s.ID, reembolsadas)
+		reembolsadas += n
+		log.Printf("sorteo %d vencido: %d apuesta(s) reembolsada(s)", sorteos[i].ID, n)
 	}
 	return procesados, reembolsadas
 }

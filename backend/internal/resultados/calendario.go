@@ -17,6 +17,7 @@ import (
 type turnoPlan struct {
 	sufijo string // como aparece en el título del sorteo
 	hora   int
+	minuto int
 }
 
 var calendario = map[string]struct {
@@ -24,16 +25,17 @@ var calendario = map[string]struct {
 	turnos []turnoPlan
 	titulo string
 }{
-	"LN": {dias: []time.Weekday{time.Sunday}, turnos: []turnoPlan{{"", 19}}, titulo: "Lotería Nacional"},
-	"CA": {dias: []time.Weekday{time.Tuesday, time.Friday}, turnos: []turnoPlan{{"", 19}}, titulo: "Chances"},
+	"LN": {dias: []time.Weekday{time.Sunday}, turnos: []turnoPlan{{"", 19, 0}}, titulo: "Lotería Nacional"},
+	"CA": {dias: []time.Weekday{time.Tuesday, time.Friday}, turnos: []turnoPlan{{"", 19, 0}}, titulo: "Chances"},
+	// Los tres turnos de NT son a las 12:55, 16:30 y 19:30 (hora CR).
 	"NT": {dias: nil, turnos: []turnoPlan{
-		{"la tarde", 17}, {"el medio día", 12}, {"la noche", 21},
+		{"la tarde", 16, 30}, {"el medio día", 12, 55}, {"la noche", 19, 30},
 	}, titulo: "Nuevos Tiempos"},
 	// Lotto y su revancha se cantan los lunes, miércoles y sábados.
-	"LOTTO":    {dias: []time.Weekday{time.Monday, time.Wednesday, time.Saturday}, turnos: []turnoPlan{{"", 20}}, titulo: "Lotto"},
-	"REVANCHA": {dias: []time.Weekday{time.Monday, time.Wednesday, time.Saturday}, turnos: []turnoPlan{{"", 20}}, titulo: "Lotto Revancha"},
+	"LOTTO":    {dias: []time.Weekday{time.Monday, time.Wednesday, time.Saturday}, turnos: []turnoPlan{{"", 20, 0}}, titulo: "Lotto"},
+	"REVANCHA": {dias: []time.Weekday{time.Monday, time.Wednesday, time.Saturday}, turnos: []turnoPlan{{"", 20, 0}}, titulo: "Lotto Revancha"},
 	"MONAZOS": {dias: nil, turnos: []turnoPlan{
-		{"el medio día", 12}, {"la tarde", 17}, {"la noche", 21},
+		{"el medio día", 12, 55}, {"la tarde", 16, 30}, {"la noche", 19, 30},
 	}, titulo: "3 Monazos"},
 }
 
@@ -89,7 +91,7 @@ func GenerarSorteosVentana(db *gorm.DB, zona *time.Location, diasAtras, diasAvan
 				if tp.sufijo != "" {
 					titulo = fmt.Sprintf("%s · Sorteo de %s", plan.titulo, tp.sufijo)
 				}
-				f := fecha.Add(time.Duration(tp.hora) * time.Hour)
+				f := fecha.Add(time.Duration(tp.hora)*time.Hour + time.Duration(tp.minuto)*time.Minute)
 				existe, err := existeSorteo(db, l.ID, titulo, f)
 				if err != nil {
 					return creados, err

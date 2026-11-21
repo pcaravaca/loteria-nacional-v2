@@ -47,7 +47,7 @@ onMounted(async () => {
             <th>Aciertos</th>
             <th>Premio</th>
             <th>Estado</th>
-            <th>Fecha</th>
+            <th>Fecha sorteo</th>
           </tr>
         </thead>
         <tbody>
@@ -71,7 +71,10 @@ onMounted(async () => {
                 {{ (estadoApuesta[a.estado] ?? {}).texto ?? a.estado }}
               </span>
             </td>
-            <td>{{ fechaHora(a.created_at) }}</td>
+            <td>
+              <div>{{ fechaHora(a.sorteo?.fecha ?? a.created_at) }}</div>
+              <div class="hint">apuesta {{ fechaHora(a.created_at) }}</div>
+            </td>
           </tr>
         </tbody>
       </table>
@@ -87,3 +90,7 @@ onMounted(async () => {
     </EmptyState>
   </div>
 </template>
+
+<style scoped>
+.hint { font-size: 10.5px; color: var(--faint); margin-top: 2px; }
+</style>

@@ -34,6 +34,7 @@ const (
 	ApuestaGanadora  = "ganadora"
 	ApuestaPerdedora = "perdedora"
 	ApuestaPagada    = "pagada"
+	ApuestaCancelada = "cancelada"
 )
 
 // Movimiento de saldo.

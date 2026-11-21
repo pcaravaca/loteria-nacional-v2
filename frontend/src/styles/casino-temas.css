@@ -19,6 +19,8 @@
   --tm-chip-on-text: #1a1405;
   --tm-accent: #ecd28a;
   --tm-text: #eef3f0;
+  --tm-board-light: #e8dcc0;
+  --tm-board-dark: #0f9d6b;
 }
 
 .casino-modal[data-tema='clasico'] {
@@ -38,6 +40,8 @@
   --tm-chip-on-text: #1a1405;
   --tm-accent: #2a1a05;
   --tm-text: #2a1a05;
+  --tm-board-light: #f7ecca;
+  --tm-board-dark: #8a5a2b;
 }
 
 .casino-modal[data-tema='neon'] {
@@ -57,6 +61,8 @@
   --tm-chip-on-text: #04202f;
   --tm-accent: #8fdcff;
   --tm-text: #eef3f0;
+  --tm-board-light: #24385c;
+  --tm-board-dark: #101c33;
 }
 
 .casino-modal[data-tema='tropical'] {
@@ -76,6 +82,8 @@
   --tm-chip-on-text: #3a1c05;
   --tm-accent: #3a1c05;
   --tm-text: #0b2c20;
+  --tm-board-light: #f6efd8;
+  --tm-board-dark: #0b5c3c;
 }
 
 .casino-modal[data-tema='medianoche'] {
@@ -95,6 +103,8 @@
   --tm-chip-on-text: #0d0a1e;
   --tm-accent: #c9b8ff;
   --tm-text: #eef3f0;
+  --tm-board-light: #3b2f72;
+  --tm-board-dark: #171133;
 }
 
 .casino-modal[data-tema='rubi'] {
@@ -114,6 +124,8 @@
   --tm-chip-on-text: #2b050b;
   --tm-accent: #ffb3bb;
   --tm-text: #eef3f0;
+  --tm-board-light: #5c1f30;
+  --tm-board-dark: #230710;
 }
 
 /* La carcasa se aplica a las piezas existentes del modal: no hace falta cambiar

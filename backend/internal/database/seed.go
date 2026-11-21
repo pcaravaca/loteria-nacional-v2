@@ -51,10 +51,13 @@ func Seed(db *gorm.DB) error {
 		}
 	}
 
+	// El sorteo abierto del demo tiene que ser un sorteo real del calendario:
+	// si se inventa una fecha, el importador nunca lo puede cerrar y la apuesta
+	// del usuario queda "pendiente" para siempre.
 	abierto := models.Sorteo{
 		LoteriaID: loterias[0].ID,
-		Titulo:    "Lotería Nacional · Sorteo de la suerte",
-		Fecha:     time.Now().Add(48 * time.Hour),
+		Titulo:    "Lotería Nacional · Sorteo",
+		Fecha:     proximoDomingo(time.Now()),
 		Estado:    models.SorteoAbierto,
 	}
 	if err := db.Create(&abierto).Error; err != nil {
@@ -96,6 +99,18 @@ func Seed(db *gorm.DB) error {
 	log.Println("seed: admin@loteria.test/admin123 · agente@loteria.test/agente123 · cliente@loteria.test/cliente123")
 
 	return nil
+}
+
+// proximoDomingo devuelve el proximo domingo a las 19:00 (hora CR), el sorteo
+// real de Loteria Nacional. El seed lo usa para el sorteo abierto de demo.
+func proximoDomingo(ahora time.Time) time.Time {
+	zona := time.FixedZone("CR", -6*3600)
+	h := ahora.In(zona)
+	dias := (int(time.Sunday) - int(h.Weekday()) + 7) % 7
+	if dias == 0 {
+		dias = 7
+	}
+	return time.Date(h.Year(), h.Month(), h.Day()+dias, 19, 0, 0, 0, zona)
 }
 
 // SeedCasino crea los juegos del mini casino si faltan. Es idempotente y se
