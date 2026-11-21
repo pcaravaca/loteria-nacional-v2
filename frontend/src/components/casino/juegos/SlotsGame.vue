@@ -51,9 +51,10 @@ function aleatorio() {
 // que la animacion se arme con el resultado de la tirada anterior (el mensaje
 // de premio quedaba adelantado respecto a los rodillos).
 const ultimaRonda = ref(0)
+const rondaPar = computed<[number, any]>(() => [props.rondaKey, props.resultado])
 watch(
-  () => [props.rondaKey, props.resultado],
-  ([k, r]: [number, any]) => {
+  rondaPar,
+  ([k, r]) => {
     if (!k || k === ultimaRonda.value) return
     if (!r?.rodillos) return // todavia no llego; el proximo cambio dispara
     ultimaRonda.value = k

@@ -3,7 +3,15 @@ import { computed, onUnmounted, ref } from 'vue'
 import { api } from '@/api/client'
 import { useAuthStore } from '@/stores/auth'
 import { colones } from '@/utils/formato'
-import { reproducir } from '@/utils/sfx'
+import { reproducir, silenciado } from '@/utils/sfx'
+import {
+  cantarBolilla,
+  callar,
+  fijarPresetVoz,
+  presetPorId,
+  presetVoz,
+  PRESETS_VOZ,
+} from '@/utils/vozBingo'
 import {
   bingoVariante,
   celdasGanadoras,
@@ -53,6 +61,8 @@ const cargando = ref(false)
 const error = ref('')
 // El canto es automático por defecto: se puede pausar o cantar a mano.
 const auto = ref(true)
+// Voz que canta las bolillas (estilo Waze: el cliente elige el preset).
+const vozId = ref(presetVoz())
 const reloj = ref(0)
 let timeout: number | null = null
 let ticker: number | null = null
@@ -124,6 +134,17 @@ function etiqueta(n: number) {
 
 function demora() {
   return 1500 + Math.random() * 1000
+}
+
+function elegirVoz(id: string) {
+  vozId.value = id
+  fijarPresetVoz(id)
+  reproducir('click')
+}
+
+function probarVoz() {
+  const texto = ronda.value?.bolilla ? etiqueta(ronda.value.bolilla) : 'B 12'
+  cantarBolilla(`¡${texto}!`, vozId.value, true)
 }
 
 function detenerTimers() {
@@ -199,6 +220,7 @@ async function cantar(manual = false) {
   error.value = ''
   cargando.value = true
   const antes = marcadas.value.flat(2).filter(Boolean).length
+  const cantadasAntes = cantadas.value.length
   try {
     const { data } = await api.post<BingoEstado>(
       `/casino/bingo/${ronda.value.ronda_id}/hit`,
@@ -207,6 +229,10 @@ async function cantar(manual = false) {
     ronda.value = data
     if (auth.user) auth.user.saldo = data.saldo
     reproducir('bolilla')
+    // La bolilla cantada en voz alta con el preset elegido (si salio una nueva).
+    if (data.bolilla > 0 && data.cantadas.length > cantadasAntes) {
+      cantarBolilla(`¡${etiqueta(data.bolilla)}!`, vozId.value)
+    }
     const despues = marcadas.value.flat(2).filter(Boolean).length
     if (despues > antes) reproducir('acierto')
     if (data.estado !== 'abierta') {
@@ -250,7 +276,10 @@ function nueva() {
   auto.value = true
 }
 
-onUnmounted(detenerTimers)
+onUnmounted(() => {
+  detenerTimers()
+  callar()
+})
 </script>
 
 <template>
@@ -375,6 +404,24 @@ onUnmounted(detenerTimers)
         Jugar de nuevo
       </button>
     </div>
+
+    <div class="voz">
+      <span class="voz-etq">Voz de la bolilla</span>
+      <div class="voz-chips">
+        <button
+          v-for="p in PRESETS_VOZ"
+          :key="p.id"
+          type="button"
+          class="voz-chip"
+          :class="{ activo: vozId === p.id }"
+          :title="p.descripcion"
+          @click="elegirVoz(p.id)"
+        >{{ p.nombre }}</button>
+        <button type="button" class="voz-probar" title="Escuchar una bolilla de muestra" @click="probarVoz">
+          ▶ Probar
+        </button>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -477,5 +524,48 @@ onUnmounted(detenerTimers)
 .selector button.activo { background: var(--prim-dim); border-color: var(--prim); color: var(--prim-2); }
 .selector-etq { font-size: 12px; color: var(--faint); margin-left: 4px; }
 .paytable { flex: 1 1 100%; margin: 0; text-align: center; font-size: 11px; color: var(--faint); }
+
+/* Voz de la bolilla: presets configurables por el cliente (estilo Waze). */
+.voz {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  padding: 8px 10px; border-radius: 12px;
+  background: rgba(3, 16, 12, .5); border: 1px solid var(--border-soft);
+}
+.voz-etq { font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--faint); }
+.voz-chips { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
+.voz-chip {
+  border: 1px solid var(--border-soft); background: var(--surface); color: var(--muted);
+  border-radius: 999px; padding: 6px 11px; font-size: 12px; cursor: pointer;
+}
+.voz-chip:hover { color: var(--text); border-color: var(--border); }
+.voz-chip.activo {
+  border-color: var(--gold); color: var(--gold); font-weight: 700;
+  background: var(--gold-dim);
+}
+.voz-probar {
+  border: 1px solid var(--prim); background: var(--prim-dim); color: var(--prim-2);
+  border-radius: 999px; padding: 6px 11px; font-size: 12px; font-weight: 700; cursor: pointer;
+}
+
+/* En pantallas chicas (celular y tableta vertical) los cartones y el tablero
+   pasan a ser la zona tactil principal: casillas mas altas y tipografia mas
+   legible, sin bajar la cantidad de info. */
+@media (max-width: 760px) {
+  .tombola { width: 116px; height: 116px; }
+  .bola-grande { min-width: 66px; height: 66px; font-size: 20px; }
+  .tablero { gap: 4px; }
+  .casilla { height: 34px; font-size: 13px; border-radius: 8px; }
+  .registro { gap: 6px; }
+  .bola { min-width: 32px; height: 32px; font-size: 13px; }
+  .cartones { grid-template-columns: 1fr; }
+  .carton { padding: 12px; }
+  .celda { height: 42px; font-size: 15px; border-radius: 10px; }
+  .cab span { font-size: 12px; }
+  .controles .btn { flex: 1 1 100%; }
+  .voz { padding: 10px; }
+  .voz-chips { width: 100%; }
+  .voz-chip, .voz-probar { padding: 8px 12px; font-size: 12.5px; }
+}
+
 .error-text { color: #f87171; font-size: 12px; margin: 0; }
 </style>

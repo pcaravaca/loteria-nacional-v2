@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { onMounted, onUnmounted, ref, watch } from 'vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { colones } from '@/utils/formato'
 import { astSimbolo } from '@/assets/ast'
 import { reproducir } from '@/utils/sfx'
@@ -42,9 +42,10 @@ onMounted(pintarInicial)
 // de ESTA tirada: si el premio cambia antes que los rodillos, el proximo
 // cambio del arreglo vuelve a disparar y recien ahi se fijan.
 const ultimaRonda = ref(0)
+const rondaPar = computed<[number, any]>(() => [props.rondaKey, props.resultado])
 watch(
-  () => [props.rondaKey, props.resultado],
-  ([k, r]: [number, any]) => {
+  rondaPar,
+  ([k, r]) => {
     if (!k || k === ultimaRonda.value) return
     if (!r?.rodillos) return
     ultimaRonda.value = k
