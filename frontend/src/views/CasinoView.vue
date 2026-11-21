@@ -247,7 +247,9 @@ function detalleMultiplicador(r: CasinoRound): string {
 
 <style scoped>.chips-filtro {
   position: sticky;
-  top: 0;
+  /* Debajo de la topbar pegajosa (62px en web, 50px en la app nativa); antes
+     quedaba en top:0 y la barra lo tapaba por completo. */
+  top: var(--tm-sticky-top, 62px);
   z-index: 5;
   display: flex;
   gap: 8px;

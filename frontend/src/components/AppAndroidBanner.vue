@@ -1,11 +1,12 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 
-import { esDispositivoAndroid } from '@/utils/dispositivo'
+import { esDispositivoAndroid, esAppNativa } from '@/utils/dispositivo'
 
 const esAndroid = ref(esDispositivoAndroid())
 const cerrado = ref(sessionStorage.getItem('app-banner-cerrado') === '1')
-const mostrar = computed(() => esAndroid.value && !cerrado.value)
+// Dentro de la app nativa no tiene sentido autopromocionarse.
+const mostrar = computed(() => esAndroid.value && !esAppNativa() && !cerrado.value)
 function cerrar() {
   sessionStorage.setItem('app-banner-cerrado', '1')
   cerrado.value = true

@@ -1,6 +1,9 @@
 import axios, { AxiosError } from 'axios'
 
 const TOKEN_KEY = 'loteria_token'
+// Marca de que la pagina corrio dentro del WebView de la app Android nativa.
+// Se guarda antes de limpiar el query, porque `getToken` lo elimina.
+export const APP_KEY = 'loteria_app_nativa'
 
 export const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL || '/api',
@@ -41,10 +44,13 @@ export function clearToken() {
 }
 
 export function getToken() {
-  // La app nativa abre la web con ?token=JWT para heredar la sesion ya iniciada.
-  const porUrl = new URLSearchParams(window.location.search).get('token')
+  // La app nativa abre la web con ?token=JWT&app=1 para heredar la sesion ya
+  // iniciada y pedir el modo app (sin sidebar ni topbar propios).
+  const params = new URLSearchParams(window.location.search)
+  const porUrl = params.get('token')
   if (porUrl) {
     setToken(porUrl)
+    if (params.get('app') === '1') sessionStorage.setItem(APP_KEY, '1')
     const limpia = window.location.pathname + window.location.hash
     window.history.replaceState(null, '', limpia)
   }

@@ -5,7 +5,7 @@ import { useAuthStore } from '@/stores/auth'
 import { colones } from '@/utils/formato'
 import { useMarcaStore } from '@/stores/marca'
 import AppAndroidBanner from '@/components/AppAndroidBanner.vue'
-import { esDispositivoAndroid } from '@/utils/dispositivo'
+import { esDispositivoAndroid, esAppNativa } from '@/utils/dispositivo'
 import AudioControl from '@/components/AudioControl.vue'
 import TemaAppControl from '@/components/TemaAppControl.vue'
 
@@ -16,6 +16,9 @@ const router = useRouter()
 const auth = useAuthStore()
 const abierto = ref(false)
 const esAndroid = esDispositivoAndroid()
+// Dentro de la app Android nativa ya estan el encabezado, el saldo y las
+// pestanas: la web se despeja (sin sidebar ni topbar de escritorio).
+const modoApp = esAppNativa()
 
 const titulos: Record<string, string> = {
   dashboard: 'Panel de control',
@@ -71,8 +74,8 @@ function salir() {
 </script>
 
 <template>
-  <div class="app-shell">
-    <aside class="sidebar" :class="{ abierta: abierto }">
+  <div class="app-shell" :class="{ 'modo-app': modoApp }">
+    <aside v-if="!modoApp" class="sidebar" :class="{ abierta: abierto }">
       <div class="brand">
         <img v-if="marca.icono" class="brand-img" :src="marca.icono" alt="" />
         <div v-else class="brand-mark">LN</div>
@@ -115,12 +118,12 @@ function salir() {
 
     <div class="main">
       <header class="topbar">
-        <button class="btn btn-ghost btn-sm menu-btn" @click="abierto = !abierto">☰</button>
-        <h2>{{ titulo }}</h2>
+        <button v-if="!modoApp" class="btn btn-ghost btn-sm menu-btn" @click="abierto = !abierto">☰</button>
+        <h2 v-if="!modoApp">{{ titulo }}</h2>
         <div class="spacer"></div>
         <AudioControl />
         <TemaAppControl />
-        <div class="saldo-chip">
+        <div v-if="!modoApp" class="saldo-chip">
           <span class="etq">Saldo</span>
           <span class="valor">{{ colones(auth.user?.saldo ?? 0) }}</span>
         </div>

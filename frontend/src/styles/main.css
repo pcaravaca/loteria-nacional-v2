@@ -120,6 +120,18 @@ h1, h2, h3, h4 { font-family: var(--display); margin: 0; letter-spacing: -0.02em
 
 .content { padding: 26px; max-width: 1180px; width: 100%; margin: 0 auto; }
 
+/* ---------- modo app Android nativa ----------
+   Dentro del WebView de la app ya estan el encabezado, el saldo, el cierre de
+   sesion y las pestanas de modulos. La web se despeja: sin sidebar ni topbar de
+   escritorio, y el contenido usa todo el ancho. */
+.app-shell { --tm-sticky-top: 62px; }
+.app-shell.modo-app .topbar { height: 50px; padding: 0 16px; }
+.app-shell.modo-app .content { max-width: none; padding: 16px; }
+.app-shell.modo-app .page-head { margin-bottom: 14px; }
+.app-shell.modo-app .page-head h1 { font-size: 22px; margin-top: 2px; }
+.app-shell.modo-app .page-head p { font-size: 13px; margin-top: 4px; }
+.app-shell.modo-app { --tm-sticky-top: 50px; }
+
 /* ---------- tarjetas y grids ---------- */
 .grid { display: grid; gap: 16px; }
 .grid-2 { grid-template-columns: repeat(2, 1fr); }
