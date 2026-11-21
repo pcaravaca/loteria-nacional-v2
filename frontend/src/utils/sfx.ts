@@ -148,6 +148,8 @@ export type SfxNombre =
   | 'error'
   | 'bingo'
   | 'tambor'
+  | 'ruleta'
+  | 'deflector'
 
 export function reproducir(nombre: SfxNombre) {
   if (silenciado()) return
@@ -193,6 +195,36 @@ export function reproducir(nombre: SfxNombre) {
       break
     case 'tambor':
       for (let i = 0; i < 3; i++) tono(c, 160, 0.08, 'square', 0.09, i * 0.1)
+      break
+    case 'ruleta': {
+      // Friccion del aro: ruido filtrado que va bajando de frecuencia mientras
+      // la bola pierde velocidad por el carril.
+      const salida = ganancia()
+      if (!salida) break
+      const dur = 3.4
+      const buf = c.createBuffer(1, Math.floor(c.sampleRate * dur), c.sampleRate)
+      const datos = buf.getChannelData(0)
+      for (let i = 0; i < datos.length; i++) datos[i] = Math.random() * 2 - 1
+      const ruido = c.createBufferSource()
+      ruido.buffer = buf
+      const filtro = c.createBiquadFilter()
+      filtro.type = 'bandpass'
+      filtro.Q.value = 1.4
+      filtro.frequency.setValueAtTime(1500, c.currentTime)
+      filtro.frequency.exponentialRampToValueAtTime(320, c.currentTime + dur)
+      const g = c.createGain()
+      g.gain.setValueAtTime(0.0001, c.currentTime)
+      g.gain.exponentialRampToValueAtTime(0.07, c.currentTime + 0.12)
+      g.gain.exponentialRampToValueAtTime(0.0001, c.currentTime + dur)
+      ruido.connect(filtro).connect(g).connect(salida)
+      ruido.start()
+      ruido.stop(c.currentTime + dur + 0.05)
+      break
+    }
+    case 'deflector':
+      // Golpe seco de la bolilla contra un deflector metalico.
+      tono(c, 2300, 0.035, 'square', 0.05)
+      tono(c, 1560, 0.06, 'triangle', 0.05, 0.008)
       break
     case 'bingo':
       // Campanilla de bingo: arpegio brillante con campanas.
@@ -283,4 +315,6 @@ export const sfx = {
   error: () => reproducir('error'),
   bingo: () => reproducir('bingo'),
   tambor: () => reproducir('tambor'),
+  ruleta: () => reproducir('ruleta'),
+  deflector: () => reproducir('deflector'),
 }
