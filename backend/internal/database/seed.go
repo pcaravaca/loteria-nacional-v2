@@ -172,6 +172,19 @@ func SeedCasino(db *gorm.DB) error {
 	for i := range juegos {
 		var existente models.CasinoGame
 		if err := db.Where("codigo = ?", juegos[i].Codigo).First(&existente).Error; err == nil {
+			// El catalogo es dueno de nombre, descripcion y orden; el operador
+			// duena de limites, techos y RTP. Sin este update, una base ya
+			// sembrada jamas recibia los nombres corregidos del catalogo (ej.
+			// "Acesandfaces" en vez de "Aces and Faces").
+			if err := db.Model(&models.CasinoGame{}).
+				Where("codigo = ?", juegos[i].Codigo).
+				Updates(map[string]any{
+					"nombre":      juegos[i].Nombre,
+					"descripcion": juegos[i].Descripcion,
+					"orden":       juegos[i].Orden,
+				}).Error; err != nil {
+				return err
+			}
 			continue
 		}
 		// Select("*") para que GORM no omita los campos con valor cero que

@@ -83,3 +83,46 @@ func TestSeedCasino(t *testing.T) {
 		t.Fatalf("keno deberia tener techo 1000000, tiene %d", techo)
 	}
 }
+
+// TestSeedCasinoRefrescaNombres verifica que una base ya sembrada reciba los
+// nombres del catalogo sin perder la configuracion del operador (límites,
+// techos y RTP). Antes el seed ignoraba las filas existentes y el lobby
+// mostraba nombres viejos como "Acesandfaces".
+func TestSeedCasinoRefrescaNombres(t *testing.T) {
+	db, err := Open(&config.Config{DatabasePath: ":memory:"})
+	if err != nil {
+		t.Fatalf("open: %v", err)
+	}
+	if err := SeedCasino(db); err != nil {
+		t.Fatalf("seed casino: %v", err)
+	}
+
+	// Simula la base real: nombre viejo y configuracion propia del operador.
+	if err := db.Model(&models.CasinoGame{}).
+		Where("codigo = ?", "acesandfaces").
+		Updates(map[string]any{
+			"nombre":     "Acesandfaces",
+			"orden":      99,
+			"max_premio": 123456,
+		}).Error; err != nil {
+		t.Fatalf("preparar: %v", err)
+	}
+
+	if err := SeedCasino(db); err != nil {
+		t.Fatalf("re-seed casino: %v", err)
+	}
+
+	var juego models.CasinoGame
+	if err := db.Where("codigo = ?", "acesandfaces").First(&juego).Error; err != nil {
+		t.Fatalf("leer: %v", err)
+	}
+	if juego.Nombre != "Aces and Faces" {
+		t.Errorf("nombre = %q, esperaba %q", juego.Nombre, "Aces and Faces")
+	}
+	if juego.Orden == 99 {
+		t.Errorf("orden = %d, esperaba el del catalogo", juego.Orden)
+	}
+	if juego.MaxPremio != 123456 {
+		t.Errorf("max_premio = %d, el operador lo habia configurado en 123456", juego.MaxPremio)
+	}
+}
