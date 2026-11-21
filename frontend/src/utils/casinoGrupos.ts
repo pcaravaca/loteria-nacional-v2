@@ -20,13 +20,13 @@ export const GRUPOS_CASINO: GrupoCasino[] = [
   {
     id: 'mesa',
     titulo: 'Mesas',
-    descripcion: 'Blackjack, ruleta y baccará contra la casa.',
+    descripcion: 'Blackjack, Ruleta y baccará contra la casa.',
     codigos: ['blackjack', 'ruleta', 'baccarat'],
   },
   {
     id: 'mesa-nueva',
     titulo: 'Dominó y mesa',
-    descripcion: 'Dominó, ajedrez relámpago, backgammon y tetris por líneas.',
+    descripcion: 'Dominó, Ajedrez relámpago, backgammon y tetris por líneas.',
     codigos: ['domino', 'ajedrez', 'backgammon', 'tetris'],
   },
   {

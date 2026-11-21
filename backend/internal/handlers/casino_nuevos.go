@@ -92,6 +92,14 @@ func (h *CasinoHandler) nuevosApostadoHoy(userID uint, codigo string, desde time
 	case models.CasinoAjedrez:
 		err = h.db.Model(&models.AjedrezRonda{}).Where("user_id = ? AND created_at >= ?", userID, desde).
 			Select("COALESCE(SUM(monto),0)").Scan(&total).Error
+		if err == nil {
+			var partidas int64
+			if e2 := h.db.Model(&models.AjedrezPartida{}).Where("user_id = ? AND created_at >= ?", userID, desde).
+				Select("COALESCE(SUM(monto),0)").Scan(&partidas).Error; e2 != nil {
+				return -1
+			}
+			total += partidas
+		}
 	case models.CasinoBackgammon:
 		err = h.db.Model(&models.BackgammonRonda{}).Where("user_id = ? AND created_at >= ?", userID, desde).
 			Select("COALESCE(SUM(monto),0)").Scan(&total).Error

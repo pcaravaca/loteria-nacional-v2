@@ -38,53 +38,66 @@ function pintarInicial() {
 }
 onMounted(pintarInicial)
 
-function girar() {
-  const [rodillos, filas] = dimensiones()
+// Vigilar (rondaKey, resultado) garantiza armar la animacion con el resultado
+// de ESTA tirada: si el premio cambia antes que los rodillos, el proximo
+// cambio del arreglo vuelve a disparar y recien ahi se fijan.
+const ultimaRonda = ref(0)
+watch(
+  () => [props.rondaKey, props.resultado],
+  ([k, r]: [number, any]) => {
+    if (!k || k === ultimaRonda.value) return
+    if (!r?.rodillos) return
+    ultimaRonda.value = k
+    fijarRodillos(r.rodillos)
+  },
+  { flush: 'post', immediate: true },
+)
+
+function fijarRodillos(rodillos: string[][]) {
   girando.value = true
   reproducir('rodillo')
   lineasGanadoras.value = []
   celdasGanadoras.value = new Set()
-  visibles.value = Array.from({ length: rodillos }, () =>
+  const cols = Math.max(1, rodillos.length)
+  const filas = Math.max(1, Array.isArray(rodillos[0]) ? rodillos[0].length : 3)
+  visibles.value = Array.from({ length: cols }, () =>
     Array.from({ length: filas }, () => emojiAlAzar()),
   )
+  const repeticiones = [700, 1050, 1400, 1750, 2100]
+  const ultimo = Math.max(2, cols - 1)
+  // Solo giran las columnas que todavia no se resolvieron: si el interval
+  // regenerara toda la matriz pisaria las que ya quedaron fijas.
+  const pendientes = new Set<number>(Array.from({ length: cols }, (_, i) => i))
+  window.clearInterval(timer)
   timer = window.setInterval(() => {
-    visibles.value = Array.from({ length: rodillos }, () =>
-      Array.from({ length: filas }, () => emojiAlAzar()),
-    )
+    const nuevo = visibles.value.map((fila) => [...fila])
+    for (const c of pendientes) {
+      nuevo[c] = Array.from({ length: filas }, () => emojiAlAzar())
+    }
+    visibles.value = nuevo
   }, 90)
+  repeticiones.slice(0, Math.max(3, cols)).forEach((ms, i) => {
+    window.setTimeout(() => {
+      const columna = rodillos[i]
+      if (Array.isArray(columna)) {
+        const nueva = visibles.value.map((fila) => [...fila])
+        nueva[i] = columna
+        visibles.value = nueva
+        pendientes.delete(i)
+      }
+      if (i === ultimo) {
+        window.clearInterval(timer)
+        girando.value = false
+        lineasGanadoras.value = props.resultado?.lineas ?? []
+        const set = new Set<string>()
+        for (const l of lineasGanadoras.value) {
+          for (const par of l.celdas ?? []) set.add(`${par[0]}:${par[1]}`)
+        }
+        celdasGanadoras.value = set
+      }
+    }, ms)
+  })
 }
-
-watch(
-  () => props.rondaKey,
-  (k) => {
-    if (k === 0) return
-    girar()
-    const [rodillos] = dimensiones()
-    const repeticiones = [700, 1050, 1400, 1750, 2100]
-    repeticiones.slice(0, Math.max(3, rodillos)).forEach((ms, i) => {
-      window.setTimeout(() => {
-        if (props.resultado?.rodillos) {
-          const columna = props.resultado.rodillos[i]
-          if (Array.isArray(columna)) {
-            const nueva = visibles.value.map((fila) => [...fila])
-            nueva[i] = columna
-            visibles.value = nueva
-          }
-        }
-        if (i === Math.max(2, rodillos - 1)) {
-          window.clearInterval(timer)
-          girando.value = false
-          lineasGanadoras.value = props.resultado?.lineas ?? []
-          const set = new Set<string>()
-          for (const l of lineasGanadoras.value) {
-            for (const par of l.celdas ?? []) set.add(`${par[0]}:${par[1]}`)
-          }
-          celdasGanadoras.value = set
-        }
-      }, ms)
-    })
-  },
-)
 
 onUnmounted(() => window.clearInterval(timer))
 
@@ -109,7 +122,8 @@ function jugar() {
       </div>
     </div>
 
-    <div v-if="resultado" class="estado" :class="{ gana: premio > 0 }">
+    <div v-if="girando" class="estado"><span class="neutro">Girando…</span></div>
+    <div v-else-if="resultado" class="estado" :class="{ gana: premio > 0 }">
       <template v-if="premio > 0">
         <span>Ganaste</span><strong>{{ colones(premio) }}</strong>
       </template>

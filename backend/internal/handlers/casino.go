@@ -147,6 +147,11 @@ func (h *CasinoHandler) RotarSemilla(c *gin.Context) {
 		c.JSON(http.StatusConflict, gin.H{"error": "tenes una jugada de ajedrez abierta: cerrala antes de rotar la semilla"})
 		return
 	}
+	if err := h.db.Model(&models.AjedrezPartida{}).
+		Where("user_id = ? AND estado = ?", userID, "abierta").Count(&abiertas).Error; err == nil && abiertas > 0 {
+		c.JSON(http.StatusConflict, gin.H{"error": "tenes una partida de ajedrez abierta: cerrala antes de rotar la semilla"})
+		return
+	}
 	if err := h.db.Model(&models.BackgammonRonda{}).
 		Where("user_id = ? AND estado = ?", userID, "abierta").Count(&abiertas).Error; err == nil && abiertas > 0 {
 		c.JSON(http.StatusConflict, gin.H{"error": "tenes una carrera de backgammon abierta: cerrala antes de rotar la semilla"})
@@ -403,6 +408,14 @@ func (h *CasinoHandler) Stats(c *gin.Context) {
 		Scan(&ajTotal)
 	sumar(models.CasinoAjedrez, ajTotal)
 
+	// Las partidas completas de ajedrez viven en su propia tabla pero suman al
+	// mismo juego.
+	var apTotal fila
+	h.db.Model(&models.AjedrezPartida{}).
+		Select("count(*) as jugadas, COALESCE(sum(monto),0) as apostado, COALESCE(sum(premio),0) as premios, COALESCE(sum(monto - premio),0) as beneficio").
+		Scan(&apTotal)
+	sumar(models.CasinoAjedrez, apTotal)
+
 	var bgmTotal fila
 	h.db.Model(&models.BackgammonRonda{}).
 		Select("count(*) as jugadas, COALESCE(sum(monto),0) as apostado, COALESCE(sum(premio),0) as premios, COALESCE(sum(monto - premio),0) as beneficio").
@@ -592,6 +605,12 @@ func (h *CasinoHandler) apostadoHoy(userID uint, codigo string, desde time.Time)
 			Where("user_id = ? AND created_at >= ?", userID, desde).
 			Select("COALESCE(SUM(monto),0)").Scan(&aj).Error; err == nil {
 			total += aj
+		}
+		var ap int64
+		if err := h.db.Model(&models.AjedrezPartida{}).
+			Where("user_id = ? AND created_at >= ?", userID, desde).
+			Select("COALESCE(SUM(monto),0)").Scan(&ap).Error; err == nil {
+			total += ap
 		}
 	}
 	if codigo == models.CasinoBackgammon {

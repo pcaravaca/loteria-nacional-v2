@@ -109,6 +109,7 @@ function detalleMultiplicador(r: CasinoRound): string {
     </div>
 
     <div class="ambiente">
+      <div class="ambiente-nota">Se aplica a todos los juegos y queda guardado en tu perfil.</div>
       <span class="ambiente-etq">Ambiente</span>
       <button
         v-for="t in TEMAS"
@@ -121,7 +122,6 @@ function detalleMultiplicador(r: CasinoRound): string {
         <i class="punto" :style="{ background: t.muestra }"></i>
         {{ t.nombre }}
       </button>
-      <span class="ambiente-nota">Se aplica a todos los juegos y queda guardado en tu perfil.</span>
     </div>
 
     <p class="juego-responsable">
@@ -182,7 +182,7 @@ function detalleMultiplicador(r: CasinoRound): string {
           <h2>{{ g.titulo }}</h2>
           <p v-if="g.descripcion">{{ g.descripcion }}</p>
         </div>
-        <div class="grid grid-3">
+        <div class="grid-grid">
           <div
             v-for="j in g.juegos"
             :key="j.codigo"
@@ -301,10 +301,21 @@ function detalleMultiplicador(r: CasinoRound): string {
   margin: 0 0 18px; font-size: 12px; color: var(--faint);
   border: 1px solid var(--border-soft); border-radius: 10px; padding: 8px 12px;
 }
-.juego { display: flex; flex-direction: column; }
-.juego .arte { position: relative; height: 150px; border-radius: 12px; overflow: hidden; border: 1px solid var(--border-soft); margin-bottom: 12px; }
+/* Lobby: grilla uniforme y marco de arte consistente en TODAS las tarjetas,
+   para que los iconos/previz sigan un mismo estilo visual. */
+.grid-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(216px, 1fr));
+  gap: 14px;
+}
+@media (max-width: 760px) {
+  .grid-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+}
+.juego .arte { height: auto; aspect-ratio: 4 / 3; }
+.juego h3 { font-size: 14px; letter-spacing: .01em; }
+.juego .arte { position: relative; border-radius: 12px; overflow: hidden; border: 1px solid var(--border-soft); margin-bottom: 12px; }
 .juego .arte img { width: 100%; height: 100%; object-fit: cover; display: block; }
-.juego h3 { margin: 0 0 4px; }
+.juego h3 { margin: 0 0 4px; font-size: 14px; }
 .juego .desc { color: var(--muted); font-size: 13px; min-height: 34px; margin: 0 0 10px; }
 .juego .meta { display: flex; gap: 12px; padding: 10px 0; margin: 0 0 12px; border-top: 1px solid var(--border-soft); border-bottom: 1px solid var(--border-soft); }
 .juego .meta div { font-size: 11px; color: var(--faint); text-transform: uppercase; letter-spacing: .06em; }
@@ -321,4 +332,25 @@ function detalleMultiplicador(r: CasinoRound): string {
 .verif .linea span { color: var(--faint); }
 .verif .mono { font-family: ui-monospace, monospace; font-size: 12px; word-break: break-all; }
 .verif .nota { font-size: 11px; color: var(--faint); margin-top: 10px; }
+.casino-layout {
+  display: flex;
+  gap: 24px;
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 0 20px;
+  align-items: flex-start;
+}
+.casino-layout .sidebar {
+  flex: 0 0 30%;
+  position: sticky;
+  top: 20px;
+}
+.casino-layout .main {
+  flex: 0 0 70%;
+}
+@media (max-width: 1024px) {
+  .casino-layout { flex-direction: column; }
+  .casino-layout .sidebar { flex: 0 0 auto; position: static; }
+  .casino-layout .main { flex: 0 0 auto; }
+}
 </style>

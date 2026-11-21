@@ -21,11 +21,22 @@ const ganadores = computed<number[]>(() => {
   if (r[0] === r[1]) return [0, 1]
   return []
 })
+// Nombres legibles para el mensaje de premio (el backend devuelve el codigo
+// del simbolo, que es como se ve en la paytable).
+const nombreSimbolo: Record<string, string> = {
+  cereza: 'cerezas',
+  campana: 'campanas',
+  herradura: 'herraduras',
+  barra: 'barras',
+  diamante: 'diamantes',
+  siete: 'sietes',
+}
 const motivo = computed(() => {
   const r = props.resultado?.rodillos
   if (!r || !ganadores.value.length) return ''
-  if (ganadores.value.length === 3) return `Tres ${r[0]}`
-  return `Dos ${r[0]}`
+  const nombre = nombreSimbolo[r[0]] ?? r[0]
+  if (ganadores.value.length === 3) return `Tres ${nombre}`
+  return `Dos ${nombre}`
 })
 
 const visibles = ref<string[]>(['cereza', 'campana', 'siete'])
@@ -36,34 +47,49 @@ function aleatorio() {
   return ordenSimbolos[Math.floor(Math.random() * ordenSimbolos.length)]
 }
 
-function girar() {
+// Fuente unica de verdad: el par (rondaKey, resultado). Vigilar los dos evita
+// que la animacion se arme con el resultado de la tirada anterior (el mensaje
+// de premio quedaba adelantado respecto a los rodillos).
+const ultimaRonda = ref(0)
+watch(
+  () => [props.rondaKey, props.resultado],
+  ([k, r]: [number, any]) => {
+    if (!k || k === ultimaRonda.value) return
+    if (!r?.rodillos) return // todavia no llego; el proximo cambio dispara
+    ultimaRonda.value = k
+    fijarRodillos(r.rodillos)
+  },
+  { flush: 'post', immediate: true },
+)
+
+function fijarRodillos(rodillos: string[]) {
   girando.value = true
   reproducir('rodillo')
-  visibles.value = [aleatorio(), aleatorio(), aleatorio()]
+  const total = rodillos.length
+  visibles.value = Array.from({ length: total }, () => aleatorio())
+  // Cada rodillo se fija en su propio tempo; el giro solo debe mover los que
+  // todavia no llegaron, si no el interval pisa los que ya se resolvieron.
+  const pendientes = new Set<number>(Array.from({ length: total }, (_, i) => i))
+  window.clearInterval(timer)
   timer = window.setInterval(() => {
-    visibles.value = [aleatorio(), aleatorio(), aleatorio()]
+    const nuevo = [...visibles.value]
+    for (const i of pendientes) nuevo[i] = aleatorio()
+    visibles.value = nuevo
   }, 90)
+  const retardo = [900, 1350, 1800]
+  retardo.forEach((ms, i) => {
+    window.setTimeout(() => {
+      if (i < total) {
+        visibles.value[i] = rodillos[i]
+        pendientes.delete(i)
+      }
+      if (i === total - 1) {
+        window.clearInterval(timer)
+        girando.value = false
+      }
+    }, ms)
+  })
 }
-
-watch(
-  () => props.rondaKey,
-  (k) => {
-    if (k === 0) return
-    girar()
-    const retardo = [900, 1350, 1800]
-    retardo.forEach((ms, i) => {
-      window.setTimeout(() => {
-        if (props.resultado?.rodillos) {
-          visibles.value[i] = props.resultado.rodillos[i]
-        }
-        if (i === 2) {
-          window.clearInterval(timer)
-          girando.value = false
-        }
-      }, ms)
-    })
-  },
-)
 
 onUnmounted(() => window.clearInterval(timer))
 
@@ -88,7 +114,8 @@ function jugar() {
       <div class="bandeja"><span class="ranura"></span><span class="monedas">◉ ◉ ◉</span></div>
     </div>
 
-    <div v-if="resultado" class="estado" :class="{ gana: premio > 0 }">
+    <div v-if="girando" class="estado"><span class="neutro">Girando…</span></div>
+    <div v-else-if="resultado" class="estado" :class="{ gana: premio > 0 }">
       <template v-if="premio > 0">
         <span>Ganaste{{ motivo ? ' · ' + motivo : '' }}</span><strong>{{ colones(premio) }}</strong>
       </template>

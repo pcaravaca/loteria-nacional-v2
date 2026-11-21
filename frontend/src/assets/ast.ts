@@ -17,11 +17,11 @@ export type AstPokerInfo = {
 
 export const astSlots: AstSlotInfo[] = [
   { codigo: 'spy', nombre: 'Spy', emoji: ['🕵️', '🎯', '🔫', '💣', '🛩️', '🚁', '🏆', '💰', '⭐', '👑'], color: '#1b2a4a' },
-  { codigo: 'tuttifruti', nombre: 'TuttiFruti', emoji: ['🍒', '🍋', '🍊', '🍉', '🍇', '🍓', '🥝', '🍍', '🔔', '7️⃣'], color: '#3a1d3f' },
+  { codigo: 'tuttifruti', nombre: 'Tutti Frutti', emoji: ['🍒', '🍋', '🍊', '🍉', '🍇', '🍓', '🥝', '🍍', '🔔', '7️⃣'], color: '#3a1d3f' },
   { codigo: 'venice', nombre: 'Venice', emoji: ['🎭', '⛲', '🏛️', '🕯️', '🍇', '💍', '🎶', '🌹', '⭐', '👑'], color: '#2a1e3f' },
   { codigo: 'viking', nombre: 'Viking', emoji: ['🪓', '🛡️', '⚔️', '🏹', '🍺', '🐺', '⚓', '🔥', '⭐', '👑'], color: '#24303d' },
   { codigo: 'winplaceshow', nombre: 'Win Place Show', emoji: ['🏇', '🐎', '🏆', '🎖️', '🥈', '🥇', '🏟️', '🎺', '⭐', '👑'], color: '#33251a' },
-  { codigo: 'winterfest', nombre: 'WinterFest', emoji: ['⛄', '❄️', '🎿', '🛷', '🎁', '🕯️', '🍪', '🔔', '⭐', '🎄'], color: '#1d3242' },
+  { codigo: 'winterfest', nombre: 'Winter Fest', emoji: ['⛄', '❄️', '🎿', '🛷', '🎁', '🕯️', '🍪', '🔔', '⭐', '🎄'], color: '#1d3242' },
   { codigo: 'witchhouse', nombre: 'Witch House', emoji: ['🧙', '🦇', '🕸️', '🧹', '🔮', '💀', '🌙', '🍬', '⭐', '🕷️'], color: '#2c1d38' },
   { codigo: 'wonderland', nombre: 'Wonderland', emoji: ['🎩', '🐇', '🫖', '♠️', '♥️', '♦️', '♣️', '🍄', '⭐', '👑'], color: '#1e3a2a' },
   { codigo: 'worldcup', nombre: 'World Cup', emoji: ['⚽', '🥅', '🏟️', '🎽', '🏆', '🥇', '🎺', '⭐', '👑', '🍿'], color: '#1e3326' },

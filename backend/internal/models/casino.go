@@ -395,6 +395,51 @@ func (a *AjedrezRonda) AfterFind(tx *gorm.DB) error {
 	return nil
 }
 
+// AjedrezPartida es una partida completa de ajedrez contra el adversario de la
+// casa. La apuesta se descuenta al abrir y la partida queda abierta hasta el
+// mate o las tablas; la posicion (FEN) y la lista de jugadas guardadas permiten
+// reconstruirla y reproducir la jugada de la casa desde las semillas.
+type AjedrezPartida struct {
+	ID             uint      `gorm:"primaryKey" json:"id"`
+	UserID         uint      `gorm:"not null;index" json:"user_id"`
+	Monto          int64     `gorm:"not null" json:"monto"`
+	ColorJugador   string    `gorm:"size:16;not null;default:blancas" json:"color"`
+	FEN            string    `gorm:"size:128;not null" json:"fen"`
+	JugadasRaw     string    `gorm:"column:jugadas_raw;type:text" json:"-"`
+	Jugadas        []string  `gorm:"-" json:"jugadas"`
+	Turno          string    `gorm:"size:8" json:"turno"`
+	Resultado      string    `gorm:"size:16" json:"resultado"`
+	Motivo         string    `gorm:"size:64" json:"motivo"`
+	Estado         string    `gorm:"not null;default:abierta" json:"estado"`
+	Multiplicador  float64   `gorm:"not null;default:0" json:"multiplicador"`
+	Premio         int64     `gorm:"not null;default:0" json:"premio"`
+	ClientSeed     string    `gorm:"size:64" json:"client_seed"`
+	ServerSeedHash string    `gorm:"size:64" json:"server_seed_hash"`
+	Nonce          int64     `json:"nonce"`
+	CreatedAt      time.Time `json:"created_at"`
+}
+
+func (AjedrezPartida) TableName() string { return "ajedrez_partidas" }
+
+func (p *AjedrezPartida) BeforeSave(tx *gorm.DB) error {
+	if p.Jugadas == nil {
+		p.Jugadas = []string{}
+	}
+	b, err := json.Marshal(p.Jugadas)
+	if err != nil {
+		return err
+	}
+	p.JugadasRaw = string(b)
+	return nil
+}
+
+func (p *AjedrezPartida) AfterFind(tx *gorm.DB) error {
+	if p.JugadasRaw == "" {
+		return nil
+	}
+	return json.Unmarshal([]byte(p.JugadasRaw), &p.Jugadas)
+}
+
 // BackgammonRonda es una carrera simplificada de tres fichas por lado. La
 // tirada de dados sale de las semillas (provably fair) y la casa mueve siempre
 // la ficha mas atrasada.

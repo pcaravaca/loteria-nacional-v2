@@ -323,6 +323,25 @@ input, select, textarea, button { font-size: 16px; } /* evita el zoom automatico
   --prim: #94a3b8; --prim-2: #cbd5e1; --prim-dim: rgba(148, 163, 184, .14);
   --gold: #d4a437; --gold-dim: rgba(212, 164, 55, .14);
 }
+[data-tema-app="obsidiana"] {
+  --bg: #000000; --bg-2: #050505; --surface: #0a0a0a; --surface-2: #111111;
+  --surface-3: #1a1a1a; --border: #222222; --border-soft: #1c1c1c;
+  --prim: #ffffff; --prim-2: #e2e2e2; --prim-dim: rgba(255, 255, 255, .1);
+  --gold: #d4a437; --gold-dim: rgba(212, 164, 55, .14);
+}
+[data-tema-app="cirrus"] {
+  --bg: #f1f5f9; --bg-2: #e2e8f0; --surface: #f8fafc; --surface-2: #f1f5f9;
+  --surface-3: #e2e8f0; --border: #cbd5e1; --border-soft: #cbd5e1;
+  --prim: #475569; --prim-2: #64748b; --prim-dim: rgba(100, 116, 139, .14);
+  --gold: #d4a437; --gold-dim: rgba(212, 164, 55, .14);
+  --text: #0f172a; --muted: #64748b; --faint: #94a3b8;
+}
+[data-tema-app="titanio"] {
+  --bg: #1b1b1b; --bg-2: #252525; --surface: #2e2e2e; --surface-2: #383838;
+  --surface-3: #444444; --border: #555555; --border-soft: #4a4a4a;
+  --prim: #94a3b8; --prim-2: #cbd5e1; --prim-dim: rgba(148, 163, 184, .14);
+  --gold: #d4a437; --gold-dim: rgba(212, 164, 55, .14);
+}
 
 
 /* Resaltado de los items que pagaron (todos los juegos lo reutilizan) */
@@ -349,8 +368,10 @@ input, select, textarea, button { font-size: 16px; } /* evita el zoom automatico
 .modal h3 { font-size: 19px; margin-bottom: 4px; }
 .modal .modal-sub { color: var(--muted); font-size: 13px; margin-bottom: 16px; }
 .modal-acciones { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; }
-/* Variante ancha para los juegos del casino (aprobada por Peter). */
-.modal.modal-lg { max-width: 720px; padding: 24px 26px; }
+/* Variante ancha para los juegos del casino (aprobada por Peter).
+   El tablero manda: el modal es lo mas grande posible sin pasarse de alto,
+   y el area de juego absorbe el espacio que dejan los controles. */
+.modal.modal-lg { max-width: 840px; padding: 18px 20px; }
 .modal-x {
   position: absolute; top: 14px; right: 14px; width: 34px; height: 34px;
   border-radius: 10px; border: 1px solid var(--border);

@@ -57,6 +57,7 @@ func Open(cfg *config.Config) (*gorm.DB, error) {
 		&models.GemasRonda{},
 		&models.DominoRonda{},
 		&models.AjedrezRonda{},
+		&models.AjedrezPartida{},
 		&models.BackgammonRonda{},
 		&models.TetrisRonda{},
 		&models.PokerMano{},

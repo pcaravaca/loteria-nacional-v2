@@ -288,13 +288,16 @@ const guias: Partial<Record<string, Guia>> = {
   },
   ajedrez: {
     pasos: [
-      { t: 'Mirá el tablero', d: 'Es una posición real de mate en una: las blancas juegan primero.' },
-      { t: 'Elegí el mate', d: 'Cuatro jugadas legales: solo una da jaque mate.' },
-      { t: 'Cobrar', d: 'Si acertás, la casa paga x3.5.' },
+      { t: 'Elegí la modalidad', d: 'Mate en una: encontrá el mate entre cuatro jugadas. Partida completa: jugás una partida real contra el motor de la casa.' },
+      { t: 'Mate en una', d: 'Las blancas juegan primero y solo una de las cuatro jugadas da jaque mate.' },
+      { t: 'Partida completa', d: 'Salís de la posición inicial con blancas o negras; tocá una pieza y después el destino. Gana quien da mate.' },
+      { t: 'Cobrar', d: 'Mate acertado x3.5. En partida completa, ganás x1.7 y las tablas devuelven lo apostado.' },
     ],
     premios: [
-      { etq: 'Mate acertado', mult: 'x3.5' },
-      { etq: 'Jugada incorrecta', mult: 'x0' },
+      { etq: 'Mate en una acertado', mult: 'x3.5' },
+      { etq: 'Partida ganada', mult: 'x1.7' },
+      { etq: 'Partida empatada', mult: 'x1 (devuelve)' },
+      { etq: 'Jugada incorrecta o derrota', mult: 'x0' },
     ],
   },
   backgammon: {
@@ -617,6 +620,22 @@ function repetir() {
 .casino-modal { display: flex; flex-direction: column; gap: 10px; min-width: 0; max-width: 100%; }
 .casino-modal > div { min-width: 0; }
 .rapidos { flex-wrap: wrap; }
+/* Controles compactos: cuanto menos ocupen, mas lugar tiene el tablero. */
+.tema-marquesina { padding: 7px 12px; font-size: 12px; letter-spacing: .14em; gap: 8px; }
+.apuesta { gap: 8px; }
+.step { width: 36px; height: 36px; font-size: 16px; }
+.monto { padding: 6px; }
+.monto strong { font-size: 18px; }
+.rapidos { gap: 6px; }
+.rapidos .chip { padding: 5px 9px; font-size: 11.5px; }
+.saldo { font-size: 11.5px; }
+/* La arena es el area predominante: crece con el espacio libre del modal. */
+.tema-arena {
+  flex: 1 1 auto;
+  min-height: 340px;
+  display: flex;
+  flex-direction: column;
+}
 .zoom-ctl { display: flex; align-items: center; gap: 4px; margin-left: auto; }
 .zoom-ctl button {
   border: 1px solid var(--tm-reel-border); background: rgba(255,255,255,.06);

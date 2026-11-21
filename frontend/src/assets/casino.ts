@@ -1,8 +1,8 @@
 // Assets del mini casino (generados, paleta oscura + esmeralda + dorado).
 import dadosCard from './casino/cards/dados.webp'
 import slotsCard from './casino/cards/slots.webp'
-import ruletaCard from './casino/cards/ruleta.webp'
-import blackjackCard from './casino/cards/blackjack.webp'
+import RuletaCard from './casino/cards/ruleta.webp'
+import BlackjackCard from './casino/cards/blackjack.webp'
 import raspaCard from './casino/cards/raspa.webp'
 import kenoCard from './casino/cards/keno.webp'
 import cascadaCard from './casino/cards/cascada.webp'
@@ -15,8 +15,8 @@ import parleyCard from './casino/cards/parley.webp'
 import baccaratCard from './casino/cards/baccarat.webp'
 import bingoCard from './casino/cards/bingo.svg'
 import gemasCard from './casino/cards/gemas.svg'
-import dominoCard from './casino/cards/domino.svg'
-import ajedrezCard from './casino/cards/ajedrez.svg'
+import DominóCard from './casino/cards/domino.svg'
+import AjedrezCard from './casino/cards/ajedrez.svg'
 import backgammonCard from './casino/cards/backgammon.svg'
 import tetrisCard from './casino/cards/tetris.svg'
 
@@ -139,8 +139,8 @@ export type CodigoJuego =
 export const cartas: Record<CodigoJuego, string> = {
   dados: dadosCard,
   slots: slotsCard,
-  ruleta: ruletaCard,
-  blackjack: blackjackCard,
+  ruleta: RuletaCard,
+  blackjack: BlackjackCard,
   raspa: raspaCard,
   keno: kenoCard,
   cascada: cascadaCard,
@@ -153,8 +153,8 @@ export const cartas: Record<CodigoJuego, string> = {
   baccarat: baccaratCard,
   bingo: bingoCard,
   gemas: gemasCard,
-  domino: dominoCard,
-  ajedrez: ajedrezCard,
+  domino: DominóCard,
+  ajedrez: AjedrezCard,
   backgammon: backgammonCard,
   tetris: tetrisCard,
   ...astArte,

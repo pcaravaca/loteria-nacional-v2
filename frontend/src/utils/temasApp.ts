@@ -1,7 +1,7 @@
 // Temas visuales de toda la aplicacion (no solo el casino). Cada tema redefine
 // las variables base de la hoja de estilos; la preferencia se guarda en este
 // dispositivo y se sincroniza con el perfil (users.tema_app).
-export type TemaAppId = 'esmeralda' | 'zafiro' | 'rubi' | 'amatista' | 'grafito'
+export type TemaAppId = 'esmeralda' | 'zafiro' | 'rubi' | 'amatista' | 'grafito' | 'obsidiana' | 'cirrus' | 'titanio'
 
 export interface TemaApp {
   id: TemaAppId
@@ -15,6 +15,9 @@ export const TEMAS_APP: TemaApp[] = [
   { id: 'rubi', nombre: 'Rubí', muestra: '#e11d48' },
   { id: 'amatista', nombre: 'Amatista', muestra: '#a78bfa' },
   { id: 'grafito', nombre: 'Grafito', muestra: '#94a3b8' },
+  { id: 'obsidiana', nombre: 'Obsidiana', muestra: '#000000' },
+  { id: 'cirrus', nombre: 'Cirrus', muestra: '#e2e8f0' },
+  { id: 'titanio', nombre: 'Titanio', muestra: '#94a3b8' },
 ]
 
 const KEY = 'app-tema'

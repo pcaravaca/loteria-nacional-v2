@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, ref, watch } from 'vue'
 import { api } from '@/api/client'
 import { useAuthStore } from '@/stores/auth'
 import { colones } from '@/utils/formato'
@@ -36,14 +36,146 @@ interface DominoEstado {
   nonce: number
 }
 
+// ---------------------------------------------------------------- muestra ---
+// La ventana se abre con una mano y una mesa de ejemplo ya dibujadas, para que
+// el juego se entienda de una. La muestra es local y no cuesta ni paga nada:
+// recien al pulsar Empezar se pide /start y este estado se reemplaza.
+
+function hashCadena(texto: string): number {
+  let h = 2166136261 >>> 0
+  for (let i = 0; i < texto.length; i++) {
+    h ^= texto.charCodeAt(i)
+    h = Math.imul(h, 16777619)
+  }
+  return h >>> 0
+}
+
+function rngDeterminista(a: number) {
+  return function () {
+    a |= 0
+    a = (a + 0x6d2b79f5) | 0
+    let t = Math.imul(a ^ (a >>> 15), 1 | a)
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296
+  }
+}
+
+// Pipas de cada mitad en una grilla 3x3 (indices 0..8).
+const PIPOS: number[][] = [
+  [],
+  [4],
+  [0, 8],
+  [0, 4, 8],
+  [0, 2, 6, 8],
+  [0, 2, 4, 6, 8],
+  [0, 2, 3, 5, 6, 8],
+]
+
+function piposDe(n: number): boolean[] {
+  const out = new Array<boolean>(9).fill(false)
+  for (const k of PIPOS[n] ?? []) out[k] = true
+  return out
+}
+
 const ronda = ref<DominoEstado | null>(null)
 const cargando = ref(false)
 const error = ref('')
 const seleccionada = ref<number | null>(null)
+// Marca qué fichas de la mesa son de la casa (solo aplica a la muestra).
+const duenoPreview = ref<boolean[]>([])
 
 const saldo = computed(() => auth.user?.saldo ?? 0)
+const esPreview = computed(() => ronda.value?.estado === 'preview')
 const abierta = computed(() => ronda.value?.estado === 'abierta')
-const casaVisible = computed(() => ronda.value?.casa ?? [])
+
+const duenoCasa = computed<boolean[]>(() => {
+  if (esPreview.value) return duenoPreview.value
+  return (ronda.value?.tablero ?? []).map(() => false)
+})
+
+function esExtremo(i: number): boolean {
+  const t = ronda.value?.tablero ?? []
+  return t.length > 0 && (i === 0 || i === t.length - 1)
+}
+
+// Genera la mano y la mesa de ejemplo de forma determinista a partir de la
+// clientSeed: mismo valor -> misma muestra, y nunca implica apuesta.
+function generarPreview() {
+  const rng = rngDeterminista(hashCadena('domino-preview:' + props.clientSeed))
+  const mazo: Ficha[] = []
+  for (let a = 0; a <= 6; a++) {
+    for (let b = a; b <= 6; b++) mazo.push({ 0: a, 1: b })
+  }
+  for (let i = mazo.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1))
+    const tmp = mazo[i]
+    mazo[i] = mazo[j]
+    mazo[j] = tmp
+  }
+  const mano = mazo.slice(0, 7)
+  const casa = mazo.slice(7, 14)
+  const pool = mazo.slice(14)
+
+  // Cadena de ejemplo: arranca con una ficha y se extiende por un extremo.
+  const primera = pool.splice(Math.floor(rng() * pool.length), 1)[0]
+  const cadena: Ficha[] = [primera]
+  const dueno: boolean[] = [false]
+  let izq = primera[0]
+  let der = primera[1]
+  const target = 6 + Math.floor(rng() * 3)
+  while (cadena.length < target && pool.length) {
+    const candidatas = pool
+      .map((f, i) => ({ f, i }))
+      .filter(({ f }) => f[0] === izq || f[1] === izq || f[0] === der || f[1] === der)
+    if (!candidatas.length) break
+    const { f, i } = candidatas[Math.floor(rng() * candidatas.length)]
+    pool.splice(i, 1)
+    if (f[0] === der) {
+      cadena.push(f)
+      der = f[1]
+    } else if (f[1] === der) {
+      cadena.push({ 0: f[1], 1: f[0] })
+      der = f[0]
+    } else if (f[0] === izq) {
+      cadena.unshift({ 0: f[1], 1: f[0] })
+      izq = f[1]
+    } else {
+      cadena.unshift(f)
+      izq = f[0]
+    }
+    dueno.push(dueno.length % 2 === 1)
+  }
+
+  duenoPreview.value = dueno
+  ronda.value = {
+    ronda_id: 0,
+    monto: props.monto,
+    mano,
+    casa,
+    casa_fichas: casa.length,
+    tablero: cadena,
+    extremos: [izq, der],
+    turno: 'jugador',
+    estado: 'preview',
+    multiplicador: 0,
+    premio: 0,
+    premio_pagado: 0,
+    jugadas: [],
+    saldo: auth.user?.saldo ?? 0,
+    server_seed_hash: '',
+    nonce: 0,
+  }
+}
+
+generarPreview()
+watch(
+  () => props.clientSeed,
+  () => {
+    if (esPreview.value) generarPreview()
+  },
+)
+
+// ------------------------------------------------------------------ juego ---
 
 function esValida(f: Ficha): boolean {
   if (!ronda.value) return false
@@ -53,8 +185,8 @@ function esValida(f: Ficha): boolean {
 }
 
 const jugables = computed(() => {
-  if (!ronda.value) return new Set<number>()
   const set = new Set<number>()
+  if (!ronda.value || esPreview.value) return set
   ronda.value.mano.forEach((f, i) => {
     if (esValida(f)) set.add(i)
   })
@@ -62,10 +194,6 @@ const jugables = computed(() => {
 })
 
 const sinJugada = computed(() => abierta.value && jugables.value.size === 0)
-
-function puntos(f: Ficha): number {
-  return f[0] + f[1]
-}
 
 async function empezar() {
   error.value = ''
@@ -106,7 +234,7 @@ async function jugar(ficha: number) {
 }
 
 function tocarFicha(i: number) {
-  if (!abierta.value || cargando.value) return
+  if (esPreview.value || !abierta.value || cargando.value) return
   if (!jugables.value.has(i)) {
     error.value = 'Esa ficha no encaja en los extremos.'
     reproducir('error')
@@ -130,53 +258,87 @@ function tocarFicha(i: number) {
       </div>
       <div class="contador">
         <span class="etq">Premio</span>
-        <strong class="oro">{{ colones(ronda?.premio ?? 0) }}</strong>
+        <strong class="oro">{{ esPreview ? '—' : colones(ronda?.premio ?? 0) }}</strong>
       </div>
       <div class="info">
         <span>Saldo <b>{{ colones(saldo) }}</b></span>
-        <span>Apuesta <b>{{ colones(monto) }}</b></span>
+        <span>{{ esPreview ? 'Se cobra al empezar' : 'Apuesta' }} <b>{{ colones(monto) }}</b></span>
       </div>
     </div>
 
-    <div class="tablero">
-      <div v-if="!ronda || !ronda.tablero.length" class="vacio">
-        <span>Tocá <b>Empezar</b> para recibir tus 7 fichas.</span>
-        <small>La casa también recibe 7. Gana quien se queda sin fichas.</small>
+    <div class="mesa">
+      <div class="mesa-top">
+        <span class="etq">Mesa</span>
+        <span class="encaje">
+          Encaja
+          <b class="extremo-chip">{{ ronda?.extremos[0] ?? '—' }}</b>
+          <i>o</i>
+          <b class="extremo-chip">{{ ronda?.extremos[1] ?? '—' }}</b>
+        </span>
+        <span v-if="esPreview" class="badge-muestra">Muestra · sin cargo</span>
+        <span v-else-if="ronda?.turno === 'casa'" class="aviso-casa">Jugó la casa…</span>
       </div>
-      <div
-        v-for="(f, i) in ronda?.tablero ?? []"
-        :key="i"
-        class="ficha"
-        :class="{ 'resalta-ganador': ronda?.estado === 'pagada' && i === ronda.tablero.length - 1 }"
-      >
-        <span>{{ f[0] }}</span>
-        <i />
-        <span>{{ f[1] }}</span>
+
+      <div class="tablero" :class="{ vacio: !ronda?.tablero.length }">
+        <span v-if="!ronda?.tablero.length" class="vacio-texto">
+          Tocá una ficha de tu mano para abrir la mesa.
+        </span>
+        <div
+          v-for="(f, i) in ronda?.tablero ?? []"
+          :key="i"
+          class="ficha horizontal"
+          :class="{
+            extremo: esExtremo(i),
+            'ultima-casa': duenoCasa[i],
+            'resalta-ganador': ronda?.estado === 'pagada' && i === ronda.tablero.length - 1,
+          }"
+        >
+          <div class="mitad">
+            <span v-for="(on, k) in piposDe(f[0])" :key="k" class="pipo" :class="{ on }" />
+          </div>
+          <div class="media-luna" />
+          <div class="mitad">
+            <span v-for="(on, k) in piposDe(f[1])" :key="k" class="pipo" :class="{ on }" />
+          </div>
+          <span v-if="duenoCasa[i]" class="titin" title="Ficha de la casa" />
+        </div>
       </div>
+
+      <p v-if="esPreview" class="mesa-nota">
+        <span class="titin inline" />
+        <span>Las fichas con el punto dorado son de la casa. Muestra sin cargo.</span>
+      </p>
+      <p v-else class="mesa-nota">La casa responde con la ficha válida de mayor puntaje.</p>
     </div>
 
-    <div v-if="ronda && abierta" class="extremos">
-      <span>Extremos: <b>{{ ronda.extremos[0] }}</b> y <b>{{ ronda.extremos[1] }}</b></span>
-      <span v-if="ronda.turno === 'casa'" class="aviso-casa">Jugó la casa…</span>
-    </div>
-
-    <div v-if="ronda && abierta" class="mano">
-      <button
-        v-for="(f, i) in ronda.mano"
-        :key="i"
-        class="ficha boton"
-        :class="{
-          seleccionada: seleccionada === i,
-          jugable: jugables.has(i),
-          'resalta-ganador': seleccionada === i,
-        }"
-        :disabled="cargando"
-        @click="tocarFicha(i)"
-      >
-        <span>{{ f[0] }}</span>
-        <i />
-        <span>{{ f[1] }}</span>
-      </button>
+    <div class="mano-seccion">
+      <div class="mano-top">
+        <span class="etq">Tu mano</span>
+        <span v-if="esPreview" class="mano-hint">Así se ve una mano de 7 fichas.</span>
+        <span v-else-if="abierta" class="mano-hint">Tocá una ficha y después <b>Jugar ficha</b>.</span>
+      </div>
+      <div class="mano">
+        <button
+          v-for="(f, i) in ronda?.mano ?? []"
+          :key="i"
+          class="ficha vertical boton"
+          :class="{
+            seleccionada: seleccionada === i,
+            jugable: !esPreview && jugables.has(i),
+            'resalta-ganador': seleccionada === i,
+          }"
+          :disabled="cargando || esPreview"
+          @click="tocarFicha(i)"
+        >
+          <div class="mitad">
+            <span v-for="(on, k) in piposDe(f[0])" :key="k" class="pipo" :class="{ on }" />
+          </div>
+          <div class="media-luna" />
+          <div class="mitad">
+            <span v-for="(on, k) in piposDe(f[1])" :key="k" class="pipo" :class="{ on }" />
+          </div>
+        </button>
+      </div>
     </div>
 
     <p class="rtp">
@@ -186,7 +348,7 @@ function tocarFicha(i: number) {
 
     <p v-if="error" class="error-text">{{ error }}</p>
 
-    <div v-if="!ronda" class="controles">
+    <div v-if="esPreview" class="controles">
       <button class="btn btn-primary btn-block" :disabled="cargando" @click="empezar">
         {{ cargando ? 'Abriendo…' : 'Empezar por ' + colones(monto) }}
       </button>
@@ -209,7 +371,11 @@ function tocarFicha(i: number) {
       </button>
     </div>
 
-    <div v-if="ronda && ronda.estado !== 'abierta'" class="resultado" :class="{ gana: ronda.premio_pagado > 0 }">
+    <div
+      v-if="ronda && !esPreview && ronda.estado !== 'abierta'"
+      class="resultado"
+      :class="{ gana: ronda.premio_pagado > 0 }"
+    >
       <span v-if="ronda.premio_pagado > 0">¡Ganaste {{ colones(ronda.premio_pagado) }} (x{{ ronda.multiplicador }})</span>
       <span v-else>Sin premio en esta mano</span>
     </div>
@@ -230,33 +396,91 @@ function tocarFicha(i: number) {
 .info { margin-left: auto; display: flex; gap: 14px; font-size: 12px; color: var(--faint); flex-wrap: wrap; }
 .info b { color: var(--text); margin-left: 4px; }
 
-.tablero {
-  display: flex; flex-wrap: wrap; gap: 6px; justify-content: center;
-  padding: 12px; border-radius:  16px; border: 1px solid #243448;
-  background: linear-gradient(180deg, rgba(16, 185, 129, .05), transparent 55%), #080b10;
-  min-height: 96px; align-items: center;
+/* ------------------------------------------------------------- mesa --- */
+.mesa {
+  display: flex; flex-direction: column; gap: 7px; padding: 10px;
+  border-radius: 16px; border: 1px solid #243448;
+  background: linear-gradient(180deg, rgba(16, 185, 129, .06), transparent 60%), #080b10;
 }
-.mano { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
-.vacio { width: 100%; display: flex; flex-direction: column; align-items: center; gap: 4px; color: var(--muted); font-size: 14px; }
-.vacio small { color: var(--faint); font-size: 12px; }
+.mesa-top { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.mesa-top .etq { font-size: 10px; letter-spacing: .14em; text-transform: uppercase; color: var(--faint); }
+.encaje { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; color: var(--muted); }
+.encaje i { color: var(--faint); font-style: normal; }
+.extremo-chip {
+  display: inline-grid; place-items: center; min-width: 20px; height: 20px; padding: 0 4px;
+  border-radius: 6px; background: rgba(245, 185, 66, .14); border: 1px solid rgba(245, 185, 66, .45);
+  color: var(--gold); font-size: 12px; font-weight: 700;
+}
+.badge-muestra {
+  margin-left: auto; font-size: 10px; letter-spacing: .1em; text-transform: uppercase;
+  color: var(--prim-2); background: var(--prim-dim); border: 1px solid rgba(16, 185, 129, .35);
+  padding: 3px 8px; border-radius: 999px;
+}
+.aviso-casa { margin-left: auto; color: var(--faint); font-style: italic; font-size: 12px; }
 
-.ficha {
-  display: inline-flex; flex-direction: column; align-items: center; justify-content: center;
-  min-width: 34px; height: 52px; padding: 3px 5px; border-radius: 8px;
-  background: linear-gradient(160deg, #fdf6e3, #d9c9a3);
-  color: #1b1b1b; font-family: var(--display); font-size: 15px; font-weight: 700;
-  box-shadow: inset -2px -3px 5px rgba(0, 0, 0, .25), 0 2px 5px rgba(0, 0, 0, .4);
+.tablero {
+  display: flex; flex-wrap: wrap; gap: 4px; justify-content: center; align-items: center;
+  min-height: 46px; padding: 8px; border-radius: 12px;
+  background: rgba(0, 0, 0, .28); border: 1px dashed rgba(120, 140, 160, .18);
 }
-.ficha i { width: 80%; height: 1px; background: rgba(0, 0, 0, .35); margin: 3px 0; }
+.tablero.vacio { min-height: 54px; }
+.vacio-texto { color: var(--faint); font-size: 12.5px; }
+.mesa-nota { margin: 0; font-size: 11px; color: var(--faint); display: flex; align-items: center; gap: 6px; }
+.mesa-nota .titin.inline { position: static; display: inline-block; margin: 0; }
+
+/* ------------------------------------------------------------ fichas --- */
+.ficha {
+  position: relative;
+  display: flex;
+  background: linear-gradient(145deg, #fbf3df 0%, #efe3c2 55%, #d8c69b 100%);
+  border-radius: 10px;
+  box-shadow:
+    inset 0 0 0 1px rgba(96, 76, 44, .38),
+    inset -2px -3px 6px rgba(0, 0, 0, .18),
+    0 3px 8px rgba(0, 0, 0, .45);
+}
+.ficha.vertical { flex-direction: column; width: 42px; height: 62px; padding: 4px 3px; }
+.ficha.horizontal { flex-direction: row; width: 62px; height: 38px; padding: 3px 4px; }
+
+.mitad { flex: 1; display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(3, 1fr); place-items: center; }
+.pipo { width: 6px; height: 6px; border-radius: 50%; background: transparent; }
+.pipo.on { background: radial-gradient(circle at 35% 30%, #4a4438, #141210 72%); box-shadow: inset 0 0 1px rgba(0, 0, 0, .6); }
+.ficha.horizontal .pipo { width: 6px; height: 6px; }
+
+.media-luna { position: relative; background: rgba(80, 64, 38, .55); }
+.vertical .media-luna { height: 1px; width: 76%; margin: 2px auto; }
+.horizontal .media-luna { width: 1px; height: 76%; margin: auto 2px; }
+.media-luna::after {
+  content: ''; position: absolute; left: 50%; top: 50%;
+  transform: translate(-50%, -50%) rotate(45deg);
+  width: 6px; height: 6px; border-radius: 50%;
+  border: 2px solid rgba(120, 92, 40, .8); border-left-color: transparent;
+}
+.horizontal .media-luna::after { transform: translate(-50%, -50%) rotate(-45deg); }
+
+.titin {
+  position: absolute; top: 2px; right: 2px; width: 6px; height: 6px; margin: 0;
+  border-radius: 50%; background: transparent;
+  border: 1.5px solid #f5b942;
+  box-shadow: 0 0 3px rgba(245, 185, 66, .8);
+}
+
 .ficha.boton { cursor: pointer; border: 2px solid transparent; transition: transform .12s ease, border-color .12s ease; }
 .ficha.boton:hover { transform: translateY(-2px); }
+.ficha.boton:disabled { cursor: default; }
+.ficha.boton:disabled:hover { transform: none; }
 .ficha.boton.jugable { border-color: rgba(16, 185, 129, .55); }
 .ficha.boton.seleccionada { border-color: var(--gold); box-shadow: 0 0 0 2px var(--gold), 0 0 18px rgba(245, 185, 66, .5); }
+.ficha.extremo { box-shadow: inset 0 0 0 1px rgba(96, 76, 44, .38), 0 0 0 2px rgba(245, 185, 66, .7), 0 3px 8px rgba(0, 0, 0, .45); }
 .ficha.resalta-ganador { border-color: var(--gold); box-shadow: 0 0 14px rgba(245, 185, 66, .6); }
 
-.extremos { display: flex; justify-content: space-between; gap: 10px; font-size: 12.5px; color: var(--muted); }
-.extremos b { color: var(--gold); }
-.aviso-casa { color: var(--faint); font-style: italic; }
+/* ------------------------------------------------------------- mano --- */
+.mano-seccion { display: flex; flex-direction: column; gap: 6px; }
+.mano-top { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.mano-top .etq { font-size: 10px; letter-spacing: .14em; text-transform: uppercase; color: var(--faint); }
+.mano-hint { font-size: 11.5px; color: var(--faint); }
+.mano-hint b { color: var(--muted); }
+.mano { display: flex; flex-wrap: wrap; gap: 4px; justify-content: center; }
 
 .controles { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
 .controles .btn { flex: 1 1 140px; }
@@ -265,7 +489,7 @@ function tocarFicha(i: number) {
 .rtp { display: flex; justify-content: center; gap: 6px; flex-wrap: wrap; margin: 0; font-size: 12px; color: var(--muted); }
 .rtp b { color: var(--text); }
 
-.resultado { text-align: center; padding: 10px; border-radius: 10px; background: rgba(0,0,0,.3); border: 1px solid var(--border-soft); font-size: 14px; color: var(--muted); }
-.resultado.gana { background: var(--prim-dim); border-color: rgba(16,185,129,.35); color: var(--prim-2); font-weight: 700; }
+.resultado { text-align: center; padding: 10px; border-radius: 10px; background: rgba(0, 0, 0, .3); border: 1px solid var(--border-soft); font-size: 14px; color: var(--muted); }
+.resultado.gana { background: var(--prim-dim); border-color: rgba(16, 185, 129, .35); color: var(--prim-2); font-weight: 700; }
 .error-text { color: #f87171; font-size: 12px; margin: 0; }
 </style>
