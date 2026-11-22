@@ -394,7 +394,7 @@ func TestCascadaModalidades(t *testing.T) {
 // TestDrawsModalidades verifica que el juego pida draws suficientes para la
 // modalidad mas larga.
 func TestDrawsModalidades(t *testing.T) {
-	esperado := map[string]int{"ruleta": 1, "keno": 24, "raspa": 3, "baccarat": 6, "alto": 2, "hilo": 3, "cascada": 12}
+	esperado := map[string]int{"ruleta": 1, "keno": 40, "raspa": 3, "baccarat": 6, "alto": 2, "hilo": 3, "cascada": 12, "parley": 12}
 	for codigo, n := range esperado {
 		if Draws(codigo) != n {
 			t.Errorf("%s: Draws() = %d, queria %d", codigo, Draws(codigo), n)
@@ -491,9 +491,11 @@ func TestRTPModalidades(t *testing.T) {
 		modalidad string
 		rtp       float64
 	}{
-		// Modalidades clasicas: mismo RTP que antes de agregar modalidades.
+		// Modalidades clasicas. Keno clasico bajo de 92,53 a 64,68 cuando se
+		// corrigio el reparto (ver sorteo_uniforme_test.go): la medicion
+		// anterior usaba los numeros 1-2-3-4-5, que el probing favorecia.
 		{"ruleta", "europea", 94.40},
-		{"keno", "clasico", 92.53},
+		{"keno", "clasico", 64.68},
 		{"raspa", "clasica", 92.09},
 		{"baccarat", "estandar", 98.70},
 		{"alto", "clasico", 95.97},
@@ -501,7 +503,7 @@ func TestRTPModalidades(t *testing.T) {
 		{"cascada", "clasica", 96.90},
 		// Modalidades nuevas.
 		{"ruleta", "rapida", 80.08},
-		{"keno", "relampago", 86.66},
+		{"keno", "relampago", 83.83},
 		{"raspa", "expres", 87.63},
 		{"baccarat", "sin-comision", 86.02},
 		{"alto", "racha", 92.04},

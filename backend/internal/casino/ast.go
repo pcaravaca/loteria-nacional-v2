@@ -317,17 +317,19 @@ func SpecsAST() []SpecJuego {
 	return out
 }
 
-// rtpPoker declara el RTP medido con la estrategia automatica del sistema.
+// rtpPoker declara el RTP medido con la estrategia automatica del sistema y un
+// reparto sin sesgo (ver sorteo_uniforme_test.go). Valores de RTP() con
+// 200.000 iteraciones por mesa.
 func rtpPoker(codigo string) float64 {
 	valores := map[string]float64{
-		"jacksorbetter": 83.0,
-		"allamerican":   83.0,
-		"tensorbetter":  88.0,
-		"acesandfaces":  83.0,
-		"eightsandaces": 83.0,
-		"twowaysroyal":  83.0,
-		"deucewild":     66.0,
-		"jokerpoker":    60.0,
+		"jacksorbetter": 78.4,
+		"allamerican":   79.6,
+		"tensorbetter":  80.7,
+		"acesandfaces":  78.8,
+		"eightsandaces": 79.8,
+		"twowaysroyal":  80.1,
+		"deucewild":     63.5,
+		"jokerpoker":    60.9,
 	}
 	if v, ok := valores[codigo]; ok {
 		return v

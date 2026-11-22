@@ -385,8 +385,10 @@ func kenoBolillas(draws []int, bolillas, cantidad int) []int {
 	out := make([]int, 0, cantidad)
 	for _, d := range draws {
 		n := (d % bolillas) + 1
-		for vistos[n] {
-			n = n%bolillas + 1
+		if vistos[n] {
+			// Sin probing: saltear al proximo valor. Sumar 1 corria la bolilla
+			// y sesgaba el sorteo hacia numeros consecutivos.
+			continue
 		}
 		vistos[n] = true
 		out = append(out, n)
@@ -767,10 +769,18 @@ func jugarParley(monto int64, draws []int, p Params) (Outcome, error) {
 	bolillaSet := map[int]bool{}
 	for _, d := range draws {
 		n := (d % 20) + 1
-		for bolillaSet[n] {
-			n = n%20 + 1
+		if bolillaSet[n] {
+			// Sin probing: saltear al proximo valor. Sumar 1 corria la bolilla
+			// y inflaba el sorteo (siempre 4 bolillas, mas aciertos).
+			continue
 		}
 		bolillaSet[n] = true
+		if len(bolillaSet) == 4 {
+			break
+		}
+	}
+	if len(bolillaSet) < 4 {
+		return Outcome{}, fmt.Errorf("sorteo incompleto")
 	}
 	bolillas := make([]int, 0, len(bolillaSet))
 	for n := range bolillaSet {
@@ -1116,7 +1126,9 @@ func Draws(codigo string) int {
 	case "ruleta":
 		return 1
 	case "keno":
-		return 24
+		// 15 bolillas de 60 sin repetir: se piden de sobra porque los duplicados
+		// se descartan.
+		return 40
 	case "cascada":
 		// La modalidad profunda pide 12 draws; las cortas ignoran los de sobra.
 		return cascadaFilasMax()
@@ -1129,7 +1141,9 @@ func Draws(codigo string) int {
 	case "fortuna", "moneda", "suertudo":
 		return 1
 	case "parley":
-		return 4
+		// Cuatro bolillas de 20 sin repetir: se piden de sobra porque los
+		// duplicados se descartan.
+		return 12
 	case "baccarat":
 		return 6
 	}

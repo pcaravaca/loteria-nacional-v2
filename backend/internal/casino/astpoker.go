@@ -74,8 +74,11 @@ func repartirPoker(cfg AstPoker, draws []int) ([]cartaPoker, error) {
 	cartas := make([]cartaPoker, 0, 5)
 	for i := 0; i < len(draws) && len(cartas) < 5; i++ {
 		idx := draws[i] % total
-		for usadas[idx] {
-			idx = (idx + 1) % total
+		if usadas[idx] {
+			// Sin probing: si el indice ya salio, se descarta y se sigue con el
+			// proximo valor. Sumar 1 al indice sesgaba el reparto (fabricaba
+			// parejas, porque idx/4 comparte rango con (idx+1)/4).
+			continue
 		}
 		usadas[idx] = true
 		cartas = append(cartas, aCarta(cfg, idx))
@@ -111,9 +114,6 @@ func completarPoker(cfg AstPoker, draws []int, retener []bool) ([]cartaPoker, er
 			return nil, fmt.Errorf("sorteo incompleto")
 		}
 		idx := draws[siguiente] % total
-		for usadas[idx] {
-			idx = (idx + 1) % total
-		}
 		usadas[idx] = true
 		cartas[i] = aCarta(cfg, idx)
 		siguiente++
@@ -382,7 +382,9 @@ func optimizarRetencion(cfg AstPoker, cartas []cartaPoker) []bool {
 			return retener
 		}
 	}
-	// escalera: cuatro cartas consecutivas
+	// escalera: cuatro rangos distintos consecutivos. Los rangos repetidos no
+	// suman: con 5,5,7,9 hay tres rangos (5,7,9), no cuatro, y sostener las dos
+	// cincos desperdicia una carta.
 	rangos := []int{}
 	for _, c := range cartas {
 		if c.Comodin {
@@ -392,23 +394,27 @@ func optimizarRetencion(cfg AstPoker, cartas []cartaPoker) []bool {
 		}
 	}
 	for desde := 2; desde <= 10; desde++ {
-		cuantas := 0
+		vistos := map[int]bool{}
 		for _, r := range rangos {
 			if r >= desde && r <= desde+4 {
-				cuantas++
+				vistos[r] = true
 			}
 		}
-		if cuantas >= 4 {
+		if len(vistos) >= 4 {
+			tenidos := map[int]bool{}
 			for i, r := range rangos {
-				if r >= desde && r <= desde+4 {
+				if r >= desde && r <= desde+4 && !tenidos[r] {
 					retener[i] = true
+					tenidos[r] = true
 				}
 			}
 			return retener
 		}
 	}
-	// par bajo: se sostiene solo si la tabla paga por par
-	if cat == "Pair" && pagoPoker(cfg, "Pair", rangoPar, 0) > 0 {
+	// Par bajo: se sostiene salvo en Deuce Wild, donde los dos son comodin y
+	// conviene soltar el par para buscarlos (medido: 58,3% sosteniendolo,
+	// 65,2% soltandolo).
+	if cat == "Pair" && cfg.Codigo != "deucewild" {
 		for i, c := range cartas {
 			if !c.Comodin && c.Rango == rangoPar {
 				retener[i] = true
