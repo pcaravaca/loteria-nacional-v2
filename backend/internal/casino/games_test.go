@@ -145,3 +145,13 @@ func TestSorteoDeterminista(t *testing.T) {
 		t.Fatal("semillas distintas produjeron el mismo sorteo")
 	}
 }
+
+// TestDadosMotorCoincideConLaTabla: paramsRTP juega siempre a la suma 7, que
+// sale 6 de 36 veces y paga x5 -> 83,33 %. Este test fija el techo que el
+// catalogo puede prometer: el RTP declarado de Dados del Sur no puede pasarse
+// de lo que la tabla paga (antes declaba 88 %, imposible).
+func TestDadosMotorCoincideConLaTabla(t *testing.T) {
+	if got := RTP("dados", 100000); got < 81.8 || got > 84.8 {
+		t.Errorf("RTP(dados) = %.2f, la tabla dice 83,33 (el declarado no puede pasarse)", got)
+	}
+}

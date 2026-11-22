@@ -124,7 +124,7 @@ func proximoDomingo(ahora time.Time) time.Time {
 // seed no toca las filas, asi que el techo queda en 0 hasta que se configure.
 func SeedCasino(db *gorm.DB) error {
 	juegos := []models.CasinoGame{
-		{Codigo: models.CasinoDados, Nombre: "Dados del Sur", Descripcion: "Acerta la suma de dos dados.", MinApuesta: 200, MaxApuesta: 50000, RTP: 80.0, MaxMultipl: 27, MaxPremio: 1000000, Orden: 1, LimiteDiario: 200000, Activo: true},
+		{Codigo: models.CasinoDados, Nombre: "Dados del Sur", Descripcion: "Acerta la suma de dos dados.", MinApuesta: 200, MaxApuesta: 50000, RTP: 83.3, MaxMultipl: 27, MaxPremio: 1000000, Orden: 1, LimiteDiario: 200000, Activo: true},
 		{Codigo: models.CasinoSlots, Nombre: "Fortuna CR", Descripcion: "Tragamonedas de 3 rodillos y 6 simbolos.", MinApuesta: 500, MaxApuesta: 50000, RTP: 94.7, MaxMultipl: 50, MaxPremio: 1000000, Orden: 2, LimiteDiario: 200000, Activo: true},
 		{Codigo: models.CasinoRuleta, Nombre: "Rueda Fortuna", Descripcion: "Ruleta de 37 casillas: pleno o color.", MinApuesta: 500, MaxApuesta: 50000, RTP: 94.4, MaxMultipl: 35, MaxPremio: 1000000, Orden: 3, LimiteDiario: 200000, Activo: true},
 		{Codigo: models.CasinoRaspa, Nombre: "Raspa y Gana", Descripcion: "Tres casillas: si coinciden, ganaste.", MinApuesta: 200, MaxApuesta: 50000, RTP: 92.1, MaxMultipl: 18, MaxPremio: 1000000, Orden: 4, LimiteDiario: 200000, Activo: true},
