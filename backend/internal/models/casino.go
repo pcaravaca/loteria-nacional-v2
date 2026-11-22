@@ -34,6 +34,9 @@ const (
 	CasinoAjedrez        = "ajedrez"
 	CasinoBackgammon     = "backgammon"
 	CasinoTetris         = "tetris"
+	CasinoPinballNeon    = "pinball-neon"
+	CasinoPinballClasico = "pinball-clasico"
+	CasinoPlinkoPremium  = "plinko-premium"
 )
 
 // CasinoGame es un juego del mini casino con sus limites y su RTP declarado.

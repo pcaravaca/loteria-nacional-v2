@@ -19,6 +19,9 @@ import DominóCard from './casino/cards/domino.svg'
 import AjedrezCard from './casino/cards/ajedrez.svg'
 import backgammonCard from './casino/cards/backgammon.svg'
 import tetrisCard from './casino/cards/tetris.svg'
+import pinballNeonCard from './casino/cards/pinball-neon.svg'
+import pinballClasicoCard from './casino/cards/pinball-clasico.svg'
+import plinkoPremiumCard from './casino/cards/plinko-premium.svg'
 
 import dadosHero from './casino/hero/dados.webp'
 import slotsHero from './casino/hero/slots.webp'
@@ -40,6 +43,9 @@ import dominoHero from './casino/hero/domino.svg'
 import ajedrezHero from './casino/hero/ajedrez.svg'
 import backgammonHero from './casino/hero/backgammon.svg'
 import tetrisHero from './casino/hero/tetris.svg'
+import pinballNeonHero from './casino/hero/pinball-neon.svg'
+import pinballClasicoHero from './casino/hero/pinball-clasico.svg'
+import plinkoPremiumHero from './casino/hero/plinko-premium.svg'
 
 // Arte del catalogo AST Casino (ilustraciones generadas con la misma paleta).
 import astTuttifruti from './casino/ast/tuttifruti.webp'
@@ -114,6 +120,9 @@ export type CodigoJuego =
   | 'ajedrez'
   | 'backgammon'
   | 'tetris'
+  | 'pinball-neon'
+  | 'pinball-clasico'
+  | 'plinko-premium'
   // Catalogo AST Casino
   | 'spy'
   | 'tuttifruti'
@@ -157,6 +166,9 @@ export const cartas: Record<CodigoJuego, string> = {
   ajedrez: AjedrezCard,
   backgammon: backgammonCard,
   tetris: tetrisCard,
+  'pinball-neon': pinballNeonCard,
+  'pinball-clasico': pinballClasicoCard,
+  'plinko-premium': plinkoPremiumCard,
   ...astArte,
 } as Record<CodigoJuego, string>
 
@@ -181,6 +193,9 @@ export const heroes: Record<CodigoJuego, string> = {
   ajedrez: ajedrezHero,
   backgammon: backgammonHero,
   tetris: tetrisHero,
+  'pinball-neon': pinballNeonHero,
+  'pinball-clasico': pinballClasicoHero,
+  'plinko-premium': plinkoPremiumHero,
   ...astArte,
 } as Record<CodigoJuego, string>
 

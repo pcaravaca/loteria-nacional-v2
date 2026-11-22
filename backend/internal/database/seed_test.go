@@ -23,15 +23,15 @@ func TestSeedCasino(t *testing.T) {
 	if err := db.Table("casino_juegos").Count(&total).Error; err != nil {
 		t.Fatalf("contar: %v", err)
 	}
-	if total != 44 {
-		t.Fatalf("se esperaban 44 juegos, hay %d", total)
+	if total != 47 {
+		t.Fatalf("se esperaban 47 juegos, hay %d", total)
 	}
 
 	var activos int64
 	if err := db.Table("casino_juegos").Where("activo = ?", true).Count(&activos).Error; err != nil {
 		t.Fatalf("contar activos: %v", err)
 	}
-	if activos != 44 {
+	if activos != 47 {
 		t.Fatalf("los juegos deberian quedar activos, hay %d", activos)
 	}
 
@@ -65,6 +65,19 @@ func TestSeedCasino(t *testing.T) {
 	// Los cuatro juegos de mesa nuevos quedan activos.
 	for _, codigo := range []string{
 		models.CasinoDomino, models.CasinoAjedrez, models.CasinoBackgammon, models.CasinoTetris,
+	} {
+		var juego models.CasinoGame
+		if err := db.Where("codigo = ?", codigo).First(&juego).Error; err != nil {
+			t.Fatalf("%s: %v", codigo, err)
+		}
+		if !juego.Activo {
+			t.Errorf("%s debería quedar activo", codigo)
+		}
+	}
+
+	// Las tres mesas de pinball quedan activas.
+	for _, codigo := range []string{
+		models.CasinoPinballNeon, models.CasinoPinballClasico, models.CasinoPlinkoPremium,
 	} {
 		var juego models.CasinoGame
 		if err := db.Where("codigo = ?", codigo).First(&juego).Error; err != nil {

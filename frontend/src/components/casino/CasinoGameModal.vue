@@ -29,6 +29,7 @@ import DominoGame from './juegos/DominoGame.vue'
 import AjedrezGame from './juegos/AjedrezGame.vue'
 import BackgammonGame from './juegos/BackgammonGame.vue'
 import TetrisGame from './juegos/TetrisGame.vue'
+import PinballGame from './juegos/PinballGame.vue'
 import { modalidadCompartida } from './juegos/modalidades'
 
 const props = defineProps<{ juego: CasinoGame; clientSeed: string }>()
@@ -324,6 +325,42 @@ const guias: Partial<Record<string, Guia>> = {
       { etq: '7 líneas', mult: 'x2.05' }, { etq: '8 o más', mult: 'x2.35' },
     ],
   },
+  'pinball-neon': {
+    pasos: [
+      { t: 'Elegí la fuerza', d: 'Suave: 4 rebotes y premio chico. Media: 7 rebotes. Fuerte: 10 rebotes y el premio más alto.' },
+      { t: 'Lanzá la bola', d: 'Cada rebote sale del sorteo: par = izquierda, impar = derecha.' },
+      { t: 'Cobrar', d: 'La tronera en la que cae la bola define el multiplicador.' },
+    ],
+    premios: [
+      { etq: 'Suave (4 rebotes)', mult: 'hasta x4' },
+      { etq: 'Media (7 rebotes)', mult: 'hasta x17' },
+      { etq: 'Fuerte (10 rebotes)', mult: 'hasta x10' },
+    ],
+  },
+  'pinball-clasico': {
+    pasos: [
+      { t: 'Elegí la fuerza', d: 'Suave: 4 rebotes. Media: 7 rebotes. Fuerte: 10 rebotes con más dispersión.' },
+      { t: 'Lanzá la bola', d: 'Cada rebote sale del sorteo: par = izquierda, impar = derecha.' },
+      { t: 'Cobrar', d: 'La tronera en la que cae la bola define el multiplicador.' },
+    ],
+    premios: [
+      { etq: 'Suave (4 rebotes)', mult: 'hasta x3' },
+      { etq: 'Media (7 rebotes)', mult: 'hasta x12' },
+      { etq: 'Fuerte (10 rebotes)', mult: 'hasta x12' },
+    ],
+  },
+  'plinko-premium': {
+    pasos: [
+      { t: 'Elegí la fuerza', d: 'Suave: 6 rebotes. Media: 9 rebotes. Fuerte: 12 rebotes y el premio más alto.' },
+      { t: 'Lanzá la bola', d: 'La bola cae por los pinchos; cada rebote sale del sorteo.' },
+      { t: 'Cobrar', d: 'La tronera en la que cae la bola define el multiplicador.' },
+    ],
+    premios: [
+      { etq: 'Suave (6 rebotes)', mult: 'hasta x6' },
+      { etq: 'Media (9 rebotes)', mult: 'hasta x20' },
+      { etq: 'Fuerte (12 rebotes)', mult: 'hasta x11' },
+    ],
+  },
 }
 
 // Guías genéricas para el catalogo AST (slots y video poker).
@@ -343,6 +380,9 @@ const guiaAstPoker: Guia = {
   ],
   premios: [],
 }
+
+const esPinball = (codigo: string) =>
+  codigo === 'pinball-neon' || codigo === 'pinball-clasico' || codigo === 'plinko-premium'
 
 const guia = computed<Guia | undefined>(() => {
   const codigo = props.juego.codigo as CodigoJuego
@@ -562,6 +602,13 @@ function repetir() {
         v-else-if="juego.codigo === 'tetris'"
         :monto="monto"
         :client-seed="clientSeed"
+      />
+      <PinballGame
+        v-else-if="esPinball(juego.codigo)"
+        :resultado="respuesta?.resultado ?? null"
+        :premio="respuesta?.premio ?? 0"
+        :cargando="cargando"
+        @jugar="jugar"
       />
       </div>
 

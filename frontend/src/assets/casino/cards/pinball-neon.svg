@@ -1,0 +1,29 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="400" height="260" viewBox="0 0 400 260">
+  <defs>
+    <linearGradient id="f" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#1a1030"/><stop offset="1" stop-color="#070312"/>
+    </linearGradient>
+    <radialGradient id="b" cx="0.5" cy="0.45" r="0.6">
+      <stop offset="0" stop-color="#fdf6d8"/><stop offset="1" stop-color="#c9922a"/>
+    </radialGradient>
+  </defs>
+  <rect width="400" height="260" rx="18" fill="url(#f)"/>
+  <g transform="translate(70 26)">
+    <rect x="6" y="6" width="248" height="176" rx="14" fill="none" stroke="#5b2fbf" stroke-width="3" opacity=".8"/>
+    <circle cx="70" cy="60" r="20" fill="none" stroke="#22d3ee" stroke-width="4"/>
+    <circle cx="180" cy="48" r="20" fill="none" stroke="#e879f9" stroke-width="4"/>
+    <circle cx="126" cy="112" r="20" fill="none" stroke="#34d399" stroke-width="4"/>
+    <text x="70" y="66" fill="#a5f3fc" font-family="ui-sans-serif,system-ui" font-size="15" font-weight="700" text-anchor="middle">x2</text>
+    <text x="180" y="54" fill="#f5d0fe" font-family="ui-sans-serif,system-ui" font-size="15" font-weight="700" text-anchor="middle">x3</text>
+    <text x="126" y="118" fill="#a7f3d0" font-family="ui-sans-serif,system-ui" font-size="15" font-weight="700" text-anchor="middle">x5</text>
+    <path d="M20 200 L96 164 L96 176 L26 214 Z" fill="#e8ce7a"/>
+    <path d="M236 200 L160 164 L160 176 L230 214 Z" fill="#e8ce7a"/>
+    <circle cx="128" cy="150" r="11" fill="url(#b)"/>
+    <g fill="#22d3ee" opacity=".85">
+      <rect x="34" y="196" width="36" height="20" rx="3"/><rect x="74" y="196" width="36" height="20" rx="3" fill="#e879f9"/>
+      <rect x="114" y="196" width="36" height="20" rx="3" fill="#34d399"/><rect x="154" y="196" width="36" height="20" rx="3" fill="#e879f9"/>
+      <rect x="194" y="196" width="36" height="20" rx="3"/>
+    </g>
+  </g>
+  <text x="24" y="238" fill="#e8ce7a" font-family="Georgia,serif" font-size="22" font-weight="700">Pinball Neón</text>
+</svg>

@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="520" viewBox="0 0 1200 520">
+  <defs>
+    <linearGradient id="f" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#1a1030"/><stop offset="1" stop-color="#070312"/>
+    </linearGradient>
+    <radialGradient id="b" cx="0.5" cy="0.45" r="0.6">
+      <stop offset="0" stop-color="#fdf6d8"/><stop offset="1" stop-color="#c9922a"/>
+    </radialGradient>
+  </defs>
+  <rect width="1200" height="520" fill="url(#f)"/>
+  <circle cx="1020" cy="150" r="220" fill="#5b2fbf" opacity=".18"/>
+  <g transform="translate(760 110)">
+    <rect x="10" y="10" width="380" height="270" rx="20" fill="none" stroke="#5b2fbf" stroke-width="5"/>
+    <circle cx="100" cy="90" r="30" fill="none" stroke="#22d3ee" stroke-width="6"/>
+    <circle cx="270" cy="72" r="30" fill="none" stroke="#e879f9" stroke-width="6"/>
+    <circle cx="186" cy="168" r="30" fill="none" stroke="#34d399" stroke-width="6"/>
+    <text x="100" y="98" fill="#a5f3fc" font-family="ui-sans-serif,system-ui" font-size="24" font-weight="700" text-anchor="middle">x2</text>
+    <text x="270" y="80" fill="#f5d0fe" font-family="ui-sans-serif,system-ui" font-size="24" font-weight="700" text-anchor="middle">x3</text>
+    <text x="186" y="176" fill="#a7f3d0" font-family="ui-sans-serif,system-ui" font-size="24" font-weight="700" text-anchor="middle">x5</text>
+    <path d="M30 300 L140 252 L140 268 L40 320 Z" fill="#e8ce7a"/>
+    <path d="M360 300 L250 252 L250 268 L350 320 Z" fill="#e8ce7a"/>
+    <circle cx="190" cy="228" r="17" fill="url(#b)"/>
+  </g>
+  <text x="80" y="150" fill="#e8ce7a" font-family="Georgia,serif" font-size="64" font-weight="700">Pinball Neón</text>
+  <text x="80" y="212" fill="#a5f3fc" font-family="Georgia,serif" font-size="30">Fuerza, bumpers y tronera</text>
+</svg>

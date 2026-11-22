@@ -987,6 +987,8 @@ func Jugar(codigo string, monto int64, draws []int, p Params) (Outcome, error) {
 		return jugarParley(monto, draws, p)
 	case "baccarat":
 		return jugarBaccarat(monto, draws, p)
+	case "pinball-neon", "pinball-clasico", "plinko-premium":
+		return jugarPinball(codigo, monto, draws, p)
 	}
 	// Catalogo AST Casino: maquinas tragamonedas y mesas de video poker.
 	if _, ok := BuscarSlot(codigo); ok {
@@ -1087,6 +1089,11 @@ func MultiplicadorMaximo(codigo string, maxMultipl int64) int64 {
 	if m := MaxMultiplPoker(codigo); m > 0 {
 		return m
 	}
+	// Pinball: el multiplicador lo pone la tronera, la fuerza y los bumpers; el
+	// tope de la mesa cubre los tres sin tocar el catálogo.
+	if m := pinballMaxMult(codigo); m > 0 {
+		return m
+	}
 	// Los juegos que tienen modalidades pueden pagar mas que el multiplicador
 	// declarado en el catalogo (el hilo en racha paga x6). El tope cubre todas
 	// las modalidades para que ninguna apuesta supere el techo de premio.
@@ -1146,6 +1153,8 @@ func Draws(codigo string) int {
 		return 12
 	case "baccarat":
 		return 6
+	case "pinball-neon", "pinball-clasico", "plinko-premium":
+		return pinballDraws(codigo)
 	}
 	// Catalogo AST: cada rodillo y fila de la ventana consume un draw.
 	if s, ok := BuscarSlot(codigo); ok {
@@ -1218,6 +1227,8 @@ func paramsRTP(codigo, modalidad string) Params {
 	case "baccarat":
 		p["tipo"] = "banca"
 	case "raspa":
+	case "pinball-neon", "pinball-clasico", "plinko-premium":
+		p["fuerza"] = 1
 	}
 	return p
 }

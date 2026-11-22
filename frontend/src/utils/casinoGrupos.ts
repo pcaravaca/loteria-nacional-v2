@@ -30,6 +30,12 @@ export const GRUPOS_CASINO: GrupoCasino[] = [
     codigos: ['domino', 'ajedrez', 'backgammon', 'tetris'],
   },
   {
+    id: 'pinball',
+    titulo: 'Pinball',
+    descripcion: 'Tres mesas de bumpers y troneras: neón, clásica y plinko.',
+    codigos: ['pinball-neon', 'pinball-clasico', 'plinko-premium'],
+  },
+  {
     id: 'clasicos',
     titulo: 'Clásicos',
     descripcion: 'Los juegos de siempre, con pago inmediato.',
