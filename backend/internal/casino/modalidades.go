@@ -47,8 +47,8 @@ var modalidadesPorJuego = map[string][]Modalidad{
 		{
 			Codigo:      "clasico",
 			Nombre:      "Keno Clasico",
-			Descripcion: "Elegi 5 numeros de 60 y salen 15 bolillas: 2 aciertos x1, 3 x3, 4 x8 y 5 x65.",
-			Pagos:       []PagoModalidad{{Etiqueta: "5 aciertos", Mult: "x65"}, {Etiqueta: "4 aciertos", Mult: "x8"}, {Etiqueta: "3 aciertos", Mult: "x3"}, {Etiqueta: "2 aciertos", Mult: "x1"}},
+			Descripcion: "Elegi 5 numeros de 60 y salen 15 bolillas: 2 aciertos x1, 3 x5, 4 x15 y 5 x65.",
+			Pagos:       []PagoModalidad{{Etiqueta: "5 aciertos", Mult: "x65"}, {Etiqueta: "4 aciertos", Mult: "x15"}, {Etiqueta: "3 aciertos", Mult: "x5"}, {Etiqueta: "2 aciertos", Mult: "x1"}},
 		},
 		{
 			Codigo:      "relampago",
