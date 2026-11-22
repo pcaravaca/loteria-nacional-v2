@@ -156,7 +156,7 @@ async function jugar(ficha: number) {
       <button class="btn btn-primary btn-block" :disabled="cargando" @click="empezar">
         {{ cargando ? 'Abriendo…' : 'Empezar por ' + colones(monto) }}
       </button>
-      <p class="paytable">Ganaste x1.85 · los dobles duplican el avance · la casa mueve la ficha más atrasada.</p>
+      <p class="paytable">Ganás x1.85 · los dobles duplican el avance · la casa mueve la ficha más atrasada.</p>
     </div>
 
     <div v-else-if="abierta" class="controles">

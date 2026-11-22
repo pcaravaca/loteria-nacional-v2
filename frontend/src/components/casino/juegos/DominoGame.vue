@@ -352,7 +352,7 @@ function tocarFicha(i: number) {
       <button class="btn btn-primary btn-block" :disabled="cargando" @click="empezar">
         {{ cargando ? 'Abriendo…' : 'Empezar por ' + colones(monto) }}
       </button>
-      <p class="paytable">Ganaste x1.52 · empate devuelve lo apostado · la casa juega la ficha de mayor puntaje.</p>
+      <p class="paytable">Ganás x1.52 · empate devuelve lo apostado · la casa juega la ficha de mayor puntaje.</p>
     </div>
 
     <div v-else-if="abierta" class="controles">
@@ -404,7 +404,7 @@ function tocarFicha(i: number) {
 }
 .mesa-top { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .mesa-top .etq { font-size: 10px; letter-spacing: .14em; text-transform: uppercase; color: var(--faint); }
-.encaje { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; color: var(--muted); }
+.encaje { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; color: var(--muted); white-space: nowrap; }
 .encaje i { color: var(--faint); font-style: normal; }
 .extremo-chip {
   display: inline-grid; place-items: center; min-width: 20px; height: 20px; padding: 0 4px;
