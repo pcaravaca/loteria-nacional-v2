@@ -245,10 +245,14 @@ function girar() {
   display: grid; grid-template-rows: repeat(12, 1fr); gap: 2px; padding: 6px;
   border-radius: 12px; border: 1px solid #243448;
   background: #080b10; box-shadow: inset 0 14px 30px rgba(0, 0, 0, .45);
-  width: min(220px, 60vw);
+  /* Alto acotado: antes el ancho era el unico tope y las 12 filas con `1fr`
+     inflaban el tablero hasta 1776 px en un telefono (Peter: "demasiado alto,
+     hace demasiado scroll vertical"). Con aspect-ratio el alto deriva del ancho. */
+  width: min(170px, 46vw);
+  aspect-ratio: 6 / 12;
 }
-.fila { display: grid; grid-template-columns: repeat(6, 1fr); gap: 2px; }
-.celda { aspect-ratio: 1; border-radius: 4px; background: rgba(255, 255, 255, .04); border: 1px solid rgba(255, 255, 255, .05); }
+.fila { display: grid; grid-template-columns: repeat(6, 1fr); gap: 2px; min-height: 0; }
+.celda { border-radius: 4px; background: rgba(255, 255, 255, .04); border: 1px solid rgba(255, 255, 255, .05); }
 .celda.t0 { background: linear-gradient(150deg,#a5f3fc,#0891b2); }
 .celda.t1 { background: linear-gradient(150deg,#fef08a,#ca8a04); }
 .celda.t2 { background: linear-gradient(150deg,#d8b4fe,#7b3fd1); }
@@ -256,7 +260,7 @@ function girar() {
 .celda.t4 { background: linear-gradient(150deg,#fca5a5,#dc2626); }
 .celda.t5 { background: linear-gradient(150deg,#fdba74,#ea580c); }
 .celda.t6 { background: linear-gradient(150deg,#93c5fd,#2563eb); }
-.vacio { grid-column: 1 / -1; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 30px 12px; color: var(--muted); text-align: center; }
+.vacio { grid-column: 1 / -1; grid-row: 1 / -1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px; padding: 12px; color: var(--muted); text-align: center; }
 .vacio small { color: var(--faint); font-size: 12px; }
 
 .lateral { display: flex; flex-direction: column; gap: 8px; width: 96px; }

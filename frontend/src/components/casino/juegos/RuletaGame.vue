@@ -225,11 +225,15 @@ function anguloFinal(casilla: string): number {
   // casilla i en el rotor es `-PI/2 + i*paso`, asi que el giro necesario es
   // exactamente `-i*paso`. (Antes sobraba un -PI/2 y la casilla quedaba ~90° corrida.)
   const base = -indice * paso.value
-  const vueltas = Math.PI * 2 * (4 + Math.floor(Math.random() * 2))
-  // Normalizamos para que gire siempre hacia adelante.
-  let destino = base + vueltas
-  while (destino < rotacion.value) destino += Math.PI * 2
-  return destino
+  const dosPI = Math.PI * 2
+  // CLAVE: la rotacion es acumulativa y nunca se normaliza. Si el destino se
+  // calcula contra ella con un `while`, despues de la primera jugada el delta
+  // tiende a cero y la rueda gira cada vez mas lento (el sintoma de Peter).
+  // Por eso se mide el desfasaje modular y se suman siempre 4-5 vueltas enteras
+  // hacia adelante, sin importar cuanto se haya girado antes.
+  const resto = (((rotacion.value - base) % dosPI) + dosPI) % dosPI
+  const vueltas = 4 + Math.floor(Math.random() * 2)
+  return rotacion.value + (dosPI - resto) + vueltas * dosPI
 }
 
 function animar(hasta: number) {

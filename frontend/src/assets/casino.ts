@@ -13,15 +13,19 @@ import monedaCard from './casino/cards/moneda.webp'
 import suertudoCard from './casino/cards/suertudo.webp'
 import parleyCard from './casino/cards/parley.webp'
 import baccaratCard from './casino/cards/baccarat.webp'
-import bingoCard from './casino/cards/bingo.svg'
-import gemasCard from './casino/cards/gemas.svg'
-import DominóCard from './casino/cards/domino.svg'
-import AjedrezCard from './casino/cards/ajedrez.svg'
-import backgammonCard from './casino/cards/backgammon.svg'
-import tetrisCard from './casino/cards/tetris.svg'
-import pinballNeonCard from './casino/cards/pinball-neon.svg'
-import pinballClasicoCard from './casino/cards/pinball-clasico.svg'
-import plinkoPremiumCard from './casino/cards/plinko-premium.svg'
+import bingoCard from './casino/cards/bingo.webp'
+import bingo90Card from './casino/cards/bingo90.webp'
+import bingoEsquinasCard from './casino/cards/bingo-esquinas.webp'
+import bingoDiamanteCard from './casino/cards/bingo-diamante.webp'
+import bingoRelampagoCard from './casino/cards/bingo-relampago.webp'
+import gemasCard from './casino/cards/gemas.webp'
+import DominóCard from './casino/cards/domino.webp'
+import AjedrezCard from './casino/cards/ajedrez.webp'
+import backgammonCard from './casino/cards/backgammon.webp'
+import tetrisCard from './casino/cards/tetris.webp'
+import pinballNeonCard from './casino/cards/pinball-neon.webp'
+import pinballClasicoCard from './casino/cards/pinball-clasico.webp'
+import plinkoPremiumCard from './casino/cards/plinko-premium.webp'
 
 import dadosHero from './casino/hero/dados.webp'
 import slotsHero from './casino/hero/slots.webp'
@@ -37,15 +41,19 @@ import monedaHero from './casino/hero/moneda.webp'
 import suertudoHero from './casino/hero/suertudo.webp'
 import parleyHero from './casino/hero/parley.webp'
 import baccaratHero from './casino/hero/baccarat.webp'
-import bingoHero from './casino/hero/bingo.svg'
-import gemasHero from './casino/hero/gemas.svg'
-import dominoHero from './casino/hero/domino.svg'
-import ajedrezHero from './casino/hero/ajedrez.svg'
-import backgammonHero from './casino/hero/backgammon.svg'
-import tetrisHero from './casino/hero/tetris.svg'
-import pinballNeonHero from './casino/hero/pinball-neon.svg'
-import pinballClasicoHero from './casino/hero/pinball-clasico.svg'
-import plinkoPremiumHero from './casino/hero/plinko-premium.svg'
+import bingoHero from './casino/hero/bingo.webp'
+import bingo90Hero from './casino/hero/bingo90.webp'
+import bingoEsquinasHero from './casino/hero/bingo-esquinas.webp'
+import bingoDiamanteHero from './casino/hero/bingo-diamante.webp'
+import bingoRelampagoHero from './casino/hero/bingo-relampago.webp'
+import gemasHero from './casino/hero/gemas.webp'
+import dominoHero from './casino/hero/domino.webp'
+import ajedrezHero from './casino/hero/ajedrez.webp'
+import backgammonHero from './casino/hero/backgammon.webp'
+import tetrisHero from './casino/hero/tetris.webp'
+import pinballNeonHero from './casino/hero/pinball-neon.webp'
+import pinballClasicoHero from './casino/hero/pinball-clasico.webp'
+import plinkoPremiumHero from './casino/hero/plinko-premium.webp'
 
 // Arte del catalogo AST Casino (ilustraciones generadas con la misma paleta).
 import astTuttifruti from './casino/ast/tuttifruti.webp'
@@ -115,6 +123,10 @@ export type CodigoJuego =
   | 'parley'
   | 'baccarat'
   | 'bingo'
+  | 'bingo90'
+  | 'bingo-esquinas'
+  | 'bingo-diamante'
+  | 'bingo-relampago'
   | 'gemas'
   | 'domino'
   | 'ajedrez'
@@ -161,6 +173,10 @@ export const cartas: Record<CodigoJuego, string> = {
   parley: parleyCard,
   baccarat: baccaratCard,
   bingo: bingoCard,
+  bingo90: bingo90Card,
+  'bingo-esquinas': bingoEsquinasCard,
+  'bingo-diamante': bingoDiamanteCard,
+  'bingo-relampago': bingoRelampagoCard,
   gemas: gemasCard,
   domino: DominóCard,
   ajedrez: AjedrezCard,
@@ -188,6 +204,10 @@ export const heroes: Record<CodigoJuego, string> = {
   parley: parleyHero,
   baccarat: baccaratHero,
   bingo: bingoHero,
+  bingo90: bingo90Hero,
+  'bingo-esquinas': bingoEsquinasHero,
+  'bingo-diamante': bingoDiamanteHero,
+  'bingo-relampago': bingoRelampagoHero,
   gemas: gemasHero,
   domino: dominoHero,
   ajedrez: ajedrezHero,

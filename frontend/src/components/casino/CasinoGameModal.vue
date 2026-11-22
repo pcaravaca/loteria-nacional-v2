@@ -605,6 +605,7 @@ function repetir() {
       />
       <PinballGame
         v-else-if="esPinball(juego.codigo)"
+        :codigo="juego.codigo"
         :resultado="respuesta?.resultado ?? null"
         :premio="respuesta?.premio ?? 0"
         :cargando="cargando"
