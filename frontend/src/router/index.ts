@@ -13,7 +13,8 @@ const routes = [
   // La historia de apuestas vive en Reportes; la ruta vieja redirige para no
   // romper enlaces ya repartidos.
   { path: '/mis-apuestas', redirect: () => ({ path: '/reportes', query: { tab: 'apuestas' } }) },
-  { path: '/resultados', name: 'resultados', component: () => import('@/views/ResultadosView.vue') },
+  // Los resultados por sorteo viven en Reportes; la ruta vieja redirige.
+  { path: '/resultados', redirect: () => ({ path: '/reportes', query: { tab: 'resultados' } }) },
   { path: '/reportes', name: 'reportes', component: () => import('@/views/ReportesView.vue') },
   { path: '/casino', name: 'casino', component: () => import('@/views/CasinoView.vue') },
   { path: '/transparencia', name: 'transparencia', component: () => import('@/views/TransparenciaView.vue'), meta: { publica: true } },

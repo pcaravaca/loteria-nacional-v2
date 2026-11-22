@@ -1,13 +1,26 @@
 <script setup lang="ts">
-import { computed, nextTick, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { colones } from '@/utils/formato'
 import { reproducir } from '@/utils/sfx'
+import pfNeon from '@/assets/casino/playfields/pinball-neon.webp'
+import pfClasico from '@/assets/casino/playfields/pinball-clasico.webp'
+import pfPlinko from '@/assets/casino/playfields/plinko-premium.webp'
+
+// El playfield es ARTE (una imagen por mesa), no una forma geometrica dibujada:
+// Peter lo dejo claro con la foto de la mesa Cinematronics. El canvas va encima,
+// transparente, y dibuja solo lo interactivo (bumpers, troneras, palancas, bola).
+const PLAYFIELDS: Record<string, string> = {
+  'pinball-neon': pfNeon,
+  'pinball-clasico': pfClasico,
+  'plinko-premium': pfPlinko,
+}
 
 const props = defineProps<{
   resultado: any
   premio: number
   cargando: boolean
   codigo?: string
+  multiplicador?: number
 }>()
 const emit = defineEmits<{ jugar: [Record<string, unknown>] }>()
 
@@ -36,6 +49,8 @@ const PALETAS: Record<string, { fondo: string; marco: string; vetas: string; ace
   },
 }
 const paleta = computed(() => PALETAS[props.codigo ?? ''] ?? PALETAS['pinball-neon'])
+const fondo = computed(() => PLAYFIELDS[props.codigo ?? ''] ?? pfNeon)
+const estiloTablero = computed(() => ({ backgroundImage: `url(${fondo.value})` }))
 
 const canvas = ref<HTMLCanvasElement | null>(null)
 const animando = ref(false)
@@ -75,45 +90,6 @@ function dibujar() {
 
   ctx.clearRect(0, 0, W, H)
 
-  // ---- marco de madera / metal del gabinete
-  ctx.beginPath()
-  ctx.roundRect(2 * u, 2 * u, (320 - 4) * u, (416 - 4) * u, 16 * u)
-  const gm = ctx.createLinearGradient(0, 0, W, H)
-  gm.addColorStop(0, aclarar(P.marco, 0.25))
-  gm.addColorStop(0.45, P.marco)
-  gm.addColorStop(1, sombrear(P.marco, 0.55))
-  ctx.fillStyle = gm
-  ctx.fill()
-
-  // vetas del marco
-  ctx.save()
-  ctx.beginPath()
-  ctx.roundRect(2 * u, 2 * u, (320 - 4) * u, (416 - 4) * u, 16 * u)
-  ctx.clip()
-  ctx.globalAlpha = 0.22
-  ctx.strokeStyle = P.vetas
-  for (let i = 0; i < 26; i++) {
-    ctx.lineWidth = (1 + (i % 3)) * u
-    ctx.beginPath()
-    ctx.moveTo(-20 * u, i * 18 * u)
-    ctx.bezierCurveTo(90 * u, i * 18 * u + 8 * u, 220 * u, i * 18 * u - 8 * u, 350 * u, i * 18 * u + 4 * u)
-    ctx.stroke()
-  }
-  ctx.restore()
-  ctx.globalAlpha = 1
-
-  // ---- campo de juego (acrílico oscuro sobre la mesa)
-  ctx.beginPath()
-  ctx.roundRect(14 * u, 14 * u, (320 - 28) * u, (416 - 28) * u, 12 * u)
-  const gc = ctx.createRadialGradient(W / 2, H * 0.35, 10 * u, W / 2, H / 2, W * 0.75)
-  gc.addColorStop(0, aclarar(P.fondo, 0.16))
-  gc.addColorStop(0.6, P.fondo)
-  gc.addColorStop(1, sombrear(P.fondo, 0.5))
-  ctx.fillStyle = gc
-  ctx.fill()
-  ctx.strokeStyle = aclarar(P.marco, 0.1)
-  ctx.lineWidth = 1.5 * u
-  ctx.stroke()
 
   const filas = Math.max(camino.value.length, tabla.value.length ? tabla.value.length - 1 : 0)
 
@@ -179,10 +155,10 @@ function dibujar() {
     ctx.fillText(`x${b.mult}`, b.x * u, b.y * u + 1 * u)
   })
 
-  // ---- guías de caída hacia las troneras
+  // ---- guías de caída hacia las troneras (solo cuando ya hay tabla)
   ctx.strokeStyle = 'rgba(255,255,255,.14)'
   ctx.lineWidth = 2 * u
-  for (let i = 1; i < tabla.value.length; i++) {
+  for (let i = 1; tabla.value.length > 0 && i < tabla.value.length; i++) {
     const x = (i * 320) / tabla.value.length
     ctx.beginPath()
     ctx.moveTo(x * u, 266 * u)
@@ -208,8 +184,9 @@ function dibujar() {
   palanca(34, 398, 108, 370, 108, 381, 38, 410)
   palanca(286, 398, 212, 370, 212, 381, 282, 410)
 
-  // ---- troneras con volumen y premio
+  // ---- troneras con volumen y premio (sin tabla no hay nada que pagar)
   const n = Math.max(1, tabla.value.length)
+  if (tabla.value.length > 0) {
   for (let i = 0; i < n; i++) {
     const x = ((i + 0.5) * 320) / n
     const ancho = 320 / n
@@ -238,6 +215,7 @@ function dibujar() {
     ctx.textAlign = 'center'
     ctx.textBaseline = 'middle'
     ctx.fillText(`${tabla.value[i]}x`, x * u, y0 + h / 2)
+  }
   }
 
   // ---- fila actual del camino
@@ -275,15 +253,6 @@ function dibujar() {
     ctx.fill()
   }
 
-  // ---- luz superior (bajo el aro)
-  const gl = ctx.createRadialGradient(W * 0.5, H * 0.16, 4 * u, W * 0.5, H * 0.16, W * 0.55)
-  gl.addColorStop(0, 'rgba(255,255,255,.16)')
-  gl.addColorStop(0.5, 'rgba(255,255,255,.04)')
-  gl.addColorStop(1, 'rgba(0,0,0,.3)')
-  ctx.beginPath()
-  ctx.roundRect(14 * u, 14 * u, (320 - 28) * u, (416 - 28) * u, 12 * u)
-  ctx.fillStyle = gl
-  ctx.fill()
 }
 
 function animar() {
@@ -334,6 +303,11 @@ watch(() => props.codigo, async () => {
   dibujar()
 })
 
+onMounted(async () => {
+  await nextTick()
+  dibujar()
+})
+
 function lanzar() {
   emit('jugar', { fuerza: fuerza.value })
 }
@@ -341,10 +315,10 @@ function lanzar() {
 
 <template>
   <div class="pinball">
-    <div class="tablero">
+    <div class="tablero" :style="estiloTablero">
       <canvas ref="canvas" class="mesa" />
       <div v-if="resultado && !animando" class="resuelto" :class="{ gana: premio > 0 }">
-        <span class="n">x{{ resultado.multiplicador ?? 0 }}</span>
+        <span class="n">x{{ multiplicador ?? resultado.multiplicador ?? 0 }}</span>
         <span v-if="premio > 0" class="p">{{ colones(premio) }}</span>
         <span v-else class="p cero">Sin premio</span>
       </div>
@@ -381,8 +355,13 @@ function lanzar() {
   border-radius: 16px; overflow: hidden;
   border: 1px solid var(--border-soft);
   box-shadow: 0 18px 40px rgba(0, 0, 0, .45);
+  background-color: #0b0f14;
+  /* el playfield se ancla abajo: las troneras del arte quedan donde el canvas dibuja las propias */
+  background-size: cover;
+  background-position: bottom center;
+  background-repeat: no-repeat;
 }
-.mesa { display: block; width: 100%; height: auto; }
+.mesa { display: block; width: 100%; height: auto; aspect-ratio: 320 / 416; }
 .resuelto {
   position: absolute; top: 26%; left: 50%; transform: translateX(-50%);
   display: flex; flex-direction: column; align-items: center; gap: 2px;

@@ -24,7 +24,6 @@ const titulos: Record<string, string> = {
   dashboard: 'Panel de control',
   loterias: 'Loterías',
   quinielas: 'Quinelas',
-  resultados: 'Resultados',
   reportes: 'Reportes',
   casino: 'Casino',
   perfil: 'Mi perfil',
@@ -39,7 +38,6 @@ const nav = computed(() => {
     { to: '/dashboard', label: 'Panel', ico: '▤' },
     { to: '/loterias', label: 'Loterías', ico: '▦' },
     { to: '/quinielas', label: 'Quinelas', ico: '⚽' },
-    { to: '/resultados', label: 'Resultados', ico: '🏆' },
     { to: '/rifas', label: 'Rifas', ico: '🎁' },
     { to: '/reportes', label: 'Reportes', ico: '📊' },
   ]
