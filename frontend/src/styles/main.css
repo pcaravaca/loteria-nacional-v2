@@ -406,6 +406,17 @@ input, select, textarea, button { font-size: 16px; } /* evita el zoom automatico
   height: 100%; max-height: 100%; overflow-y: auto; overscroll-behavior: contain;
 }
 
+/* En pantallas chicas el modal del casino ocupa toda la altura: los tableros
+   (bingo, tetris, pinball) no entran en 100vh - 24px y terminan scrolleando
+   dentro de una caja chica, con el cartón o la mesa fuera de pantalla. */
+@media (max-width: 640px) {
+  .modal-backdrop:has(> .modal.modal-lg) { padding: 0; }
+  .modal.modal-lg {
+    width: 100%; max-width: none; max-height: 100vh; max-height: 100dvh;
+    border-radius: 0; border: 0; padding: 12px 14px calc(12px + env(safe-area-inset-bottom));
+  }
+}
+
 /* ---------- selector de numeros ---------- */
 .numpad { display: grid; grid-template-columns: repeat(5, 1fr); gap: 8px; margin: 14px 0; }
 .numpad button {

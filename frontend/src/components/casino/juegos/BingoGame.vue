@@ -572,19 +572,26 @@ onUnmounted(() => {
   border-radius: 999px; padding: 6px 11px; font-size: 12px; font-weight: 700; cursor: pointer;
 }
 
-/* En pantallas chicas la tómbola pasa a una fila propia arriba y el cartón ocupa
-   el ancho completo: mantenerla a la par lo aplastaría. */
+/* Variante C (elegida por Peter): en pantallas chicas la tómbola se achica a
+   104 px y se pone a la par del registro, el cartón ocupa el ancho completo con
+   celdas altas y el bolillero queda como tira: entra todo sin scrollear. */
 @media (max-width: 620px) {
-  .bingo-cuerpo { flex-direction: column; }
-  .zap { flex: 1 1 auto; flex-direction: row; align-items: center; width: 100%; }
-  .tombola { width: 118px; height: 118px; margin: 0; flex: 0 0 auto; }
-  .bola-grande { min-width: 68px; height: 68px; font-size: 20px; }
-  .registro { flex: 1 1 auto; }
-  .cartones { grid-template-columns: 1fr; }
-  .celda { height: 40px; font-size: 15px; border-radius: 4px; }
+  .bingo { gap: 8px; }
+  .bingo-head { gap: 10px; padding: 6px 10px; font-size: 11.5px; }
+  .bingo-cuerpo { flex-direction: column; gap: 8px; }
+  .zap { flex: 1 1 auto; flex-direction: row; align-items: center; gap: 10px; width: 100%; }
+  .tombola { width: 104px; height: 104px; margin: 0; flex: 0 0 auto; }
+  .bola-grande { min-width: 52px; height: 52px; font-size: 15px; }
+  .registro { flex: 1 1 auto; gap: 4px; }
+  .bola { min-width: 24px; height: 24px; padding: 0 5px; font-size: 11px; }
+  .zona { gap: 8px; }
+  .cartones { grid-template-columns: 1fr; gap: 8px; }
+  .carton { padding: 8px; }
+  .celda { height: 44px; font-size: 16px; border-radius: 4px; }
   .cab span { font-size: 13px; }
-  .casilla { height: 26px; font-size: 11px; }
+  .casilla { height: 24px; font-size: 10.5px; }
   .controles .btn { flex: 1 1 100%; }
+  .voz { padding: 6px 8px; }
   .voz-chips { width: 100%; }
 }
 

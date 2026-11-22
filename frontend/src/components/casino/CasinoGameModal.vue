@@ -668,6 +668,21 @@ function repetir() {
 .monto strong { font-size: 17px; }
 
 .casino-modal { display: flex; flex-direction: column; gap: 10px; min-width: 0; max-width: 100%; }
+
+/* En pantallas chicas el tablero manda: se saca el arte decorativo y se compactan
+   los controles para que el cartón o la mesa queden visibles sin scrollear. */
+@media (max-width: 640px) {
+  .casino-modal { gap: 8px; }
+  .tema-marquesina { padding: 5px 10px; font-size: 11px; }
+  .tema-marquesina > span { display: none; }
+  .step { width: 32px; height: 32px; font-size: 15px; }
+  .monto { padding: 5px; }
+  .monto strong { font-size: 17px; }
+  .rapidos { gap: 5px; }
+  .rapidos .chip { padding: 4px 8px; font-size: 11px; }
+  .saldo { font-size: 11px; }
+  .hero { display: none; }
+}
 .casino-modal > div { min-width: 0; }
 .rapidos { flex-wrap: wrap; }
 /* Controles compactos: cuanto menos ocupen, mas lugar tiene el tablero. */
