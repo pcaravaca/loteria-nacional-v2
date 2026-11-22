@@ -495,7 +495,7 @@ func TestRTPModalidades(t *testing.T) {
 		// corrigio el reparto (ver sorteo_uniforme_test.go): la medicion
 		// anterior usaba los numeros 1-2-3-4-5, que el probing favorecia.
 		{"ruleta", "europea", 94.40},
-		{"keno", "clasico", 64.68},
+		{"keno", "clasico", 89.0},
 		{"raspa", "clasica", 92.09},
 		{"baccarat", "estandar", 98.70},
 		{"alto", "clasico", 95.97},

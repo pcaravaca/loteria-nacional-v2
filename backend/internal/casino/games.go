@@ -369,7 +369,7 @@ var kenoCfgs = map[string]kenoCfg{
 		Bolillas: 60,
 		Elegidos: 5,
 		Cantidad: 15,
-		Tabla:    map[int]int64{2: 1, 3: 3, 4: 8, 5: 65},
+		Tabla:    map[int]int64{2: 1, 3: 5, 4: 15, 5: 65},
 	},
 	"relampago": {
 		Bolillas: 40,
