@@ -90,7 +90,7 @@ var modalidadesPorJuego = map[string][]Modalidad{
 			Codigo:      "clasico",
 			Nombre:      "Bajo o Sobre Clasico",
 			Descripcion: "Dado del 1 al 100: elegi el tope y acerta si cae abajo o arriba. Un tiro, un pago.",
-			Pagos:       []PagoModalidad{{Etiqueta: "2%", Mult: "x48"}, {Etiqueta: "5%", Mult: "x19"}, {Etiqueta: "10%", Mult: "x9"}, {Etiqueta: "25%", Mult: "x3"}, {Etiqueta: "48%", Mult: "x2"}, {Etiqueta: "75%", Mult: "x1"}},
+			Pagos:       []PagoModalidad{{Etiqueta: "2%", Mult: "x48"}, {Etiqueta: "5%", Mult: "x19"}, {Etiqueta: "10%", Mult: "x9"}, {Etiqueta: "25%", Mult: "x3"}, {Etiqueta: "48%", Mult: "x2"}, {Etiqueta: "75%", Mult: "x1"}, {Etiqueta: "90%", Mult: "x1"}, {Etiqueta: "95%", Mult: "x1"}},
 		},
 		{
 			Codigo:      "racha",

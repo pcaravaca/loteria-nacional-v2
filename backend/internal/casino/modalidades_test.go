@@ -1,6 +1,7 @@
 package casino
 
 import (
+	"fmt"
 	"reflect"
 	"testing"
 )
@@ -546,4 +547,33 @@ func TestRTPModalidadesDentroDeBanda(t *testing.T) {
 		t.Errorf("RTP global de las modalidades nuevas: %.2f, fuera de 78-92", promedio)
 	}
 	t.Logf("RTP global de las modalidades nuevas: %.2f%%", promedio)
+}
+
+// TestPagosModalidadCoincidenConElMotor: la tabla de pagos que muestra el modal
+// (modalidades.go) tiene que reflejar lo que paga el motor (games.go). Cuando
+// quedaron desalineadas, keno seguia mostrando 3 x3 / 4 x8 y alto se habia
+// dejado dos topes afuera.
+func TestPagosModalidadCoincidenConElMotor(t *testing.T) {
+	mults := func(codigo, mod string) map[string]int64 {
+		out := map[string]int64{}
+		for _, p := range DataModalidad(codigo, mod)["pagos"].([]PagoModalidad) {
+			var n int64
+			fmt.Sscanf(p.Mult, "x%d", &n)
+			out[p.Etiqueta] = n
+		}
+		return out
+	}
+
+	for tope, mult := range altoTopes {
+		etiqueta := fmt.Sprintf("%d%%", tope)
+		if got := mults("alto", "clasico")[etiqueta]; got != mult {
+			t.Errorf("alto %s: el modal dice x%d, el motor paga x%d", etiqueta, got, mult)
+		}
+	}
+	for aciertos, mult := range kenoCfgs["clasico"].Tabla {
+		etiqueta := fmt.Sprintf("%d aciertos", aciertos)
+		if got := mults("keno", "clasico")[etiqueta]; got != mult {
+			t.Errorf("keno %s: el modal dice x%d, el motor paga x%d", etiqueta, got, mult)
+		}
+	}
 }
