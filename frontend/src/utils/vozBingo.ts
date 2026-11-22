@@ -55,7 +55,25 @@ export function presetPorId(id: string): PresetVoz {
 }
 
 function soportado(): boolean {
-  return typeof window !== 'undefined' && 'speechSynthesis' in window
+  // Se comprueba el valor y no solo la presencia: hay WebViews donde la
+  // propiedad existe pero esta indefinida, y ahi el canto tiene que caer en la
+  // voz nativa de la app.
+  return typeof window !== 'undefined' && typeof window.speechSynthesis !== 'undefined'
+}
+
+// La app Android abre los juegos en un WebView que NO trae Web Speech API: ahí la
+// voz la pone el TextToSpeech del sistema, inyectado como window.LottoVoz.
+declare global {
+  interface Window {
+    LottoVoz?: {
+      hablar: (texto: string, pitch: number, rate: number) => void
+      callar: () => void
+    }
+  }
+}
+
+function nativo(): boolean {
+  return typeof window !== 'undefined' && typeof window.LottoVoz?.hablar === 'function'
 }
 
 let vocesCache: SpeechSynthesisVoice[] = []
@@ -100,9 +118,16 @@ export function vocesDisponibles(): SpeechSynthesisVoice[] {
 
 /** Cantar una bolilla. Devuelve true si se pudo encolar la voz. */
 export function cantarBolilla(texto: string, presetId: string, forzar = false): boolean {
-  if (!soportado()) return false
   if (!forzar && silenciado()) return false
   const preset = presetPorId(presetId)
+  if (!soportado()) {
+    // WebView de la app Android: no hay Web Speech API, se usa el TTS nativo.
+    if (nativo()) {
+      window.LottoVoz!.hablar(texto, preset.pitch, preset.rate)
+      return true
+    }
+    return false
+  }
   const voz = elegirVoz(preset)
   window.speechSynthesis.cancel()
   const u = new SpeechSynthesisUtterance(texto)
@@ -116,6 +141,7 @@ export function cantarBolilla(texto: string, presetId: string, forzar = false): 
 }
 
 export function callar() {
+  if (nativo()) window.LottoVoz!.callar()
   if (!soportado()) return
   window.speechSynthesis.cancel()
 }

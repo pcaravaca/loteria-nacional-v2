@@ -91,6 +91,12 @@ const bolitasTablero = computed(() => {
   return out
 })
 
+// El pozo de bolillas es una tira ancha (15 columnas en el bingo de 75), no una
+// columna de 15 filas: antes reusaba las columnas del cartón y quedaba altísimo.
+const tableroColumnas = computed(() =>
+  Math.max(1, Math.round(cfg.value.bolillas / Math.max(1, cfg.value.columnas))),
+)
+
 // Casillas marcadas por cartón, según las bolillas cantadas. El centro es libre.
 const marcadas = computed<boolean[][][]>(() => {
   const grids = ronda.value?.grids ?? []
@@ -285,80 +291,82 @@ onUnmounted(() => {
 <template>
   <div class="bingo">
     <div class="bingo-head">
-      <div class="tombola" aria-hidden="true">
-        <div class="tambor">
-          <span v-for="(b, i) in bolitas" :key="i" class="bolita" :style="b"></span>
-        </div>
-        <div :key="bolilla" class="bola-grande">{{ etiqueta(bolilla) }}</div>
-      </div>
-      <div class="info">
-        <span class="nombre">{{ cfg.nombre }}</span>
-        <span>Saldo <b>{{ colones(saldo) }}</b></span>
-        <span>Apuesta <b>{{ colones(totalApuesta) }}</b></span>
-        <span>Premio <b>{{ colones(premio) }}</b></span>
-        <span v-if="auto && abierta" class="reloj">
-          Próxima en <b>{{ reloj.toFixed(1) }} s</b>
-        </span>
-        <span v-else-if="abierta" class="reloj pausa">Automático en pausa</span>
-      </div>
+      <span class="nombre">{{ cfg.nombre }}</span>
+      <span>Saldo <b>{{ colones(saldo) }}</b></span>
+      <span>Apuesta <b>{{ colones(totalApuesta) }}</b></span>
+      <span>Premio <b>{{ colones(premio) }}</b></span>
+      <span v-if="auto && abierta" class="reloj">Próxima en <b>{{ reloj.toFixed(1) }} s</b></span>
+      <span v-else-if="abierta" class="reloj pausa">Automático en pausa</span>
     </div>
 
-    <div
-      class="tablero"
-      :style="{ gridTemplateColumns: `repeat(${cfg.columnas}, minmax(0, 1fr))` }"
-    >
-      <button
-        v-for="n in bolitasTablero"
-        :key="n"
-        type="button"
-        class="casilla"
-        :class="{ 'resalta-ganador': cantadasSet.has(n), ultima: n === bolilla }"
-        disabled
-      >
-        {{ n }}
-      </button>
-    </div>
-
-    <div class="registro">
-      <span v-for="b in cantadas" :key="b" class="bola" :class="{ ultima: b === bolilla }">
-        {{ b }}
-      </span>
-      <span v-if="!cantadas.length" class="vacio">Todavía no se cantó ninguna bolilla</span>
-    </div>
-
-    <div v-if="ronda" class="cartones" :class="'n' + ronda.grids.length">
-      <div
-        v-for="(grid, n) in ronda.grids"
-        :key="n"
-        class="carton"
-        :class="{ lleno: tiers[n] === 25 }"
-      >
-        <div class="carton-head">
-          <span>Cartón {{ n + 1 }}</span>
-          <b v-if="tiers[n]">x{{ tiers[n] }}</b>
-        </div>
-        <div class="cab" :style="{ gridTemplateColumns: `repeat(${cfg.columnas}, 1fr)` }">
-          <span v-for="l in cfg.letras" :key="l">{{ l }}</span>
-        </div>
-        <div
-          v-for="(fila, r) in grid"
-          :key="r"
-          class="fila"
-          :style="{ gridTemplateColumns: `repeat(${cfg.columnas}, 1fr)` }"
-        >
-          <div
-            v-for="(num, c) in fila"
-            :key="c"
-            class="celda"
-            :class="{
-              libre: num === 0,
-              marcada: marcadas[n]?.[r]?.[c],
-              'resalta-ganador': ganadoras[n]?.has(r + ',' + c),
-            }"
-          >
-            <span v-if="num === 0">★</span>
-            <span v-else>{{ num }}</span>
+    <div class="bingo-cuerpo">
+      <div class="zap">
+        <div class="tombola" aria-hidden="true">
+          <div class="tambor">
+            <span v-for="(b, i) in bolitas" :key="i" class="bolita" :style="b"></span>
           </div>
+          <div :key="bolilla" class="bola-grande">{{ etiqueta(bolilla) }}</div>
+        </div>
+        <div class="registro">
+          <span v-for="b in cantadas" :key="b" class="bola" :class="{ ultima: b === bolilla }">
+            {{ b }}
+          </span>
+          <span v-if="!cantadas.length" class="vacio">Todavía no se cantó ninguna bolilla</span>
+        </div>
+      </div>
+
+      <div class="zona">
+        <div v-if="ronda" class="cartones" :class="'n' + ronda.grids.length">
+          <div
+            v-for="(grid, n) in ronda.grids"
+            :key="n"
+            class="carton"
+            :class="{ lleno: tiers[n] === 25 }"
+          >
+            <div class="carton-head">
+              <span>Cartón {{ n + 1 }}</span>
+              <b v-if="tiers[n]">x{{ tiers[n] }}</b>
+            </div>
+            <div class="cab" :style="{ gridTemplateColumns: `repeat(${cfg.columnas}, 1fr)` }">
+              <span v-for="l in cfg.letras" :key="l">{{ l }}</span>
+            </div>
+            <div
+              v-for="(fila, r) in grid"
+              :key="r"
+              class="fila"
+              :style="{ gridTemplateColumns: `repeat(${cfg.columnas}, 1fr)` }"
+            >
+              <div
+                v-for="(num, c) in fila"
+                :key="c"
+                class="celda"
+                :class="{
+                  libre: num === 0,
+                  marcada: marcadas[n]?.[r]?.[c],
+                  'resalta-ganador': ganadoras[n]?.has(r + ',' + c),
+                }"
+              >
+                <span v-if="num === 0">★</span>
+                <span v-else>{{ num }}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div
+          class="tablero"
+          :style="{ gridTemplateColumns: `repeat(${tableroColumnas}, minmax(0, 1fr))` }"
+        >
+          <button
+            v-for="n in bolitasTablero"
+            :key="n"
+            type="button"
+            class="casilla"
+            :class="{ 'resalta-ganador': cantadasSet.has(n), ultima: n === bolilla }"
+            disabled
+          >
+            {{ n }}
+          </button>
         </div>
       </div>
     </div>
@@ -427,15 +435,28 @@ onUnmounted(() => {
 
 <style scoped>
 .bingo { display: flex; flex-direction: column; gap: 10px; }
+
+/* Info arriba, en una sola fila: antes era una columna que ocupaba media pantalla. */
 .bingo-head {
   display: flex; align-items: center; gap: 14px; flex-wrap: wrap;
-  padding: 10px 12px; border-radius: 12px;
+  padding: 8px 12px; border-radius: 12px;
   background: rgba(3, 16, 12, .75); border: 1px solid rgba(232, 206, 122, .35);
+  font-size: 12px; color: var(--faint);
 }
+.bingo-head .nombre { font-size: 13px; font-weight: 700; color: var(--gold); margin-right: 4px; }
+.bingo-head b { color: var(--text); margin-left: 4px; }
+.bingo-head .reloj b { color: var(--prim-2); }
+.bingo-head .reloj.pausa { color: var(--muted); font-style: italic; }
+
+/* Tómbola a la par del cartón: el cartón era la sección más alta y se llevaba
+   todo el espacio vertical. */
+.bingo-cuerpo { display: flex; gap: 14px; align-items: flex-start; }
+.zap { flex: 0 0 148px; display: flex; flex-direction: column; gap: 10px; }
+.zona { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 10px; }
 
 /* Tómbola: tambor que gira con bolitas mezclándose y la bola cantada afuera. */
 .tombola {
-  position: relative; width: 132px; height: 132px; flex: 0 0 auto;
+  position: relative; width: 148px; height: 148px; margin: 0 auto;
   border-radius: 50%; overflow: hidden;
   background: radial-gradient(circle at 35% 30%, #1d3b2a, #0a1a12 70%);
   border: 3px solid rgba(232, 206, 122, .55);
@@ -448,12 +469,12 @@ onUnmounted(() => {
 }
 .tambor { position: absolute; inset: 0; animation: girar 7s linear infinite; }
 .bolita {
-  position: absolute; width: 16px; height: 16px; border-radius: 50%;
+  position: absolute; width: 17px; height: 17px; border-radius: 50%;
   transform: translate(-50%, -50%); box-shadow: inset -2px -2px 4px rgba(0, 0, 0, .35);
 }
 .bola-grande {
   position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
-  min-width: 74px; height: 74px; padding: 0 10px; border-radius: 50%;
+  min-width: 80px; height: 80px; padding: 0 10px; border-radius: 50%;
   display: grid; place-items: center; text-align: center;
   background: linear-gradient(180deg, #f5dd9a, #c9a227); color: #3a2a05;
   font-size: 22px; font-weight: 800; letter-spacing: .02em;
@@ -467,22 +488,7 @@ onUnmounted(() => {
   100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
 }
 
-.info { display: flex; flex-direction: column; gap: 3px; font-size: 12px; color: var(--faint); flex: 1 1 160px; }
-.info b { color: var(--text); margin-left: 4px; }
-.info .nombre { font-size: 13px; font-weight: 700; color: var(--gold); }
-.reloj b { color: var(--prim-2); }
-.reloj.pausa { color: var(--muted); font-style: italic; }
-
-.tablero { display: grid; gap: 3px; }
-.casilla {
-  height: 24px; border-radius: 6px; border: 1px solid var(--border-soft);
-  background: var(--surface); color: var(--muted); font-size: 11px; font-weight: 600;
-  cursor: default; padding: 0;
-}
-.casilla:disabled { opacity: 1; }
-.casilla.ultima { border-color: var(--gold); color: var(--gold); }
-
-.registro { display: flex; flex-wrap: wrap; gap: 5px; min-height: 28px; align-items: center; }
+.registro { display: flex; flex-wrap: wrap; gap: 5px; min-height: 28px; align-content: flex-start; }
 .bola {
   min-width: 28px; height: 28px; padding: 0 6px; border-radius: 999px; display: grid; place-items: center;
   background: var(--surface); border: 1px solid var(--border-soft); font-size: 12px; color: var(--muted);
@@ -490,26 +496,45 @@ onUnmounted(() => {
 .bola.ultima { background: var(--prim-dim); border-color: var(--prim); color: var(--prim-2); font-weight: 700; }
 .vacio { font-size: 12px; color: var(--faint); font-style: italic; }
 
+/* Cartón de papel: se ve como el cartón físico de salón, no como una tabla. */
 .cartones { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); }
-.cartones.n1 { grid-template-columns: minmax(210px, 260px); justify-content: center; }
-.cartones.n1.columnas9 { grid-template-columns: minmax(260px, 340px); }
+.cartones.n1 { grid-template-columns: minmax(210px, 300px); }
 .carton {
-  padding: 10px; border-radius: 14px; background: rgba(255, 255, 255, .03);
-  border: 1px solid var(--border-soft);
+  padding: 10px; border-radius: 6px;
+  background: linear-gradient(180deg, #f8f3e3, #e6dec6);
+  border: 1px solid #b9ad8c;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, .45), inset 0 0 40px rgba(120, 100, 60, .12);
 }
-.carton.lleno { border-color: var(--gold); box-shadow: 0 0 0 1px var(--gold), 0 0 24px rgba(245, 185, 66, .35); }
-.carton-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; font-size: 12px; color: var(--faint); }
-.carton-head b { color: var(--gold); font-size: 15px; }
+.carton.lleno { border-color: #c9a227; box-shadow: 0 0 0 1px #c9a227, 0 0 24px rgba(245, 185, 66, .4); }
+.carton-head {
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 6px; font-size: 11px; letter-spacing: .1em; text-transform: uppercase;
+  color: #7a6a3f; font-weight: 700;
+}
+.carton-head b { color: #8a6d1f; font-size: 14px; }
 .cab { display: grid; gap: 4px; margin-bottom: 4px; }
-.cab span { text-align: center; font-size: 11px; font-weight: 800; letter-spacing: .1em; color: var(--gold); }
+.cab span { text-align: center; font-size: 12px; font-weight: 800; letter-spacing: .18em; color: #8a6d1f; }
 .fila { display: grid; gap: 4px; }
 .celda {
-  height: 34px; border-radius: 8px; display: grid; place-items: center;
-  background: var(--surface); border: 1px solid var(--border-soft);
-  font-size: 13px; color: var(--text); transition: transform .12s, background .12s;
+  height: 34px; border-radius: 3px; display: grid; place-items: center;
+  background: #fffdf5; border: 1px solid #c8bd9c;
+  font-size: 14px; font-weight: 600; color: #2b2b2b;
+  transition: transform .12s, background .12s;
 }
-.celda.libre { background: var(--prim-dim); color: var(--prim-2); font-size: 15px; }
-.celda.marcada { background: rgba(16, 185, 129, .18); border-color: rgba(16, 185, 129, .5); color: var(--prim-2); font-weight: 700; }
+.celda.libre { background: #d8ecd9; color: #2f6b45; font-size: 16px; }
+.celda.marcada {
+  background: #1f8f5f; border-color: #126843; color: #fff; font-weight: 800;
+  box-shadow: inset 0 -2px 0 rgba(0, 0, 0, .18);
+}
+
+.tablero { display: grid; gap: 3px; }
+.casilla {
+  height: 22px; border-radius: 5px; border: 1px solid var(--border-soft);
+  background: var(--surface); color: var(--muted); font-size: 10.5px; font-weight: 600;
+  cursor: default; padding: 0;
+}
+.casilla:disabled { opacity: 1; }
+.casilla.ultima { border-color: var(--gold); color: var(--gold); }
 
 .resultado { text-align: center; padding: 10px; border-radius: 10px; background: rgba(0, 0, 0, .3); border: 1px solid var(--border-soft); font-size: 14px; color: var(--muted); }
 .resultado.gana { background: var(--prim-dim); border-color: rgba(16, 185, 129, .35); color: var(--prim-2); font-weight: 700; }
@@ -547,24 +572,20 @@ onUnmounted(() => {
   border-radius: 999px; padding: 6px 11px; font-size: 12px; font-weight: 700; cursor: pointer;
 }
 
-/* En pantallas chicas (celular y tableta vertical) los cartones y el tablero
-   pasan a ser la zona tactil principal: casillas mas altas y tipografia mas
-   legible, sin bajar la cantidad de info. */
-@media (max-width: 760px) {
-  .tombola { width: 116px; height: 116px; }
-  .bola-grande { min-width: 66px; height: 66px; font-size: 20px; }
-  .tablero { gap: 4px; }
-  .casilla { height: 34px; font-size: 13px; border-radius: 8px; }
-  .registro { gap: 6px; }
-  .bola { min-width: 32px; height: 32px; font-size: 13px; }
+/* En pantallas chicas la tómbola pasa a una fila propia arriba y el cartón ocupa
+   el ancho completo: mantenerla a la par lo aplastaría. */
+@media (max-width: 620px) {
+  .bingo-cuerpo { flex-direction: column; }
+  .zap { flex: 1 1 auto; flex-direction: row; align-items: center; width: 100%; }
+  .tombola { width: 118px; height: 118px; margin: 0; flex: 0 0 auto; }
+  .bola-grande { min-width: 68px; height: 68px; font-size: 20px; }
+  .registro { flex: 1 1 auto; }
   .cartones { grid-template-columns: 1fr; }
-  .carton { padding: 12px; }
-  .celda { height: 42px; font-size: 15px; border-radius: 10px; }
-  .cab span { font-size: 12px; }
+  .celda { height: 40px; font-size: 15px; border-radius: 4px; }
+  .cab span { font-size: 13px; }
+  .casilla { height: 26px; font-size: 11px; }
   .controles .btn { flex: 1 1 100%; }
-  .voz { padding: 10px; }
   .voz-chips { width: 100%; }
-  .voz-chip, .voz-probar { padding: 8px 12px; font-size: 12.5px; }
 }
 
 .error-text { color: #f87171; font-size: 12px; margin: 0; }

@@ -30,9 +30,10 @@ const filtro = ref('todos')
 const gruposVisibles = computed(() =>
   filtro.value === 'todos' ? grupos.value : grupos.value.filter((g) => g.id === filtro.value),
 )
+// NO mover la pagina al elegir un chip: el scrollIntoView anterior apuntaba a
+// la propia barra de filtros (sticky) y dejaba al usuario arriba del todo.
 function elegirFiltro(id: string) {
   filtro.value = id
-  document.getElementById('lista-juegos')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
 }
 
 async function elegirTema(codigo: TemaCasino) {
@@ -162,7 +163,7 @@ function detalleMultiplicador(r: CasinoRound): string {
         texto="Elegi un juego, hacé una apuesta y tu historial aparecera aqui."
       />
 
-      <div id="lista-juegos" class="chips-filtro" role="navigation" aria-label="Tipos de juego">
+      <div class="chips-filtro" role="navigation" aria-label="Tipos de juego">
         <button
           class="chip"
           :class="{ activo: filtro === 'todos' }"
@@ -254,6 +255,10 @@ function detalleMultiplicador(r: CasinoRound): string {
   display: flex;
   gap: 8px;
   overflow-x: auto;
+  /* Que la rueda sobre la barra de chips no se lleve puesto el scroll vertical
+     de la pagina. */
+  overscroll-behavior-x: contain;
+  overscroll-behavior-y: none;
   padding: 10px 2px 12px;
   background: var(--bg);
   scrollbar-width: none;

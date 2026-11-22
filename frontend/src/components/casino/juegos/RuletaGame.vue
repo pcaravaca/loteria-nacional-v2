@@ -45,6 +45,21 @@ watch(casillas, (cs) => {
   if (numero.value < 0) numero.value = 0
 })
 
+function aclarar(hex: string, t: number): string {
+  const n = parseInt(hex.slice(1), 16)
+  const r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255
+  const mez = (c: number) => Math.round(c + (255 - c) * t)
+  return `rgb(${mez(r)},${mez(g)},${mez(b)})`
+}
+function sombrear(hex: string, t: number): string {
+  const n = parseInt(hex.slice(1), 16)
+  const r = (n >> 16) & 255, g = (n >> 8) & 255, b = n & 255
+  const mez = (c: number) => Math.round(c * (1 - t))
+  return `rgb(${mez(r)},${mez(g)},${mez(b)})`
+}
+
+// Rueda realista: cuenco de madera y aro metalico fijos, rotor (casillas,
+// separadores, numeros y cono) que gira, y bola de marfil en el carril.
 function dibujar() {
   const cv = canvas.value
   if (!cv) return
@@ -59,61 +74,157 @@ function dibujar() {
     cv.height = want
   }
   const size = cv.width
-  const centro = size / 2
-  const radio = centro - 6
+  const C = size / 2
+  const R = C - 4
 
   ctx.clearRect(0, 0, size, size)
-  ctx.save()
-  ctx.translate(centro, centro)
 
-  // aro exterior
-  ctx.beginPath()
-  ctx.arc(0, 0, radio, 0, Math.PI * 2)
-  ctx.fillStyle = '#0d2a22'
-  ctx.fill()
-  ctx.lineWidth = 4
-  ctx.strokeStyle = '#c9a227'
-  ctx.stroke()
+  // ---- cuenco de madera (fijo)
+  let g = ctx.createRadialGradient(C, C, R * 0.72, C, C, R)
+  g.addColorStop(0, '#5a2f1c')
+  g.addColorStop(1, '#22100a')
+  ctx.beginPath(); ctx.arc(C, C, R, 0, Math.PI * 2); ctx.fillStyle = g; ctx.fill()
 
   ctx.save()
-  ctx.rotate(rotacion.value)
-  for (let i = 0; i < orden.value.length; i++) {
-    const casilla = orden.value[i]
-    const a0 = i * paso.value - Math.PI / 2
+  ctx.beginPath(); ctx.arc(C, C, R - 1, 0, Math.PI * 2); ctx.clip()
+  ctx.globalAlpha = 0.14
+  for (let i = 0; i < 40; i++) {
+    const rr = R * 0.74 + i * (R * 0.26 / 40)
     ctx.beginPath()
-    ctx.moveTo(0, 0)
-    ctx.arc(0, 0, radio - 8, a0, a0 + paso.value)
-    ctx.closePath()
-    ctx.fillStyle = colorDe(casilla)
-    ctx.fill()
-    ctx.strokeStyle = 'rgba(0,0,0,.5)'
-    ctx.lineWidth = 1
+    ctx.arc(C, C, rr, i * 0.7, i * 0.7 + 2.4)
+    ctx.strokeStyle = i % 2 ? '#7a452a' : '#3a1c10'
+    ctx.lineWidth = 1 + (i % 3)
     ctx.stroke()
-
-    ctx.save()
-    ctx.rotate(a0 + paso.value / 2)
-    ctx.fillStyle = casilla === '0' || casilla === '00' ? '#04140e' : '#f3f5f7'
-    ctx.font = 'bold 11px ui-sans-serif, system-ui'
-    ctx.textAlign = 'center'
-    ctx.fillText(casilla, radio - 22, 4)
-    ctx.restore()
   }
   ctx.restore()
+  ctx.globalAlpha = 1
 
-  // bolita fija en la parte superior
+  // ---- aro metalico (fijo)
+  const rOut = R * 0.99
+  const rIn = R * 0.855
+  g = ctx.createLinearGradient(C - R, C - R, C + R, C + R)
+  g.addColorStop(0, '#8a6a1f')
+  g.addColorStop(0.35, '#f4e2a0')
+  g.addColorStop(0.6, '#b8922f')
+  g.addColorStop(1, '#5e4712')
   ctx.beginPath()
-  ctx.arc(0, -radio + 2, 6, 0, Math.PI * 2)
-  ctx.fillStyle = '#f8fafc'
-  ctx.shadowColor = 'rgba(0,0,0,.6)'
-  ctx.shadowBlur = 6
+  ctx.arc(C, C, rOut, 0, Math.PI * 2)
+  ctx.arc(C, C, rIn, 0, Math.PI * 2, true)
+  ctx.fillStyle = g
   ctx.fill()
+  ctx.beginPath()
+  ctx.arc(C, C, (rOut + rIn) / 2, 0, Math.PI * 2)
+  ctx.strokeStyle = 'rgba(255,236,170,.55)'
+  ctx.lineWidth = Math.max(1.5, size * 0.006)
+  ctx.stroke()
+
+  // ---- rotor (gira)
+  ctx.save()
+  ctx.translate(C, C)
+  ctx.rotate(rotacion.value)
+
+  const rBol = R * 0.60
+  const n = orden.value.length
+
+  for (let i = 0; i < n; i++) {
+    const casilla = orden.value[i]
+    const a0 = i * paso.value - Math.PI / 2 - paso.value / 2
+    const a1 = a0 + paso.value
+    const base = colorDe(casilla)
+    ctx.beginPath()
+    ctx.arc(0, 0, rIn, a0, a1)
+    ctx.arc(0, 0, rBol, a1, a0, true)
+    ctx.closePath()
+    const rg = ctx.createRadialGradient(0, 0, rBol, 0, 0, rIn)
+    rg.addColorStop(0, sombrear(base, 0.45))
+    rg.addColorStop(0.55, base)
+    rg.addColorStop(1, aclarar(base, 0.18))
+    ctx.fillStyle = rg
+    ctx.fill()
+  }
+
+  // separadores dorados (en los bordes de las casillas, no en el centro)
+  ctx.strokeStyle = '#d9b45c'
+  ctx.lineWidth = Math.max(1.2, size * 0.005)
+  for (let i = 0; i < n; i++) {
+    const a = -Math.PI / 2 + i * paso.value - paso.value / 2
+    ctx.beginPath()
+    ctx.moveTo(Math.cos(a) * rBol, Math.sin(a) * rBol)
+    ctx.lineTo(Math.cos(a) * rIn, Math.sin(a) * rIn)
+    ctx.stroke()
+  }
+
+  // numeros de las casillas
+  ctx.fillStyle = '#f4f1e8'
+  ctx.font = `700 ${Math.max(8, Math.round(size * 0.042))}px ui-sans-serif, system-ui`
+  ctx.textAlign = 'center'
+  ctx.textBaseline = 'middle'
+  for (let i = 0; i < n; i++) {
+    const a = -Math.PI / 2 + i * paso.value
+    const rr = (rIn + rBol) / 2
+    ctx.save()
+    ctx.rotate(a)
+    ctx.translate(rr, 0)
+    ctx.rotate(Math.PI / 2)
+    ctx.fillText(orden.value[i], 0, 0)
+    ctx.restore()
+  }
+
+  // cono central
+  g = ctx.createRadialGradient(-R * 0.14, -R * 0.18, 4, 0, 0, rBol)
+  g.addColorStop(0, '#8a4a2c')
+  g.addColorStop(0.55, '#4a2415')
+  g.addColorStop(1, '#1d0d07')
+  ctx.beginPath(); ctx.arc(0, 0, rBol, 0, Math.PI * 2); ctx.fillStyle = g; ctx.fill()
+  ctx.beginPath()
+  ctx.arc(0, 0, rBol * 0.99, 0, Math.PI * 2)
+  ctx.strokeStyle = 'rgba(255,236,170,.4)'
+  ctx.lineWidth = Math.max(1, size * 0.004)
+  ctx.stroke()
+
+  // husillo
+  g = ctx.createLinearGradient(-size * 0.02, -size * 0.11, size * 0.02, size * 0.05)
+  g.addColorStop(0, '#f4e2a0')
+  g.addColorStop(0.5, '#b8922f')
+  g.addColorStop(1, '#5e4712')
+  ctx.beginPath()
+  ctx.moveTo(0, -R * 0.235)
+  ctx.quadraticCurveTo(R * 0.14, -R * 0.05, R * 0.08, R * 0.11)
+  ctx.lineTo(-R * 0.08, R * 0.11)
+  ctx.quadraticCurveTo(-R * 0.14, -R * 0.05, 0, -R * 0.235)
+  ctx.fillStyle = g
+  ctx.fill()
+
   ctx.restore()
+
+  // ---- bola de marfil en el carril exterior (fija, marca la casilla ganadora)
+  const rb = Math.max(4, size * 0.024)
+  const bx = C
+  const by = C - R * 0.92
+  ctx.beginPath()
+  ctx.ellipse(bx + rb * 0.35, by + rb * 0.45, rb, rb * 0.9, 0, 0, Math.PI * 2)
+  ctx.fillStyle = 'rgba(0,0,0,.35)'
+  ctx.fill()
+  g = ctx.createRadialGradient(bx - rb * 0.3, by - rb * 0.35, 1, bx, by, rb)
+  g.addColorStop(0, '#ffffff')
+  g.addColorStop(0.45, '#f0e9d6')
+  g.addColorStop(1, '#8d8574')
+  ctx.beginPath(); ctx.arc(bx, by, rb, 0, Math.PI * 2); ctx.fillStyle = g; ctx.fill()
+
+  // ---- luz superior
+  g = ctx.createRadialGradient(C - R * 0.35, C - R * 0.45, 10, C, C, R * 1.15)
+  g.addColorStop(0, 'rgba(255,255,255,.18)')
+  g.addColorStop(0.45, 'rgba(255,255,255,.05)')
+  g.addColorStop(1, 'rgba(0,0,0,.28)')
+  ctx.beginPath(); ctx.arc(C, C, R, 0, Math.PI * 2); ctx.fillStyle = g; ctx.fill()
 }
 
 function anguloFinal(casilla: string): number {
   const indice = orden.value.indexOf(casilla)
-  // Queremos la casilla en la parte superior (-PI/2).
-  const base = -Math.PI / 2 - indice * paso.value
+  // La casilla tiene que quedar bajo la bola (arriba, -PI/2). El centro de la
+  // casilla i en el rotor es `-PI/2 + i*paso`, asi que el giro necesario es
+  // exactamente `-i*paso`. (Antes sobraba un -PI/2 y la casilla quedaba ~90° corrida.)
+  const base = -indice * paso.value
   const vueltas = Math.PI * 2 * (4 + Math.floor(Math.random() * 2))
   // Normalizamos para que gire siempre hacia adelante.
   let destino = base + vueltas
