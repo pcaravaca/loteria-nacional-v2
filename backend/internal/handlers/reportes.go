@@ -70,20 +70,48 @@ func (h *ReportesHandler) Dashboard(c *gin.Context) {
 
 func (h *ReportesHandler) Movimientos(c *gin.Context) {
 	userID := c.GetUint("userID")
-	var movs []models.Movimiento
-	if err := h.db.Where("user_id = ?", userID).
-		Order("created_at desc").Limit(100).Find(&movs).Error; err != nil {
+	pagina, porPagina := leerPaginacion(c)
+
+	var total int64
+	if err := h.db.Model(&models.Movimiento{}).
+		Where("user_id = ?", userID).Count(&total).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "no se pudieron cargar los movimientos"})
 		return
 	}
-	c.JSON(http.StatusOK, movs)
+
+	var movs []models.Movimiento
+	err := h.db.Where("user_id = ?", userID).
+		Order("created_at desc").
+		Limit(porPagina).
+		Offset((pagina - 1) * porPagina).
+		Find(&movs).Error
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "no se pudieron cargar los movimientos"})
+		return
+	}
+	respuestaPagina(c, movs, total, pagina, porPagina)
 }
 
 func (h *ReportesHandler) Resultados(c *gin.Context) {
+	pagina, porPagina := leerPaginacion(c)
+
+	estadoCerrado := []string{models.SorteoCerrado, models.SorteoPagado}
+
+	var total int64
+	if err := h.db.Model(&models.Sorteo{}).
+		Where("estado IN ?", estadoCerrado).Count(&total).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "no se pudieron cargar los resultados"})
+		return
+	}
+
 	var sorteos []models.Sorteo
-	if err := h.db.Preload("Loteria").
-		Where("estado IN ?", []string{models.SorteoCerrado, models.SorteoPagado}).
-		Order("fecha desc").Limit(50).Find(&sorteos).Error; err != nil {
+	err := h.db.Preload("Loteria").
+		Where("estado IN ?", estadoCerrado).
+		Order("fecha desc").
+		Limit(porPagina).
+		Offset((pagina - 1) * porPagina).
+		Find(&sorteos).Error
+	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "no se pudieron cargar los resultados"})
 		return
 	}
@@ -101,6 +129,9 @@ func (h *ReportesHandler) Resultados(c *gin.Context) {
 
 	type fila struct {
 		Sorteo   models.Sorteo `json:"sorteo"`
+		Aposto   bool          `json:"aposto"`
+		Numeros  []int         `json:"numeros"`
+		Monto    int64         `json:"monto"`
 		Aciertos int           `json:"aciertos"`
 		Premio   int64         `json:"premio"`
 		Estado   string        `json:"estado_apuesta"`
@@ -110,14 +141,32 @@ func (h *ReportesHandler) Resultados(c *gin.Context) {
 	for _, s := range sorteos {
 		a, ok := aciertosPorSorteo[s.ID]
 		if !ok {
-			// Sorteo sin apuesta del usuario: se lista igual, con cero aciertos.
-			filas = append(filas, fila{Sorteo: s})
+			// Sorteo sin apuesta del usuario: se lista igual, con el aviso
+			// explicito de que no compró, para que no se lea como "0 aciertos".
+			filas = append(filas, fila{
+				Sorteo:  s,
+				Aposto:  false,
+				Numeros: []int{},
+				Estado:  "",
+			})
 			continue
 		}
-		filas = append(filas, fila{Sorteo: s, Aciertos: a.Aciertos, Premio: a.Premio, Estado: a.Estado})
+		nums := a.Numeros
+		if nums == nil {
+			nums = []int{}
+		}
+		filas = append(filas, fila{
+			Sorteo:   s,
+			Aposto:   true,
+			Numeros:  nums,
+			Monto:    a.Monto,
+			Aciertos: a.Aciertos,
+			Premio:   a.Premio,
+			Estado:   a.Estado,
+		})
 	}
 
-	c.JSON(http.StatusOK, gin.H{"resultados": filas, "sorteos": sorteos})
+	respuestaPagina(c, filas, total, pagina, porPagina)
 }
 
 func (h *ReportesHandler) Resumen(c *gin.Context) {

@@ -10,7 +10,9 @@ const routes = [
   { path: '/dashboard', name: 'dashboard', component: () => import('@/views/DashboardView.vue') },
   { path: '/loterias', name: 'loterias', component: () => import('@/views/LoteriasView.vue') },
   { path: '/quinielas', name: 'quinielas', component: () => import('@/views/QuinelasView.vue') },
-  { path: '/mis-apuestas', name: 'mis-apuestas', component: () => import('@/views/MisApuestasView.vue') },
+  // La historia de apuestas vive en Reportes; la ruta vieja redirige para no
+  // romper enlaces ya repartidos.
+  { path: '/mis-apuestas', redirect: () => ({ path: '/reportes', query: { tab: 'apuestas' } }) },
   { path: '/resultados', name: 'resultados', component: () => import('@/views/ResultadosView.vue') },
   { path: '/reportes', name: 'reportes', component: () => import('@/views/ReportesView.vue') },
   { path: '/casino', name: 'casino', component: () => import('@/views/CasinoView.vue') },

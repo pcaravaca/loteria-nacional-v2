@@ -2,12 +2,11 @@
 import { computed, onMounted, ref } from 'vue'
 import { api } from '@/api/client'
 import { useAuthStore } from '@/stores/auth'
-import type { Limites, Movimiento } from '@/types'
+import type { Limites } from '@/types'
 import { TIPOS_DOCUMENTO } from '@/types'
 import { colones, fechaHora } from '@/utils/formato'
 
 const auth = useAuthStore()
-const movimientos = ref<Movimiento[]>([])
 const cargando = ref(true)
 
 // Juego responsable e identificacion (KYC basico).
@@ -32,12 +31,8 @@ const tieneFoto = computed(() => !!auth.user?.tiene_foto)
 
 async function cargar() {
   try {
-    const [{ data }, estado] = await Promise.all([
-      api.get<Movimiento[]>('/movimientos'),
-      api.get<{ activa: boolean; hasta: string | null }>('/cuenta/autoexclusion'),
-    ])
-    movimientos.value = data
-    autoexclusion.value = estado.data
+    const { data: estado } = await api.get<{ activa: boolean; hasta: string | null }>('/cuenta/autoexclusion')
+    autoexclusion.value = estado
     tipoDocumento.value = auth.user?.tipo_documento ?? ''
     numeroDocumento.value = auth.user?.numero_documento ?? ''
     fechaNacimiento.value = auth.user?.fecha_nacimiento ?? ''
@@ -143,7 +138,7 @@ const etiquetas: Record<string, { texto: string; clase: string }> = {
       <h1>Mi perfil</h1>
     </div>
 
-    <div class="grid grid-2" style="align-items: start">
+    <div class="grid" style="align-items: start; max-width: 620px">
       <div class="card">
         <div style="display: flex; align-items: center; gap: 14px">
           <div class="avatar" style="width: 52px; height: 52px; font-size: 20px">
@@ -174,34 +169,12 @@ const etiquetas: Record<string, { texto: string; clase: string }> = {
         <p class="hint" style="margin-top: 16px">
           ¿Necesitas saldo? Contacta a un agente para recargar tu cuenta.
         </p>
+        <p class="hint" style="margin-top: 6px">
+          Tus movimientos de saldo y tus jugadas están en
+          <router-link class="link" to="/reportes?tab=movimientos">Reportes</router-link>.
+        </p>
       </div>
 
-      <div class="card">
-        <h3 style="font-size: 16px; margin-bottom: 12px">Movimientos de saldo</h3>
-        <div v-if="cargando" class="cargando"><span class="spinner"></span></div>
-        <div v-else-if="movimientos.length" class="grid" style="gap: 8px">
-          <div
-            v-for="m in movimientos"
-            :key="m.id"
-            style="display: flex; justify-content: space-between; gap: 10px; padding: 10px 0; border-bottom: 1px solid var(--border-soft)"
-          >
-            <div>
-              <span class="badge" :class="(etiquetas[m.tipo] ?? {}).clase">
-                {{ (etiquetas[m.tipo] ?? {}).texto ?? m.tipo }}
-              </span>
-              <div class="hint" style="margin-top: 4px">{{ m.descripcion }}</div>
-              <div class="hint" style="font-size: 11px">{{ fechaHora(m.created_at) }}</div>
-            </div>
-            <div
-              class="mono"
-              :style="{ color: m.monto >= 0 ? 'var(--prim-2)' : '#ff9b9b' }"
-            >
-              {{ m.monto >= 0 ? '+' : '' }}{{ colones(m.monto) }}
-            </div>
-          </div>
-        </div>
-        <p v-else class="hint">Sin movimientos todavía.</p>
-      </div>
     </div>
 
     <div class="card" style="margin-top: 20px">

@@ -1,30 +1,25 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
 import { api } from '@/api/client'
-import type { CasinoGame, CasinoRound, SemillaResponse } from '@/types'
+import type { CasinoGame, SemillaResponse } from '@/types'
 import { colones } from '@/utils/formato'
 import { alternarSfx, sfxHabilitado } from '@/utils/sfx'
 import { cartas, type CodigoJuego } from '@/assets/casino'
 import { TEMAS, type TemaCasino } from '@/assets/casino/temas'
 import { agruparJuegos } from '@/utils/casinoGrupos'
 import { useAuthStore } from '@/stores/auth'
-import Modal from '@/components/Modal.vue'
-import EmptyState from '@/components/EmptyState.vue'
 import CasinoGameModal from '@/components/casino/CasinoGameModal.vue'
 
 const juegos = ref<CasinoGame[]>([])
-const rondas = ref<CasinoRound[]>([])
 const cargando = ref(true)
 const error = ref('')
 const sonido = ref(sfxHabilitado())
 const abierto = ref<CasinoGame | null>(null)
 const clientSeed = ref('')
 const semillaHash = ref('')
-const verificando = ref<any | null>(null)
 const auth = useAuthStore()
 const tema = computed(() => auth.temaCasino)
 const grupos = computed(() => agruparJuegos(juegos.value))
-const rondasRecientes = computed(() => rondas.value.slice(0, 6))
 // Filtro por tipo de juego: evita tener que scrollear toda la lista.
 const filtro = ref('todos')
 const gruposVisibles = computed(() =>
@@ -44,15 +39,13 @@ async function cargar() {
   cargando.value = true
   error.value = ''
   try {
-    const [j, s, r] = await Promise.all([
+    const [j, s] = await Promise.all([
       api.get<CasinoGame[]>('/casino/games'),
       api.get<SemillaResponse>('/casino/seed'),
-      api.get<CasinoRound[]>('/casino/rounds'),
     ])
     juegos.value = j.data
     clientSeed.value = s.data.client_seed
     semillaHash.value = s.data.hash
-    rondas.value = r.data
   } catch (e: any) {
     error.value = e.message
   } finally {
@@ -62,17 +55,6 @@ async function cargar() {
 
 onMounted(cargar)
 
-async function verificar(ronda: CasinoRound) {
-  try {
-    // Cada fuente (casino_rondas, bingo_rondas, gemas_rondas) se verifica con
-    // su propio metodo; el endpoint unificado despacha segun `source`.
-    const source = ronda.source || 'casino'
-    const { data } = await api.get(`/casino/rounds/${ronda.id}/verify?source=${source}`)
-    verificando.value = data
-  } catch (e: any) {
-    error.value = e.message
-  }
-}
 
 // El multiplicador puede ser entero (dados x30), decimal (bingo x2.5, gemas
 // x0.5) o cero (ronda abierta o perdedora): se muestra con unidades claras y
@@ -84,12 +66,6 @@ function fmtMult(valor: number | undefined): string {
   return 'x' + redondeado.toFixed(2).replace(/0+$/, '').replace(/\.$/, '')
 }
 
-function detalleMultiplicador(r: CasinoRound): string {
-  const mult = fmtMult(r.multiplicador)
-  if (r.source === 'gemas' && r.puntos) return `${mult} · ${r.puntos} pts`
-  if (r.source === 'bingo' && r.lineas) return `${mult} · ${r.lineas} línea${r.lineas === 1 ? '' : 's'}`
-  return mult
-}
 </script>
 
 <template>
@@ -106,6 +82,7 @@ function detalleMultiplicador(r: CasinoRound): string {
         · <button class="link" @click="cargar">Rotar semilla</button>
         · <router-link class="link" to="/transparencia">Cómo verificamos · Provably Fair</router-link>
         · <button class="link" @click="sonido = alternarSfx()">{{ sonido ? '🔊 Sonido' : '🔇 Mudo' }}</button>
+        · <router-link class="link" to="/reportes?tab=jugadas">Tus jugadas y su verificacion</router-link>
       </p>
     </div>
 
@@ -133,36 +110,6 @@ function detalleMultiplicador(r: CasinoRound): string {
     <div v-if="cargando" class="cargando"><span class="spinner"></span> Cargando casino…</div>
 
     <template v-else>
-      <div class="section-title">Tus ultimas jugadas</div>
-      <div v-if="rondasRecientes.length" class="table-wrap historial-arriba">
-        <table class="table">
-          <thead>
-            <tr><th>Juego</th><th>Monto</th><th>Multipl</th><th>Premio</th><th>Fecha</th><th></th></tr>
-          </thead>
-          <tbody>
-            <tr v-for="r in rondasRecientes" :key="(r.source || 'casino') + '-' + r.id">
-              <td class="fuerte">{{ r.nombre || r.game }}</td>
-              <td class="mono">{{ colones(r.monto) }}</td>
-              <td class="mono">{{ detalleMultiplicador(r) }}</td>
-              <td class="mono" :style="{ color: r.premio > 0 ? 'var(--gold)' : 'var(--muted)' }">
-                {{ r.premio ? colones(r.premio) : '—' }}
-              </td>
-              <td>{{ new Date(r.created_at).toLocaleString('es-CR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) }}</td>
-              <td><button class="btn btn-ghost btn-sm" @click="verificar(r)">Verificar</button></td>
-            </tr>
-          </tbody>
-        </table>
-        <p v-if="rondas.length > rondasRecientes.length" class="mas-jugadas">
-          y {{ rondas.length - rondasRecientes.length }} jugadas mas en tu historial.
-        </p>
-      </div>
-      <EmptyState
-        v-else
-        icono="🎰"
-        titulo="Aun no jugaste en el casino"
-        texto="Elegi un juego, hacé una apuesta y tu historial aparecera aqui."
-      />
-
       <div class="chips-filtro" role="navigation" aria-label="Tipos de juego">
         <button
           class="chip"
@@ -219,30 +166,6 @@ function detalleMultiplicador(r: CasinoRound): string {
       @cerrar="abierto = null; cargar()"
     />
 
-    <Modal v-if="verificando" titulo="Verificacion provably fair" @cerrar="verificando = null">
-      <div class="verif">
-        <p class="linea"><span>Ronda</span><b>#{{ verificando.ronda_id }}</b></p>
-        <p class="linea"><span>Juego</span><b>{{ verificando.nombre || verificando.juego }}</b></p>
-        <p v-if="verificando.puntos" class="linea"><span>Puntos</span><b>{{ verificando.puntos }}</b></p>
-        <p v-if="verificando.lineas" class="linea"><span>Líneas</span><b>{{ verificando.lineas }}</b></p>
-        <p class="linea"><span>Nonce</span><b>{{ verificando.nonce }}</b></p>
-        <p class="linea"><span>Client seed</span><b class="mono">{{ verificando.client_seed }}</b></p>
-        <p class="linea"><span>Server seed</span><b class="mono">{{ verificando.server_seed }}</b></p>
-        <p class="linea"><span>Hash</span><b class="mono">{{ verificando.server_seed_hash }}</b></p>
-        <p class="linea">
-          <span>Coincide</span>
-          <b :style="{ color: verificando.verificado ? 'var(--prim-2)' : '#ff9b9b' }">
-            {{ verificando.verificado ? 'SI' : 'NO' }}
-          </b>
-        </p>
-        <p class="nota">
-          Reproducibles con HMAC-SHA256(server_seed, "client_seed:nonce:i") en cada posicion.
-        </p>
-      </div>
-      <template #acciones>
-        <button class="btn btn-primary" @click="verificando = null">Cerrar</button>
-      </template>
-    </Modal>
   </div>
 </template>
 

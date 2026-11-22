@@ -132,14 +132,27 @@ func (h *ApuestasHandler) Crear(c *gin.Context) {
 
 func (h *ApuestasHandler) Mias(c *gin.Context) {
 	userID := c.GetUint("userID")
-	var apuestas []models.Apuesta
-	if err := h.db.Preload("Sorteo.Loteria").
-		Where("user_id = ?", userID).
-		Order("created_at desc").Limit(100).Find(&apuestas).Error; err != nil {
+	pagina, porPagina := leerPaginacion(c)
+
+	var total int64
+	if err := h.db.Model(&models.Apuesta{}).
+		Where("user_id = ?", userID).Count(&total).Error; err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "no se pudieron cargar las apuestas"})
 		return
 	}
-	c.JSON(http.StatusOK, apuestas)
+
+	var apuestas []models.Apuesta
+	err := h.db.Preload("Sorteo.Loteria").
+		Where("user_id = ?", userID).
+		Order("created_at desc").
+		Limit(porPagina).
+		Offset((pagina - 1) * porPagina).
+		Find(&apuestas).Error
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "no se pudieron cargar las apuestas"})
+		return
+	}
+	respuestaPagina(c, apuestas, total, pagina, porPagina)
 }
 
 func uniqCount(nums []int) int {

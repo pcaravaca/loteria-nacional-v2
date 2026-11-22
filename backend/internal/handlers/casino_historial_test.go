@@ -73,11 +73,13 @@ func (e *historialTestEnv) rounds(t *testing.T) []RondaHistorial {
 	if w.Code != http.StatusOK {
 		t.Fatalf("rounds respondio %d: %s", w.Code, w.Body.String())
 	}
-	var out []RondaHistorial
+	var out struct {
+		Items []RondaHistorial `json:"items"`
+	}
 	if err := json.Unmarshal(w.Body.Bytes(), &out); err != nil {
 		t.Fatalf("decode rounds: %v", err)
 	}
-	return out
+	return out.Items
 }
 
 func (e *historialTestEnv) verify(t *testing.T, id uint, source string) *httptest.ResponseRecorder {

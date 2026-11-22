@@ -1,11 +1,22 @@
 <script setup lang="ts">
-import { onMounted, ref } from 'vue'
+import { onMounted, ref, watch } from 'vue'
 import { api } from '@/api/client'
 import type { Apuesta } from '@/types'
 import { colones, estadoApuesta, fechaHora } from '@/utils/formato'
-import EmptyState from '@/components/EmptyState.vue'
+import Paginador from './Paginador.vue'
 
-const apuestas = ref<Apuesta[]>([])
+interface Pagina<T> {
+  items: T[]
+  total: number
+  pagina: number
+  por_pagina: number
+  paginas: number
+}
+
+const items = ref<Apuesta[]>([])
+const pagina = ref(1)
+const paginas = ref(1)
+const total = ref(0)
 const cargando = ref(true)
 const error = ref('')
 
@@ -14,30 +25,33 @@ function esAcierto(a: Apuesta, n: number): boolean {
   return !!a.sorteo?.numeros_ganadores?.includes(n)
 }
 
-onMounted(async () => {
+async function cargar() {
+  cargando.value = true
+  error.value = ''
   try {
-    const { data } = await api.get<Apuesta[]>('/apuestas/mias')
-    apuestas.value = data
+    const { data } = await api.get<Pagina<Apuesta>>(
+      `/apuestas/mias?pagina=${pagina.value}&por_pagina=20`,
+    )
+    items.value = data.items
+    paginas.value = data.paginas
+    total.value = data.total
   } catch (e: any) {
     error.value = e.message
   } finally {
     cargando.value = false
   }
-})
+}
+
+onMounted(cargar)
+watch(pagina, cargar)
 </script>
 
 <template>
   <div>
-    <div class="page-head">
-      <div class="eyebrow">Historial</div>
-      <h1>Mis apuestas</h1>
-      <p>Todas tus jugadas, con su estado y premios.</p>
-    </div>
-
     <div v-if="cargando" class="cargando"><span class="spinner"></span> Cargando…</div>
     <p v-else-if="error" class="error-text">{{ error }}</p>
 
-    <div v-else-if="apuestas.length" class="table-wrap">
+    <div v-else-if="items.length" class="table-wrap">
       <table class="table">
         <thead>
           <tr>
@@ -51,7 +65,7 @@ onMounted(async () => {
           </tr>
         </thead>
         <tbody>
-          <tr v-for="a in apuestas" :key="a.id">
+          <tr v-for="a in items" :key="a.id">
             <td class="fuerte">{{ a.sorteo?.titulo ?? 'Sorteo' }}</td>
             <td>
               <span class="numeros">
@@ -78,16 +92,15 @@ onMounted(async () => {
           </tr>
         </tbody>
       </table>
+      <Paginador
+        :pagina="pagina"
+        :paginas="paginas"
+        :total="total"
+        @cambiar="pagina = $event"
+      />
     </div>
 
-    <EmptyState
-      v-else
-      icono="🎟"
-      titulo="Sin apuestas todavia"
-      texto="Cuando juegues tu primera apuesta aparecerá aquí."
-    >
-      <router-link to="/loterias" class="btn btn-primary btn-sm" style="margin-top: 14px">Ver sorteos</router-link>
-    </EmptyState>
+    <p v-else class="hint">Todavía no tenés apuestas de sorteos.</p>
   </div>
 </template>
 

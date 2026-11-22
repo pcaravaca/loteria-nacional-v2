@@ -371,6 +371,28 @@ func (h *CasinoHandler) historialRondas(userID uint, limite int) []RondaHistoria
 	return filas
 }
 
+// totalHistorial cuenta las jugadas del usuario en todas las fuentes del
+// historial unificado. Se usa para la paginacion: el corte de la pagina se
+// hace sobre el resultado mezclado, no por fuente.
+func (h *CasinoHandler) totalHistorial(userID uint) int64 {
+	var total int64
+	fuentes := []any{
+		&models.CasinoRound{},
+		&models.BingoRonda{},
+		&models.GemasRonda{},
+		&models.BlackjackMano{},
+		&models.DominoRonda{},
+		&models.AjedrezRonda{},
+		&models.AjedrezPartida{},
+		&models.BackgammonRonda{},
+		&models.TetrisRonda{},
+	}
+	for _, f := range fuentes {
+		total += contarPorUsuario(h.db, f, userID)
+	}
+	return total
+}
+
 // Verify es el endpoint unificado de verificacion. Acepta `?source=casino`,
 // `?source=bingo` o `?source=gemas`; sin `source` busca la ronda en las tres
 // fuentes (casero para el cliente viejo).

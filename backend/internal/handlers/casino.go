@@ -337,10 +337,27 @@ func (h *CasinoHandler) Play(c *gin.Context) {
 }
 
 // Rounds devuelve el historial de jugadas del usuario, unificado: las de
-// casino_rondas, bingo_rondas y gemas_rondas. Ver casino_historial.go.
+// casino_rondas, bingo_rondas, gemas_rondas y las mesas. Ver casino_historial.go.
+// Se pagina con `pagina` y `por_pagina` porque las fuentes son varias y el
+// corte se hace sobre el resultado mezclado.
 func (h *CasinoHandler) Rounds(c *gin.Context) {
 	userID := c.GetUint("userID")
-	c.JSON(http.StatusOK, h.historialRondas(userID, 100))
+	pagina, porPagina := leerPaginacion(c)
+	// Cada fuente trae las filas que alcanzan para llenar hasta esta pagina;
+	// el mezclado deja las mas recientes primero y el corte final es la pagina
+	// pedida (no las primeras `por_pagina` filas: eso repetiria la pagina 1).
+	filas := h.historialRondas(userID, porPagina*pagina)
+	desde := (pagina - 1) * porPagina
+	hasta := pagina * porPagina
+	switch {
+	case desde >= len(filas):
+		filas = nil
+	case hasta > len(filas):
+		filas = filas[desde:]
+	default:
+		filas = filas[desde:hasta]
+	}
+	respuestaPagina(c, filas, h.totalHistorial(userID), pagina, porPagina)
 }
 
 // Stats devuelve totales por juego (solo admin).
