@@ -168,6 +168,25 @@ func (h *CasinoHandler) BingoStart(c *gin.Context) {
 	if variante == "" {
 		variante = models.CasinoBingo
 	}
+	// Una sola jugada abierta por jugador. Si es de la misma variante se retoma
+	// (sin cobrar de nuevo); si es de otra, se avisa en cuál quedó para no
+	// cobrar otra apuesta ni mezclar rondas de modalidades distintas.
+	if ronda, ok := bingoReanudar(h.db, user.ID, ""); ok {
+		if ronda.Variante == variante {
+			h.bingoRepetida(c, ronda, true)
+			return
+		}
+		nombre := ronda.Variante
+		if v, ok := casino.BingoVariantePorCodigo(ronda.Variante); ok {
+			nombre = v.Nombre
+		}
+		c.JSON(http.StatusConflict, gin.H{
+			"error":    "ya tenés una jugada abierta en " + nombre + "; cerrala o seguila ahí",
+			"ronda_id": ronda.ID,
+			"variante": ronda.Variante,
+		})
+		return
+	}
 	if _, ok := casino.BingoVariantePorCodigo(variante); !ok {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "variante de bingo invalida: " + variante})
 		return

@@ -57,12 +57,20 @@ func saldoDe(db *gorm.DB, userID uint, respaldo int64) int64 {
 	return respaldo
 }
 
-// bingoReanudar busca la ultima ronda abierta del jugador. Devuelve falso si no
-// hay ninguna: el front arranca una jugada nueva.
-func bingoReanudar(db *gorm.DB, userID uint) (models.BingoRonda, bool) {
+// bingoReanudar busca la ultima ronda abierta del jugador para una variante.
+// Sin variante, solo la base (bingo). Devuelve falso si no hay ninguna: el
+// front arranca una jugada nueva.
+//
+// El filtro por variante es lo que evita el aviso espureo: antes devolvia la
+// ultima ronda abierta de CUALQUIER bingo y el jugador veia "se retomo la
+// jugada" (con una ronda ajena) al abrir una modalidad distinta.
+func bingoReanudar(db *gorm.DB, userID uint, variante string) (models.BingoRonda, bool) {
 	var ronda models.BingoRonda
-	err := db.Where("user_id = ? AND estado = ?", userID, "abierta").
-		Order("created_at desc").First(&ronda).Error
+	q := db.Where("user_id = ? AND estado = ?", userID, "abierta")
+	if variante != "" {
+		q = q.Where("variante = ?", variante)
+	}
+	err := q.Order("created_at desc").First(&ronda).Error
 	if err != nil {
 		return ronda, false
 	}
@@ -70,11 +78,16 @@ func bingoReanudar(db *gorm.DB, userID uint) (models.BingoRonda, bool) {
 }
 
 // BingoReanudarHandler devuelve la ronda abierta del jugador para que la app
-// la retome si se corto la conexion a mitad de jugada. Sin ronda abierta,
-// responde 204 y el front sigue como antes.
+// la retome si se corto la conexion a mitad de jugada. Acepta ?variante= para
+// no mezclar modalidades. Sin ronda abierta, responde 200 con reanudar=false
+// y el front sigue como antes.
 func (h *CasinoHandler) BingoReanudarHandler(c *gin.Context) {
 	userID := c.GetUint("userID")
-	ronda, ok := bingoReanudar(h.db, userID)
+	variante := c.Query("variante")
+	if variante == "" {
+		variante = models.CasinoBingo
+	}
+	ronda, ok := bingoReanudar(h.db, userID, variante)
 	if !ok {
 		c.JSON(http.StatusOK, gin.H{"reanudar": false, "ronda": nil})
 		return

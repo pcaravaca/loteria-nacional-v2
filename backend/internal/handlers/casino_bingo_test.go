@@ -292,8 +292,13 @@ func TestBingoCantidadesLimite(t *testing.T) {
 	if w.Code != http.StatusCreated {
 		t.Fatalf("start respondio %d: %s", w.Code, w.Body.String())
 	}
-	if res := decodearBingo(t, w); res.Cartones != 1 {
+	res := decodearBingo(t, w)
+	if res.Cartones != 1 {
 		t.Errorf("cartones 0 deberia redondear a 1, fue %d", res.Cartones)
+	}
+	// Solo una jugada abierta por vez: para probar otro start hay que cerrar.
+	if w := env.close(res.RondaID); w.Code != http.StatusOK {
+		t.Fatalf("close respondio %d: %s", w.Code, w.Body.String())
 	}
 
 	w = env.start(map[string]any{"monto": 500, "cartones": 9})
@@ -604,4 +609,86 @@ func nombreBase(nombre string) string {
 		}
 	}
 	return string(out)
+}
+
+// reanudarVariante llama a /casino/bingo/abierta con la modalidad que abre el
+// jugador: el front lo hace asi para no retomar una ronda de otro bingo.
+func (e *bingoTestEnv) reanudarVariante(variante string) *httptest.ResponseRecorder {
+	c, w := e.contexto("GET", "/casino/bingo/abierta?variante="+variante, nil, gin.Params{})
+	e.h.BingoReanudarHandler(c)
+	return w
+}
+
+// decodearReanudar lee la respuesta del handler de ronda abierta.
+func decodearReanudar(t *testing.T, w *httptest.ResponseRecorder) (uint, bool) {
+	t.Helper()
+	var out struct {
+		Reanudar bool           `json:"reanudar"`
+		Ronda    bingoRespuesta `json:"ronda"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &out); err != nil {
+		t.Fatalf("decode %s: %v", w.Body.String(), err)
+	}
+	return out.Ronda.RondaID, out.Reanudar
+}
+
+// TestBingoUnaSolaJugadaAbierta verifica que no se pueden acumular jugadas
+// abiertas cobradas: la misma variante se retoma y otra distinta se niega.
+func TestBingoUnaSolaJugadaAbierta(t *testing.T) {
+	env := nuevoBingoTestEnv(t)
+	w := env.start(map[string]any{"monto": 500, "cartones": 1, "variante": "bingo"})
+	if w.Code != http.StatusCreated {
+		t.Fatalf("start respondio %d: %s", w.Code, w.Body.String())
+	}
+	primera := decodearBingo(t, w)
+
+	// Misma modalidad: retoma la jugada, no cobra otra apuesta.
+	w = env.start(map[string]any{"monto": 500, "cartones": 1, "variante": "bingo"})
+	if w.Code != http.StatusOK {
+		t.Fatalf("retomar la misma variante respondio %d: %s", w.Code, w.Body.String())
+	}
+	var repetida struct {
+		Repetida bool           `json:"repetida"`
+		Resumen  bingoRespuesta `json:"resumen"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &repetida); err != nil {
+		t.Fatalf("decode %s: %v", w.Body.String(), err)
+	}
+	if !repetida.Repetida || repetida.Resumen.RondaID != primera.RondaID {
+		t.Errorf("no retomo la jugada propia: %s", w.Body.String())
+	}
+	if env.saldo() != 49500 {
+		t.Errorf("retomar la misma variante volvio a cobrar: saldo %d", env.saldo())
+	}
+
+	// Otra modalidad: se niega y no deja la segunda ronda abierta.
+	w = env.start(map[string]any{"monto": 500, "cartones": 1, "variante": "bingo90"})
+	if w.Code != http.StatusConflict {
+		t.Fatalf("abrir otra variante respondio %d: %s", w.Code, w.Body.String())
+	}
+	var filas int64
+	env.db.Model(&models.BingoRonda{}).Count(&filas)
+	if filas != 1 {
+		t.Errorf("quedaron %d rondas abiertas; debia quedar 1", filas)
+	}
+	if env.saldo() != 49500 {
+		t.Errorf("la negativa cobro igual: saldo %d", env.saldo())
+	}
+}
+
+// TestBingoAbiertaPorVariante verifica que el handler no entrega una ronda de
+// otra modalidad (era la causa del aviso "se retomo la jugada" en todos lados).
+func TestBingoAbiertaPorVariante(t *testing.T) {
+	env := nuevoBingoTestEnv(t)
+	w := env.start(map[string]any{"monto": 500, "cartones": 1, "variante": "bingo-esquinas"})
+	res := decodearBingo(t, w)
+
+	w = env.reanudarVariante("bingo-esquinas")
+	if id, ok := decodearReanudar(t, w); !ok || id != res.RondaID {
+		t.Errorf("la propia modalidad no se retomo: id=%d ok=%v", id, ok)
+	}
+	w = env.reanudarVariante("bingo90")
+	if _, ok := decodearReanudar(t, w); ok {
+		t.Errorf("entrego una ronda de otra modalidad: %s", w.Body.String())
+	}
 }

@@ -338,7 +338,12 @@ function nueva() {
 // se retoma en vez de perder la apuesta.
 async function recuperar() {
   try {
-    const { data } = await api.get<{ ronda?: BingoEstado }>('/casino/bingo/abierta')
+    // Solo se retoma la jugada abierta de ESTA modalidad: si el jugador tiene
+    // una ronda colgada en otro bingo, no corresponde mostrarla aca.
+    const variante = props.variante ?? 'bingo'
+    const { data } = await api.get<{ ronda?: BingoEstado }>(
+      `/casino/bingo/abierta?variante=${encodeURIComponent(variante)}`,
+    )
     if (!data?.ronda) return
     ronda.value = data.ronda
     reanudando.value = true
