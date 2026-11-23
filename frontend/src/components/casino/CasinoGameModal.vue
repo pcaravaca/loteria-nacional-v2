@@ -800,5 +800,25 @@ function repetir() {
   .rapidos .chip { padding: 4px 7px; font-size: 10.5px; }
   .saldo { font-size: 11px; }
   .hero { display: none; }
+  /* En el telefono la guia y la nota ya no caben: el carton y el tablero
+     mandan. La guia sigue disponible en pantallas grandes. */
+  .guia-detalle, .nota { display: none; }
+}
+
+/* Tablet y PC chica: el modal base solo se compacta en <=640 px; aca baja la
+   marquesina, la apuesta y los montos rapidos para que el tablero gane lugar. */
+@media (min-width: 641px) and (max-width: 1100px) {
+  .casino-modal { gap: 8px; }
+  .tema-marquesina { padding: 6px 12px; font-size: 11.5px; letter-spacing: .08em; }
+  .apuesta { gap: 8px; }
+  .monto { padding: 6px; }
+  .rapidos { gap: 6px; }
+  .rapidos .chip { padding: 5px 9px; font-size: 11.5px; }
+}
+
+/* Pantallas bajas (portatil chico): achicar tambien el tablero del juego. */
+@media (max-height: 820px) {
+  .guia-detalle { display: none; }
+  .nota { display: none; }
 }
 </style>

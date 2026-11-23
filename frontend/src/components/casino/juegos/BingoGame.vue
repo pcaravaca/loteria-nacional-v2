@@ -383,12 +383,6 @@ onUnmounted(() => {
           <div :key="bolilla" class="bola-grande">{{ etiqueta(bolilla) }}</div>
           <div v-if="jergaBolilla(bolilla)" class="jerga">{{ jergaBolilla(bolilla) }}</div>
         </div>
-        <div class="registro">
-          <span v-for="b in cantadas" :key="b" class="bola" :class="{ ultima: b === bolilla }">
-            {{ b }}
-          </span>
-          <span v-if="!cantadas.length" class="vacio">Todavía no se cantó ninguna bolilla</span>
-        </div>
       </div>
 
       <div class="zona">
@@ -530,12 +524,12 @@ onUnmounted(() => {
 /* Tómbola a la par del cartón: el cartón era la sección más alta y se llevaba
    todo el espacio vertical. */
 .bingo-cuerpo { display: flex; gap: 14px; align-items: flex-start; }
-.zap { flex: 0 0 148px; display: flex; flex-direction: column; gap: 10px; }
+.zap { flex: 0 0 132px; display: flex; flex-direction: column; gap: 10px; }
 .zona { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 10px; }
 
 /* Tómbola: tambor que gira con bolitas mezclándose y la bola cantada afuera. */
 .tombola {
-  position: relative; width: 148px; height: 148px; margin: 0 auto;
+  position: relative; width: 132px; height: 132px; margin: 0 auto;
   border-radius: 50%; overflow: hidden;
   background: radial-gradient(circle at 35% 30%, #1d3b2a, #0a1a12 70%);
   border: 3px solid rgba(232, 206, 122, .55);
@@ -573,14 +567,6 @@ onUnmounted(() => {
   70% { transform: translate(-50%, -50%) scale(1.12); opacity: 1; }
   100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
 }
-
-.registro { display: flex; flex-wrap: wrap; gap: 5px; min-height: 28px; align-content: flex-start; }
-.bola {
-  min-width: 28px; height: 28px; padding: 0 6px; border-radius: 999px; display: grid; place-items: center;
-  background: var(--surface); border: 1px solid var(--border-soft); font-size: 12px; color: var(--muted);
-}
-.bola.ultima { background: var(--prim-dim); border-color: var(--prim); color: var(--prim-2); font-weight: 700; }
-.vacio { font-size: 12px; color: var(--faint); font-style: italic; }
 
 /* Cartón de papel: se ve como el cartón físico de salón, no como una tabla. */
 .cartones { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); }
@@ -659,26 +645,64 @@ onUnmounted(() => {
 }
 
 /* Variante C (elegida por Peter): en pantallas chicas la tómbola se achica a
-   104 px y se pone a la par del registro, el cartón ocupa el ancho completo con
-   celdas altas y el bolillero queda como tira: entra todo sin scrollear. */
+   104 px y se pone arriba del cartón (el registro de bolillas se sacó: era
+   redundante con el tablero 1-75), el cartón ocupa el ancho completo con celdas
+   altas y el bolillero queda como tira: entra todo sin scrollear. */
 @media (max-width: 620px) {
-  .bingo { gap: 8px; }
-  .bingo-head { gap: 10px; padding: 6px 10px; font-size: 11.5px; }
+  .bingo { gap: 6px; }
+  .bingo-head { gap: 8px; padding: 5px 10px; font-size: 11px; }
+  .bingo-cuerpo { flex-direction: column; gap: 6px; }
+  .zap { flex: 1 1 auto; flex-direction: row; align-items: center; gap: 8px; width: 100%; }
+  .tombola { width: 92px; height: 92px; margin: 0; flex: 0 0 auto; }
+  .bola-grande { min-width: 48px; height: 48px; font-size: 14px; }
+  .jerga { font-size: 10.5px; }
+  .zona { gap: 6px; }
+  .cartones { grid-template-columns: 1fr; gap: 6px; }
+  .carton { padding: 7px; }
+  .carton-head { font-size: 11px; margin-bottom: 4px; }
+  .carton { display: flex; flex-direction: column; gap: 3px; }
+  .cab { gap: 3px; margin-bottom: 0; }
+  .cab span { font-size: 12px; }
+  .fila { gap: 3px; }
+  .celda { height: 40px; font-size: 15px; border-radius: 4px; }
+  .celda.libre { font-size: 15px; }
+  .tablero { gap: 2px; }
+  .casilla { height: 20px; font-size: 10px; border-radius: 4px; }
+  /* Los tres botones en una fila: antes cada uno ocupaba una linea entera. */
+  .controles { gap: 6px; }
+  .controles .btn { flex: 1 1 0; min-width: 0; padding: 8px 4px; font-size: 11.5px; }
+  .selector { gap: 5px; }
+  .selector button { width: 34px; height: 30px; }
+  .paytable { font-size: 10.5px; }
+  /* La voz como tira de una fila scrolleable, no dos filas de chips. */
+  .voz { flex-wrap: nowrap; gap: 6px; padding: 6px 8px; overflow-x: auto; }
+  .voz-etq { flex: none; font-size: 10px; }
+  .voz-chips { flex-wrap: nowrap; width: auto; gap: 5px; }
+  .voz-chip, .voz-probar { padding: 4px 9px; font-size: 11px; flex: none; }
+}
+
+
+/* Tablet / PC chica: el carton necesita el ancho completo, asi que la tombola
+   pasa a una fila arriba del carton (igual que en el telefono, con tamanos
+   intermedios). */
+@media (min-width: 621px) and (max-width: 900px) {
   .bingo-cuerpo { flex-direction: column; gap: 8px; }
-  .zap { flex: 1 1 auto; flex-direction: row; align-items: center; gap: 10px; width: 100%; }
-  .tombola { width: 104px; height: 104px; margin: 0; flex: 0 0 auto; }
-  .bola-grande { min-width: 52px; height: 52px; font-size: 15px; }
-  .registro { flex: 1 1 auto; gap: 4px; }
-  .bola { min-width: 24px; height: 24px; padding: 0 5px; font-size: 11px; }
-  .zona { gap: 8px; }
-  .cartones { grid-template-columns: 1fr; gap: 8px; }
-  .carton { padding: 8px; }
-  .celda { height: 44px; font-size: 16px; border-radius: 4px; }
-  .cab span { font-size: 13px; }
-  .casilla { height: 24px; font-size: 10.5px; }
-  .controles .btn { flex: 1 1 100%; }
-  .voz { padding: 6px 8px; }
-  .voz-chips { width: 100%; }
+  .zap { flex: 1 1 auto; flex-direction: row; align-items: center; gap: 12px; width: 100%; }
+  .tombola { margin: 0; flex: 0 0 auto; }
+  .cartones { grid-template-columns: repeat(auto-fit, minmax(240px, 320px)); }
+  .celda { height: 38px; }
+  .casilla { height: 22px; }
+}
+
+/* Pantallas bajas: carton y tablero mas finos para que entre la jugada. */
+@media (max-height: 820px) {
+  .bingo-head { padding: 5px 10px; font-size: 11px; }
+  .celda { height: 34px; font-size: 14px; }
+  .casilla { height: 20px; font-size: 10px; }
+  .controles .btn { min-height: 38px; padding: 8px 6px; font-size: 12px; }
+  .voz { flex-wrap: nowrap; gap: 6px; overflow-x: auto; }
+  .voz-chips { flex-wrap: nowrap; }
+  .voz-chip, .voz-probar { flex: none; }
 }
 
 .error-text { color: #f87171; font-size: 12px; margin: 0; }
