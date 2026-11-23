@@ -47,6 +47,16 @@ const cargando = ref(true)
 const error = ref('')
 
 const abierta = ref<RifaCard | null>(null)
+
+function textoBotonRifa(r: RifaCard): string {
+  if (r.estado === 'pendiente') return 'Pendiente'
+  if (r.vencida) return 'Vencida'
+  return 'Jugar'
+}
+
+function deshabilitadoRifa(r: RifaCard): boolean {
+  return r.vencida || r.estado === 'pendiente'
+}
 const numeros = ref<NumeroRifa[]>([])
 const elegidos = ref<number[]>([])
 const cargandoDetalle = ref(false)
@@ -163,9 +173,9 @@ const totalCompra = computed(() =>
             <h3 style="font-size:17px">{{ r.titulo }}</h3>
             <span
               class="badge"
-              :class="r.vencida ? 'badge-bad' : r.estado === 'abierta' ? 'badge-ok' : r.estado === 'sorteada' ? 'badge-gold' : 'badge-bad'"
+              :class="r.vencida || r.estado === 'pendiente' ? 'badge-gold' : r.estado === 'abierta' ? 'badge-ok' : r.estado === 'sorteada' ? 'badge-gold' : 'badge-bad'"
             >
-              {{ r.vencida ? 'vencida' : r.estado }}
+              {{ r.estado === 'pendiente' ? 'pendiente' : r.vencida ? 'vencida' : r.estado }}
             </span>
           </div>
           <p class="texto-muted" style="font-size:13px; margin:6px 0 0">{{ r.descripcion }}</p>
@@ -193,16 +203,16 @@ const totalCompra = computed(() =>
             </ul>
           </div>
 
-          <p v-if="r.vencida" class="hint" style="color: var(--danger, #ff9b9b)">
-            El sorteo ya pasó; el operador tiene que graduarla antes de que se pueda jugar.
+          <p v-if="r.vencida || r.estado === 'pendiente'" class="hint" style="color: var(--gold, #f5b942)">
+            El sorteo ya pasó. Cuando el operador cargue el resultado de la Lotería Nacional, la rifa se gradúa sola.
           </p>
           <button
             v-if="r.estado === 'abierta'"
             class="btn btn-primary btn-block"
-            :disabled="r.vencida"
+            :disabled="deshabilitadoRifa(r)"
             @click="abrir(r)"
           >
-            {{ r.vencida ? 'Vencida' : 'Jugar' }}
+            {{ textoBotonRifa(r) }}
           </button>
         </div>
       </div>

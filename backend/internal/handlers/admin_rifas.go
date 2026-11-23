@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"fmt"
+	"loteria-backend/internal/rifasauto"
 	"net/http"
 	"strconv"
 	"time"
@@ -23,15 +24,15 @@ func NewAdminRifasHandler(db *gorm.DB) *AdminRifasHandler { return &AdminRifasHa
 // Crear crea una rifa con su stock de numeros.
 func (h *AdminRifasHandler) Crear(c *gin.Context) {
 	var req struct {
-		Titulo        string `json:"titulo" binding:"required"`
-		Descripcion   string `json:"descripcion"`
-		Premio        string `json:"premio" binding:"required"`
-		PremioMonto   int64  `json:"premio_monto"`
-		PrecioNumero  int64  `json:"precio_numero" binding:"required"`
-		DesdeNumero   int    `json:"desde_numero"`
-		HastaNumero   int    `json:"hasta_numero"`
-		FechaSorteo   string `json:"fecha_sorteo" binding:"required"`
-		TipoSorteo    string `json:"tipo_sorteo"`
+		Titulo       string `json:"titulo" binding:"required"`
+		Descripcion  string `json:"descripcion"`
+		Premio       string `json:"premio" binding:"required"`
+		PremioMonto  int64  `json:"premio_monto"`
+		PrecioNumero int64  `json:"precio_numero" binding:"required"`
+		DesdeNumero  int    `json:"desde_numero"`
+		HastaNumero  int    `json:"hasta_numero"`
+		FechaSorteo  string `json:"fecha_sorteo" binding:"required"`
+		TipoSorteo   string `json:"tipo_sorteo"`
 	}
 	if err := c.ShouldBindJSON(&req); err != nil {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "datos invalidos: " + err.Error()})
@@ -77,7 +78,7 @@ func (h *AdminRifasHandler) Crear(c *gin.Context) {
 		DesdeNumero: req.DesdeNumero, HastaNumero: req.HastaNumero,
 		FechaSorteo: fecha, Estado: models.RifaAbierta, TipoSorteo: tipo,
 		CreadoPor: c.GetUint("userID"),
-		Semilla: semilla, SemillaHash: hashSemilla,
+		Semilla:   semilla, SemillaHash: hashSemilla,
 	}
 	err = h.db.Transaction(func(tx *gorm.DB) error {
 		if err := tx.Create(&rifa).Error; err != nil {
@@ -144,9 +145,9 @@ func (h *AdminRifasHandler) Listar(c *gin.Context) {
 	}
 	type salida struct {
 		models.Rifa
-		Vendidos  int                 `json:"vendidos"`
-		Total     int                 `json:"total"`
-		Recaudado int64               `json:"recaudado"`
+		Vendidos  int                  `json:"vendidos"`
+		Total     int                  `json:"total"`
+		Recaudado int64                `json:"recaudado"`
 		Ganadores []models.GanadorRifa `json:"ganadores,omitempty"`
 	}
 	out := make([]salida, 0, len(rifas))
@@ -219,13 +220,13 @@ func (h *AdminRifasHandler) Sortear(c *gin.Context) {
 			ganadores = append(ganadores, n)
 		}
 	} else {
-			// Azar provably fair: sale de la semilla revelable comprometida en semilla_hash.
-			if rifa.Semilla == "" || len(vendidos) == 0 {
-				c.JSON(http.StatusInternalServerError, gin.H{"error": "la rifa no tiene semilla de sorteo"})
-				return
-			}
-			idx := casino.Sortear(rifa.Semilla, "", 0, 1, len(vendidos))[0]
-			ganadores = []int{vendidos[idx].Numero}
+		// Azar provably fair: sale de la semilla revelable comprometida en semilla_hash.
+		if rifa.Semilla == "" || len(vendidos) == 0 {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "la rifa no tiene semilla de sorteo"})
+			return
+		}
+		idx := casino.Sortear(rifa.Semilla, "", 0, 1, len(vendidos))[0]
+		ganadores = []int{vendidos[idx].Numero}
 	}
 
 	err = h.db.Transaction(func(tx *gorm.DB) error {
@@ -263,6 +264,27 @@ func (h *AdminRifasHandler) Sortear(c *gin.Context) {
 		"rifa":      rifa,
 		"ganadores": rifasGanadores(h.db, rifa),
 	})
+}
+
+// Graduar cierra la rifa con el resultado de la Lotería Nacional del mismo
+// día. Si el resultado todavía no está cargado, responde con el motivo y la
+// rifa queda "pendiente".
+func (h *AdminRifasHandler) Graduar(c *gin.Context) {
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "id invalido"})
+		return
+	}
+	ok, motivo := rifasauto.GraduarUna(h.db, uint(id))
+	if !ok {
+		c.JSON(http.StatusConflict, gin.H{"error": motivo})
+		return
+	}
+	var rifa models.Rifa
+	_ = h.db.First(&rifa, uint(id))
+	RegistrarAuditoria(h.db, c, c.GetUint("userID"), "rifa.graduar", "rifa",
+		strconv.FormatUint(id, 10), "graduada con la Loteria Nacional")
+	c.JSON(http.StatusOK, gin.H{"rifa": rifa, "ganadores": rifasGanadores(h.db, rifa)})
 }
 
 // Cancelar cierra la rifa y reembolsa todos los numeros vendidos.

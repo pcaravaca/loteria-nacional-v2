@@ -12,6 +12,9 @@ const (
 	RifaAbierta   = "abierta"
 	RifaSorteada  = "sorteada"
 	RifaCancelada = "cancelada"
+	// RifaPendiente: vencio la fecha y el resultado de la loteria todavia no
+	// esta cargado. El operador la gradua cuando cargue los numeros.
+	RifaPendiente = "pendiente"
 )
 
 // Tipos de sorteo: azar (entre los vendidos) o manual (el operador ingresa el numero).

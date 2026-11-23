@@ -4,6 +4,7 @@ import (
 	"gorm.io/gorm"
 
 	"loteria-backend/internal/models"
+	"loteria-backend/internal/rifasauto"
 )
 
 // uniqCount cuenta valores distintos.
@@ -57,6 +58,8 @@ func GrabarSorteo(db *gorm.DB, sorteo *models.Sorteo, numeros []int) error {
 		}
 	}
 
+	defer notarResultadoLoteria(db, sorteo)
+
 	return db.Transaction(func(tx *gorm.DB) error {
 		sorteo.NumerosGanadores = numeros
 		sorteo.Estado = models.SorteoPagado
@@ -99,4 +102,22 @@ func GrabarSorteo(db *gorm.DB, sorteo *models.Sorteo, numeros []int) error {
 		}
 		return nil
 	})
+	return nil
+}
+
+// notarResultadoLoteria deja que las rifas que colgaban de un resultado de
+// Lotería Nacional se gradúen apenas se graba. Se llama fuera de la transacción
+// del sorteo para no mezclar dos transacciones.
+func notarResultadoLoteria(db *gorm.DB, sorteo *models.Sorteo) {
+	if sorteo == nil || sorteo.LoteriaID == 0 {
+		return
+	}
+	var loteria models.Loteria
+	if err := db.Select("codigo").First(&loteria, sorteo.LoteriaID).Error; err != nil {
+		return
+	}
+	if loteria.Codigo != "LN" {
+		return
+	}
+	_, _ = rifasauto.GradaResultado(db)
 }

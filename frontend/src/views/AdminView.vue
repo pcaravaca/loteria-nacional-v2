@@ -168,6 +168,17 @@ async function sortearRifa(id: number) {
   }
 }
 
+async function graduarRifa(id: number) {
+  if (!confirm('¿Graduar la rifa con el resultado de la Lotería Nacional del mismo día?')) return
+  try {
+    await api.post(`/admin/rifas/${id}/graduar`, {})
+    mensaje.value = 'Rifa graduada con la Lotería Nacional'
+    await cargar()
+  } catch (e: any) {
+    error.value = e.response?.data?.error ?? e.message
+  }
+}
+
 async function cancelarRifa(id: number) {
   if (!confirm('¿Cancelar la rifa y reembolsar todos los números?')) return
   try {
@@ -691,10 +702,20 @@ async function cerrarSorteo() {
               <td class="mono">{{ r.vendidos }}/{{ r.total }}</td>
               <td class="mono">{{ colones(r.recaudado) }}</td>
               <td>{{ fechaHora(r.fecha_sorteo) }}</td>
-              <td><span class="badge" :class="r.estado === 'abierta' ? 'badge-ok' : r.estado === 'sorteada' ? 'badge-gold' : 'badge-bad'">{{ r.estado }}</span></td>
               <td>
+                <span
+                  class="badge"
+                  :class="r.estado === 'abierta' ? 'badge-ok' : r.estado === 'pendiente' ? 'badge-gold' : r.estado === 'sorteada' ? 'badge-gold' : 'badge-bad'"
+                >{{ r.estado }}</span>
+              </td>
+              <td>
+                <button
+                  v-if="r.estado === 'abierta' || r.estado === 'pendiente'"
+                  class="btn btn-ghost btn-sm"
+                  @click="graduarRifa(r.id)"
+                >Graduar con LN</button>
                 <button v-if="r.estado === 'abierta'" class="btn btn-ghost btn-sm" @click="sortearRifa(r.id)">Sortear</button>
-                <button v-if="r.estado === 'abierta'" class="btn btn-danger btn-sm" @click="cancelarRifa(r.id)">Cancelar</button>
+                <button v-if="r.estado === 'abierta' || r.estado === 'pendiente'" class="btn btn-danger btn-sm" @click="cancelarRifa(r.id)">Cancelar</button>
               </td>
             </tr>
           </tbody>

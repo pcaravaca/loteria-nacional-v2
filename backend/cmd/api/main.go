@@ -14,6 +14,7 @@ import (
 	"loteria-backend/internal/middleware"
 	"loteria-backend/internal/models"
 	"loteria-backend/internal/resultados"
+	"loteria-backend/internal/rifasauto"
 )
 
 func cors() gin.HandlerFunc {
@@ -87,6 +88,9 @@ func main() {
 	// después cada 2 minutos. No toca el saldo, solo lee y deja alertas.
 	_ = alertas.Detectar(db)
 	go alertas.Trabajador(db)
+	// Rifas que cuelgan del resultado de la Lotería Nacional.
+	_, _ = rifasauto.GradaResultado(db)
+	go rifasauto.Trabajador(db)
 	cuentaH := handlers.NewCuentaHandler(db, cfg)
 	auditoriaH := handlers.NewAuditoriaHandler(db)
 	exportH := handlers.NewExportacionesHandler(db)
@@ -201,6 +205,7 @@ func main() {
 	// Servicio al cliente: linea de tiempo de lo que un jugador hizo.
 	admin.GET("/cs/timeline", csH.LineaDeTiempo)
 	admin.GET("/cs/alertas", alertasH.Listar)
+	admin.POST("/rifas/:id/graduar", adminRifasH.Graduar)
 	admin.POST("/cs/alertas/:id/revisar", alertasH.Revisar)
 	admin.PATCH("/casino/games/:codigo", casinoH.ActualizarJuego)
 

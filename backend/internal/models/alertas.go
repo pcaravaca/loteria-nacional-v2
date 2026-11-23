@@ -24,5 +24,6 @@ const (
 	AlertaBingoRetenida  = "bingo_retenida" // ronda abierta demasiado tiempo
 	AlertaReintento      = "reintento_red"  // el jugador reintentó tras un corte
 	AlertaDobleCobro     = "doble_cobro"    // dos cobros del mismo request
-	AlertaRondaHuertfana = "ronda_huerfana" // start cobró pero el jugador nunca siguió
+	AlertaRondaHuertfana = "ronda_huerfana"   // start cobró pero el jugador nunca siguió
+	AlertaRifaPendiente  = "rifa_pendiente"   // vencio y falta el resultado de la lotería
 )
