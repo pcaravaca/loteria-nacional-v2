@@ -28,7 +28,10 @@
 
 * { box-sizing: border-box; }
 
-html, body, #app { height: 100%; }
+/* min-height, no height: con height 100% el #app queda del alto del viewport
+   y el contenido que excede no genera scroll (el lobby del casino quedaba
+   truncado en el celular). */
+html, body, #app { min-height: 100vh; }
 
 body {
   margin: 0;
@@ -61,7 +64,9 @@ h1, h2, h3, h4 { font-family: var(--display); margin: 0; letter-spacing: -0.02em
   height: 100vh;
 }
 
-.brand { display: flex; align-items: center; gap: 10px; padding: 4px 8px; }
+.brand { display: flex; align-items: center; gap: 10px; padding: 4px 8px; min-width: 0; }
+.brand > div { min-width: 0; }
+.brand-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .brand-mark {
   width: 38px; height: 38px; border-radius: 11px;
   background: linear-gradient(135deg, var(--prim), #0aa37a);
@@ -466,6 +471,10 @@ input, select, textarea, button { font-size: 16px; } /* evita el zoom automatico
     position: fixed; left: 0; top: 0; z-index: 60; transform: translateX(-100%);
     transition: transform .2s; width: 260px;
   }
+  /* El nav publico entraba en 435px con un viewport de 390: la marca no se
+     achicaba y empujaba todo fuera de pantalla. */
+  .nav-publica { flex-wrap: wrap; padding: 12px 18px; row-gap: 10px; }
+  .nav-publica .acciones { margin-left: 0; width: 100%; }
   .sidebar.abierta { transform: translateX(0); box-shadow: var(--shadow); }
   .menu-btn { display: inline-flex; }
   .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; }
