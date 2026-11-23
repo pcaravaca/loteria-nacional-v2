@@ -221,6 +221,12 @@ func (h *CasinoHandler) DominoVerificar(c *gin.Context) {
 		dominoIgualar(dominoManoA(rep.Mano), ronda.Mano) &&
 		dominoIgualar(dominoManoA(rep.Casa), ronda.Casa) &&
 		dominoIgualar(dominoManoA(rep.Tablero), ronda.Tablero)
+
+	RegistrarAccionJugador(h.db, c, user.ID, "domino_cerrar", "domino_ronda",
+		strconv.FormatUint(uint64(ronda.ID), 10),
+		"monto="+strconv.FormatInt(ronda.Monto, 10)+" premio="+strconv.FormatInt(ronda.Premio, 10)+
+			" verificado="+strconv.FormatBool(verificado))
+
 	c.JSON(http.StatusOK, gin.H{
 		"ronda_id":         ronda.ID,
 		"monto":            ronda.Monto,

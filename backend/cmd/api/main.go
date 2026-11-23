@@ -80,6 +80,7 @@ func main() {
 	adminH := handlers.NewAdminHandler(db)
 	cfgH := handlers.NewConfigHandler(db)
 	casinoH := handlers.NewCasinoHandler(db, cfg)
+	csH := handlers.NewCsHandler(db)
 	cuentaH := handlers.NewCuentaHandler(db, cfg)
 	auditoriaH := handlers.NewAuditoriaHandler(db)
 	exportH := handlers.NewExportacionesHandler(db)
@@ -191,6 +192,8 @@ func main() {
 	authed.GET("/casino/rounds", casinoH.Rounds)
 	authed.GET("/casino/rounds/:id/verify", casinoH.Verify)
 	admin.GET("/casino/stats", casinoH.Stats)
+	// Servicio al cliente: linea de tiempo de lo que un jugador hizo.
+	admin.GET("/cs/timeline", csH.LineaDeTiempo)
 	admin.PATCH("/casino/games/:codigo", casinoH.ActualizarJuego)
 
 	// Blackjack: una mano de varios turnos (con bloqueo geografico).

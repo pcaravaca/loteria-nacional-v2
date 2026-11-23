@@ -191,6 +191,12 @@ func (h *CasinoHandler) TetrisVerificar(c *gin.Context) {
 		lineas == ronda.Lineas &&
 		tetrisIgualar(tab, ronda.Tablero) &&
 		ronda.Premio == casino.TetrisPremio(ronda.Monto, lineas)
+
+	RegistrarAccionJugador(h.db, c, user.ID, "tetris_cerrar", "tetris_ronda",
+		strconv.FormatUint(uint64(ronda.ID), 10),
+		"monto="+strconv.FormatInt(ronda.Monto, 10)+" lineas="+strconv.Itoa(lineas)+
+			" premio="+strconv.FormatInt(ronda.Premio, 10)+" verificado="+strconv.FormatBool(verificado))
+
 	c.JSON(http.StatusOK, gin.H{
 		"ronda_id":         ronda.ID,
 		"monto":            ronda.Monto,

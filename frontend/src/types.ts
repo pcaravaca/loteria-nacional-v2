@@ -44,6 +44,7 @@ export interface AuditEntry {
   entidad_id: string
   detalle: string
   ip: string
+  request_id?: string
   created_at: string
 }
 

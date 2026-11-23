@@ -226,6 +226,12 @@ func (h *CasinoHandler) BackgammonVerificar(c *gin.Context) {
 		casino.HashSemilla(user.CasinoSeed) == ronda.ServerSeedHash &&
 		rep.Ganador == ronda.Ganador &&
 		ronda.Premio == casino.BackgammonPremio(ronda.Monto, rep.Ganador)
+
+	RegistrarAccionJugador(h.db, c, user.ID, "backgammon_cerrar", "backgammon_ronda",
+		strconv.FormatUint(uint64(ronda.ID), 10),
+		"monto="+strconv.FormatInt(ronda.Monto, 10)+" ganador="+rep.Ganador+
+			" premio="+strconv.FormatInt(ronda.Premio, 10)+" verificado="+strconv.FormatBool(verificado))
+
 	c.JSON(http.StatusOK, gin.H{
 		"ronda_id":         ronda.ID,
 		"monto":            ronda.Monto,

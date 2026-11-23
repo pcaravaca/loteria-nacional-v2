@@ -325,6 +325,12 @@ func (h *CasinoHandler) Play(c *gin.Context) {
 	var actualizado models.User
 	_ = h.db.First(&actualizado, userID)
 
+	RegistrarAccionJugador(h.db, c, userID, "casino_play", "casino_ronda",
+		strconv.FormatUint(uint64(ronda.ID), 10),
+		"juego="+juego.Codigo+" monto="+strconv.FormatInt(req.Monto, 10)+
+			" premio="+strconv.FormatInt(premio, 10)+" mult="+strconv.FormatInt(out.Multiplicador, 10)+
+			" semilla_hash="+ronda.ServerSeedHash)
+
 	c.JSON(http.StatusOK, gin.H{
 		"saldo":            actualizado.Saldo,
 		"premio":           premio,
@@ -784,12 +790,16 @@ func (h *CasinoHandler) BlackjackStart(c *gin.Context) {
 		Update("grupo_id", bj.ID).Error
 	bj.GrupoID = bj.ID
 
+	RegistrarAccionJugador(h.db, c, user.ID, "blackjack_start", "blackjack_mano",
+		strconv.FormatUint(uint64(bj.ID), 10),
+		"monto="+strconv.FormatInt(bj.Monto, 10)+" premio="+strconv.FormatInt(bj.Premio, 10)+
+			" semilla_hash="+bj.ServerSeedHash)
+
 	resp := h.blackjackRespuesta(c, &bj, user.ID)
 	resp["server_seed_hash"] = bj.ServerSeedHash
 	resp["nonce"] = bj.Nonce
 	c.JSON(http.StatusCreated, resp)
 }
-
 
 // blackjackGrupo devuelve las filas de un grupo (una mano y sus divisiones)
 // ordenadas por Orden.
@@ -952,6 +962,10 @@ func (h *CasinoHandler) BlackjackSplit(c *gin.Context) {
 		return
 	}
 
+	RegistrarAccionJugador(h.db, c, userID, "blackjack_split", "blackjack_mano",
+		strconv.FormatUint(uint64(bj.ID), 10),
+		"monto="+strconv.FormatInt(bj.Monto, 10)+" hermana_id="+strconv.FormatUint(uint64(segunda.ID), 10))
+
 	c.JSON(http.StatusOK, h.blackjackRespuesta(c, &bj, userID))
 }
 
@@ -1077,6 +1091,11 @@ func (h *CasinoHandler) blackjackTurno(c *gin.Context, accion string) {
 		return
 	}
 
+	RegistrarAccionJugador(h.db, c, userID, "blackjack_"+accion, "blackjack_mano",
+		strconv.FormatUint(uint64(bj.ID), 10),
+		"premio="+strconv.FormatInt(premio, 10)+" mult="+strconv.FormatFloat(mult, 'f', 2, 64)+
+			" estado="+bj.Estado)
+
 	c.JSON(http.StatusOK, h.blackjackRespuesta(c, &bj, userID))
 }
 
@@ -1123,6 +1142,10 @@ func (h *CasinoHandler) BlackjackSurrender(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "no se pudo resolver la rendicion"})
 		return
 	}
+
+	RegistrarAccionJugador(h.db, c, userID, "blackjack_surrender", "blackjack_mano",
+		strconv.FormatUint(uint64(bj.ID), 10),
+		"premio="+strconv.FormatInt(bj.Premio, 10))
 
 	var actualizado models.User
 	_ = h.db.First(&actualizado, userID)
@@ -1207,6 +1230,11 @@ func (h *CasinoHandler) BlackjackInsurance(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "no se pudo tomar el seguro"})
 		return
 	}
+
+	RegistrarAccionJugador(h.db, c, userID, "blackjack_insurance", "blackjack_mano",
+		strconv.FormatUint(uint64(bj.ID), 10),
+		"costo="+strconv.FormatInt(bj.Seguro, 10)+" premio="+strconv.FormatInt(bj.Premio, 10)+
+			" estado="+bj.Estado)
 
 	var actualizado models.User
 	_ = h.db.First(&actualizado, userID)

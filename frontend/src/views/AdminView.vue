@@ -8,16 +8,17 @@ import Modal from '@/components/Modal.vue'
 import EmptyState from '@/components/EmptyState.vue'
 import AccesosAdmin from '@/components/admin/AccesosAdmin.vue'
 
-type Tab = 'usuarios' | 'loterias' | 'sorteas' | 'casino' | 'rifas' | 'accesos' | 'reportes'
+type Tab = 'usuarios' | 'loterias' | 'sorteos' | 'casino' | 'rifas' | 'accesos' | 'reportes' | 'cs'
 
 const tabs: { id: Tab; label: string; ico: string }[] = [
   { id: 'usuarios', label: 'Usuarios', ico: '👥' },
   { id: 'loterias', label: 'Loterías', ico: '🎰' },
-  { id: 'sorteas', label: 'Sorteos', ico: '📅' },
+  { id: 'sorteos', label: 'Sorteos', ico: '📅' },
   { id: 'casino', label: 'Casino', ico: '🎲' },
   { id: 'rifas', label: 'Rifas', ico: '🎁' },
   { id: 'accesos', label: 'Accesos', ico: '🔑' },
   { id: 'reportes', label: 'Reportes', ico: '📊' },
+  { id: 'cs', label: 'Servicio al cliente', ico: '🎧' },
 ]
 const route = useRoute()
 const tab = ref<Tab>((route.query.tab as Tab) || 'usuarios')
@@ -37,6 +38,12 @@ const rifaForm = reactive({
 })
 const guardandoRifa = ref(false)
 const filtrosAuditoria = reactive({ actor: '', accion: '', desde: '', hasta: '' })
+// Servicio al cliente: linea de tiempo de lo que un jugador hizo.
+const csFiltros = reactive({ user_id: '', request_id: '', accion: '', desde: '', hasta: '' })
+const csEntradas = ref<AuditEntry[]>([])
+const csJugador = ref<Record<string, any> | null>(null)
+const csTotal = ref(0)
+const csCargando = ref(false)
 const cargandoAuditoria = ref(false)
 
 const reportesDisponibles = [
@@ -195,6 +202,55 @@ async function cargarAuditoria() {
   } finally {
     cargandoAuditoria.value = false
   }
+}
+
+async function cargarCs() {
+  csCargando.value = true
+  csJugador.value = null
+  csEntradas.value = []
+  try {
+    const params: Record<string, string> = {}
+    if (csFiltros.user_id) params.user_id = csFiltros.user_id
+    if (csFiltros.request_id) params.request_id = csFiltros.request_id
+    if (csFiltros.accion) params.accion = csFiltros.accion
+    if (csFiltros.desde) params.desde = csFiltros.desde
+    if (csFiltros.hasta) params.hasta = csFiltros.hasta
+    const { data } = await api.get<{ total: number; entradas: AuditEntry[]; jugador?: Record<string, any> }>(
+      '/admin/cs/timeline',
+      { params },
+    )
+    csEntradas.value = data.entradas
+    csTotal.value = data.total
+    csJugador.value = data.jugador ?? null
+  } catch (e: any) {
+    mensaje.value = e.message
+  } finally {
+    csCargando.value = false
+  }
+}
+
+function descargarCs() {
+  const cab = ['fecha', 'jugador', 'accion', 'entidad', 'entidad_id', 'detalle', 'ip', 'request_id']
+  const filas = csEntradas.value.map((e) => [
+    fechaHora(e.created_at),
+    e.actor_nombre || e.actor_id,
+    e.accion,
+    e.entidad,
+    e.entidad_id,
+    e.detalle,
+    e.ip,
+    (e as any).request_id ?? '',
+  ])
+  const csv = [cab, ...filas]
+    .map((f) => f.map((v) => `"${String(v).replace(/"/g, '""')}"`).join(','))
+    .join('\n')
+  const url = URL.createObjectURL(new Blob(["\ufeff" + csv], { type: 'text/csv;charset=utf-8' }))
+  const a = document.createElement('a')
+  a.href = url
+  a.download = 'cs-timeline.csv'
+  a.click()
+  URL.revokeObjectURL(url)
+  mensaje.value = 'cs-timeline.csv descargado'
 }
 
 async function verDocumento(u: User) {
@@ -456,7 +512,7 @@ async function cerrarSorteo() {
       <EmptyState v-else-if="!cargando" icono="🎰" titulo="Sin loterías" texto="Crea tu primer juego para empezar." />
     </div>
 
-    <div v-show="tab === 'sorteas'">
+    <div v-show="tab === 'sorteos'">
       <div class="acciones-fila">
         <button class="btn btn-primary btn-sm" @click="nuevoSorteo">+ Nuevo sorteo</button>
       </div>
@@ -652,6 +708,56 @@ async function cerrarSorteo() {
           </table>
         </div>
         <p v-else class="hint">Sin movimientos en el registro con esos filtros.</p>
+      </div>
+    </div>
+
+    <div v-show="tab === 'cs'">
+      <div class="card">
+        <h3 style="font-size: 16px; margin-bottom: 6px">Línea de tiempo del jugador</h3>
+        <p class="hint" style="margin-bottom: 12px">
+          Busca por jugador o por <span class="mono">request_id</span> (el identificador que la app
+          manda en cada petición). Con eso ves la jugada completa: qué hizo, cuándo, desde qué IP
+          y con qué resultado, sin adivinar.
+        </p>
+        <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 12px">
+          <input v-model="csFiltros.user_id" class="input input-sm" placeholder="ID del jugador" style="width: 140px" />
+          <input v-model="csFiltros.request_id" class="input input-sm mono" placeholder="request_id" style="width: 260px" />
+          <input v-model="csFiltros.accion" class="input input-sm" placeholder="acción" style="width: 190px" />
+          <input v-model="csFiltros.desde" type="date" class="input input-sm" style="width: 150px" />
+          <input v-model="csFiltros.hasta" type="date" class="input input-sm" style="width: 150px" />
+          <button class="btn btn-primary btn-sm" :disabled="csCargando" @click="cargarCs">
+            {{ csCargando ? 'Buscando…' : 'Buscar' }}
+          </button>
+          <button class="btn btn-ghost btn-sm" :disabled="!csEntradas.length" @click="descargarCs">
+            Descargar CSV
+          </button>
+        </div>
+
+        <div v-if="csJugador" class="hint" style="margin-bottom: 12px">
+          <b>{{ csJugador.nombre }}</b> · {{ csJugador.email }} · saldo {{ colones(csJugador.saldo) }} ·
+          bono {{ colones(csJugador.bono) }} · {{ csJugador.rol }}
+        </div>
+
+        <p v-if="csTotal" class="hint" style="margin-bottom: 8px">{{ csTotal }} acción(es) registrada(s).</p>
+
+        <div v-if="csEntradas.length" class="table-wrap">
+          <table class="table">
+            <thead>
+              <tr><th>Fecha</th><th>Acción</th><th>Entidad</th><th>Detalle</th><th>IP</th><th>request_id</th></tr>
+            </thead>
+            <tbody>
+              <tr v-for="e in csEntradas" :key="e.id">
+                <td class="mono">{{ fechaHora(e.created_at) }}</td>
+                <td><span class="badge badge-info">{{ e.accion }}</span></td>
+                <td class="mono">{{ e.entidad }} {{ e.entidad_id }}</td>
+                <td class="hint" style="font-size: 12px">{{ e.detalle }}</td>
+                <td class="mono">{{ e.ip }}</td>
+                <td class="mono" style="font-size: 11px">{{ (e as any).request_id || '—' }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p v-else-if="!csCargando" class="hint">Sin acciones con esos filtros.</p>
       </div>
     </div>
 

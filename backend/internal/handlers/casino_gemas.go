@@ -308,6 +308,11 @@ func (h *CasinoHandler) GemasVerificar(c *gin.Context) {
 		repetido.Puntos == ronda.Puntos &&
 		igualarTablero(repetido.Tablero, ronda.Tablero)
 
+	RegistrarAccionJugador(h.db, c, user.ID, "gemas_cerrar", "gemas_ronda",
+		strconv.FormatUint(uint64(ronda.ID), 10),
+		"monto="+strconv.FormatInt(ronda.Monto, 10)+" puntos="+strconv.FormatInt(ronda.Puntos, 10)+
+			" premio="+strconv.FormatInt(ronda.Premio, 10)+" verificado="+strconv.FormatBool(verificado))
+
 	c.JSON(http.StatusOK, gin.H{
 		"ronda_id":         ronda.ID,
 		"monto":            ronda.Monto,

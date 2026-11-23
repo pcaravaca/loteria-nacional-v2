@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -95,17 +96,20 @@ func (h *AuthHandler) Login(c *gin.Context) {
 		return
 	}
 
+	RegistrarAccionJugador(h.db, c, user.ID, "auth_login", "usuario",
+		strconv.FormatUint(uint64(user.ID), 10), "rol="+user.Rol)
+
 	c.JSON(http.StatusOK, gin.H{
 		"token": token,
 		"user": gin.H{
-			"id":         user.ID,
-			"nombre":     user.Nombre,
-			"email":      user.Email,
-			"rol":        user.Rol,
-			"saldo":      user.Saldo,
-			"bono":       user.Bono,
+			"id":          user.ID,
+			"nombre":      user.Nombre,
+			"email":       user.Email,
+			"rol":         user.Rol,
+			"saldo":       user.Saldo,
+			"bono":        user.Bono,
 			"tema_casino": user.TemaCasino,
-			"tema_app":     user.TemaApp,
+			"tema_app":    user.TemaApp,
 		},
 	})
 }

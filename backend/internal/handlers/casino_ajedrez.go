@@ -449,6 +449,11 @@ func (h *CasinoHandler) AjedrezPartidaVerificar(c *gin.Context) {
 	hashOK := casino.HashSemilla(user.CasinoSeed) == partida.ServerSeedHash
 	verificado := coincide && casaOK && premioOK && multOK && hashOK
 
+	RegistrarAccionJugador(h.db, c, user.ID, "ajedrez_partida_cerrar", "ajedrez_partida",
+		strconv.FormatUint(uint64(partida.ID), 10),
+		"monto="+strconv.FormatInt(partida.Monto, 10)+" resultado="+partida.Resultado+
+			" premio="+strconv.FormatInt(partida.Premio, 10)+" verificado="+strconv.FormatBool(verificado))
+
 	c.JSON(http.StatusOK, gin.H{
 		"partida_id":       partida.ID,
 		"monto":            partida.Monto,
@@ -465,11 +470,11 @@ func (h *CasinoHandler) AjedrezPartidaVerificar(c *gin.Context) {
 		"nonce":            partida.Nonce,
 		"verificado":       verificado,
 		"detalle": gin.H{
-			"hash":       hashOK,
-			"posicion":   coincide,
-			"casa":       casaOK,
-			"premio":     premioOK,
-			"multipl":    multOK,
+			"hash":     hashOK,
+			"posicion": coincide,
+			"casa":     casaOK,
+			"premio":   premioOK,
+			"multipl":  multOK,
 		},
 	})
 }

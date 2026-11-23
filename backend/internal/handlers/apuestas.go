@@ -93,6 +93,7 @@ func (h *ApuestasHandler) Crear(c *gin.Context) {
 		return
 	}
 
+	var idApuesta uint
 	err := h.db.Transaction(func(tx *gorm.DB) error {
 		apuesta := models.Apuesta{
 			UserID:   userID,
@@ -104,6 +105,7 @@ func (h *ApuestasHandler) Crear(c *gin.Context) {
 		if err := tx.Create(&apuesta).Error; err != nil {
 			return err
 		}
+		idApuesta = apuesta.ID
 		if err := tx.Model(&models.User{}).Where("id = ?", userID).
 			Update("saldo", gorm.Expr("saldo - ?", monto)).Error; err != nil {
 			return err
@@ -120,6 +122,11 @@ func (h *ApuestasHandler) Crear(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "no se pudo registrar la apuesta"})
 		return
 	}
+
+	RegistrarAccionJugador(h.db, c, userID, "apuesta_crear", "apuesta",
+		strconv.FormatUint(uint64(idApuesta), 10),
+		"sorteo="+strconv.FormatUint(uint64(sorteo.ID), 10)+" monto="+strconv.FormatInt(monto, 10)+
+			" numeros="+joinInts(req.Numeros))
 
 	var actualizado models.User
 	_ = h.db.First(&actualizado, userID)

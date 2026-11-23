@@ -218,15 +218,20 @@ func (h *CasinoHandler) PokerCobrar(c *gin.Context) {
 		return
 	}
 
+	RegistrarAccionJugador(h.db, c, userID, "poker_cobrar", "poker_mano",
+		strconv.FormatUint(uint64(mano.ID), 10),
+		"monto="+strconv.FormatInt(mano.Monto, 10)+" premio="+strconv.FormatInt(premio, 10)+
+			" estado="+estado)
+
 	var actualizado models.User
 	_ = h.db.First(&actualizado, userID)
 	c.JSON(http.StatusOK, gin.H{
-		"mano_id":  mano.ID,
-		"ronda_id": mano.RondaID,
-		"estado":   estado,
-		"premio":   premio,
+		"mano_id":   mano.ID,
+		"ronda_id":  mano.RondaID,
+		"estado":    estado,
+		"premio":    premio,
 		"resultado": out.Data,
-		"saldo":    actualizado.Saldo,
+		"saldo":     actualizado.Saldo,
 	})
 }
 
