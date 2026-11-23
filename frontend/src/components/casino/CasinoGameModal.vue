@@ -821,4 +821,22 @@ function repetir() {
   .guia-detalle { display: none; }
   .nota { display: none; }
 }
+
+/* Celular en horizontal: el alto escasea (390-420 px) y sobra ancho. Se
+   compacta la marquesina, la apuesta y los montos rapidos para dejarle lugar
+   al tablero; el bingo adentro ordena carton y tablero en columnas. */
+@media (orientation: landscape) and (max-height: 500px) {
+  .casino-modal { gap: 5px; }
+  .tema-marquesina { padding: 4px 10px; font-size: 10.5px; letter-spacing: .06em; }
+  .zoom-ctl button { padding: 0 5px; font-size: 10.5px; }
+  .zoom-ctl .zoom-val { min-width: 32px; }
+  .btn-pantalla { width: 24px; height: 22px; }
+  .apuesta { gap: 5px; }
+  .step { width: 26px; height: 26px; font-size: 13px; }
+  .monto { padding: 4px 6px; }
+  .monto strong { font-size: 14px; }
+  .rapidos { gap: 5px; }
+  .rapidos .chip { padding: 3px 7px; font-size: 10.5px; }
+  .guia-detalle, .nota { display: none; }
+}
 </style>

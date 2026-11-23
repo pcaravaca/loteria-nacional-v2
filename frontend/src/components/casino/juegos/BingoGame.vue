@@ -451,6 +451,7 @@ onUnmounted(() => {
       Se retomó la jugada que quedó abierta; la apuesta ya estaba cobrada y no se volvió a descontar.
     </p>
 
+    <div class="pie">
     <div v-if="!ronda" class="controles">
       <div class="selector">
         <button
@@ -502,6 +503,7 @@ onUnmounted(() => {
           ▶ Probar
         </button>
       </div>
+    </div>
     </div>
   </div>
 </template>
@@ -703,6 +705,58 @@ onUnmounted(() => {
   .voz { flex-wrap: nowrap; gap: 6px; overflow-x: auto; }
   .voz-chips { flex-wrap: nowrap; }
   .voz-chip, .voz-probar { flex: none; }
+}
+
+/* Celular en horizontal: aca si entra todo. Se usa el ancho (carton a la
+   izquierda, tablero 1-N a la derecha) en vez de apilar y obligar al scroll
+   vertical que Peter reclamo. */
+@media (orientation: landscape) and (max-height: 500px) {
+  .bingo { gap: 5px; }
+  .bingo-head { padding: 3px 10px; font-size: 10px; gap: 7px; }
+  .bingo-cuerpo { flex-direction: row; gap: 8px; align-items: flex-start; }
+  .zap { flex: 0 0 auto; width: auto; flex-direction: column; align-items: center; gap: 6px; }
+  .tombola { width: 72px; height: 72px; margin: 0; }
+  .bola-grande { min-width: 40px; height: 40px; font-size: 12px; }
+  .jerga { display: none; }
+  .zona { flex-direction: row; gap: 8px; align-items: flex-start; }
+  .cartones { grid-template-columns: minmax(0, 320px); gap: 6px; }
+  .carton { padding: 6px; }
+  .carton-head { font-size: 10.5px; margin-bottom: 3px; }
+  .cab span { font-size: 10px; letter-spacing: .12em; }
+  .celda { height: 28px; font-size: 12.5px; }
+  .celda.libre { font-size: 13px; }
+  .tablero { flex: 1 1 auto; min-width: 0; gap: 2px; }
+  .casilla { height: 13px; font-size: 8.5px; border-radius: 3px; }
+  .controles { gap: 5px; }
+  .controles .btn { padding: 6px 4px; font-size: 10.5px; }
+  .selector button { width: 30px; height: 26px; }
+  .voz { padding: 4px 8px; gap: 5px; }
+  .voz-etq { font-size: 9px; }
+  .voz-chip, .voz-probar { padding: 2px 7px; font-size: 9.5px; }
+}
+
+/* En horizontal, los botones de accion y la voz comparten una sola fila para no
+   sumar altura. */
+.pie { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.pie > .controles { flex: 1 1 100%; }
+.pie > .voz { flex: 1 1 auto; min-width: 0; }
+
+@media (orientation: landscape) and (max-height: 500px) {
+  .pie { gap: 5px; flex-wrap: wrap; align-items: center; }
+  /* Con ronda abierta: botones y voz comparten la fila. En la jugada nueva el
+     selector necesita el ancho completo y envuelve solo. */
+  .pie > .controles { flex: 0 0 auto; flex-wrap: nowrap; }
+  .pie > .controles:has(.selector) { flex: 1 1 100%; flex-wrap: wrap; }
+  .pie > .controles .btn { flex: 0 0 auto; }
+  .pie > .voz { flex: 1 1 auto; min-width: 0; }
+}
+
+/* Escritorio/tablet ancha: sobra ancho y falta alto. Se deja de apilar el
+   tablero debajo del carton y se ponen uno al lado del otro. */
+@media (min-width: 901px) {
+  .zona { flex-direction: row; align-items: flex-start; gap: 14px; }
+  .cartones { flex: 0 0 auto; grid-template-columns: repeat(auto-fit, minmax(210px, 320px)); }
+  .tablero { flex: 1 1 auto; min-width: 0; max-width: 420px; }
 }
 
 .error-text { color: #f87171; font-size: 12px; margin: 0; }
