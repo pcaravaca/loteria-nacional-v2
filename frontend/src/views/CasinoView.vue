@@ -149,7 +149,7 @@ function fmtMult(valor: number | undefined): string {
               <div>Max<b>x{{ j.max_multiplicador }}</b></div>
             </div>
             <div v-if="j.max_premio > 0" class="techo">
-              Premio maximo por jugada: <b>{{ colones(j.max_premio) }}</b>
+              <span>Premio máximo</span><b>{{ colones(j.max_premio) }}</b>
             </div>
             <button class="btn btn-primary btn-block" :disabled="!j.activo" @click="abierto = j">
               Jugar
@@ -182,11 +182,21 @@ function fmtMult(valor: number | undefined): string {
      de la pagina. */
   overscroll-behavior-x: contain;
   overscroll-behavior-y: none;
-  padding: 10px 2px 12px;
+  padding: 10px 0 12px;
   background: var(--bg);
   scrollbar-width: none;
 }
 .chips-filtro::-webkit-scrollbar { display: none; }
+/* El carril se sigue: sin el desvanecido el ultimo chip quedaba cortado contra
+   el borde de la pantalla y parecia texto solapado. */
+.chips-filtro::after {
+  content: '';
+  position: absolute;
+  top: 0; right: 0; bottom: 0;
+  width: 30px;
+  background: linear-gradient(90deg, transparent, var(--bg) 85%);
+  pointer-events: none;
+}
 .chip {
   flex: 0 0 auto;
   border: 1px solid var(--line);
@@ -241,6 +251,7 @@ function fmtMult(valor: number | undefined): string {
 @media (max-width: 760px) {
   .grid-grid { grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
 }
+.juego { min-width: 0; }
 .juego .arte { height: auto; aspect-ratio: 4 / 3; }
 .juego h3 { font-size: 14px; letter-spacing: .01em; }
 .juego .arte { position: relative; border-radius: 12px; overflow: hidden; border: 1px solid var(--border-soft); margin-bottom: 12px; }
@@ -250,8 +261,13 @@ function fmtMult(valor: number | undefined): string {
 .juego .meta { display: flex; gap: 12px; padding: 10px 0; margin: 0 0 12px; border-top: 1px solid var(--border-soft); border-bottom: 1px solid var(--border-soft); }
 .juego .meta div { font-size: 11px; color: var(--faint); text-transform: uppercase; letter-spacing: .06em; }
 .juego .meta b { display: block; color: var(--text); font-size: 13px; letter-spacing: 0; text-transform: none; margin-top: 2px; }
-.juego .techo { font-size: 11px; color: var(--faint); margin: -4px 0 10px; }
-.juego .techo b { color: var(--muted); }
+.juego .techo {
+  font-size: 11px; color: var(--faint); margin: -4px 0 10px; line-height: 1.4;
+  /* El monto es largo: si la tarjeta es angosta, que rompa adentro y no se
+     salga sobre la tarjeta de al lado. */
+  overflow-wrap: anywhere;
+}
+.juego .techo b { color: var(--muted); font-weight: 600; margin-left: 6px; }
 .juego.apagada .arte img { filter: grayscale(.6) brightness(.6); }
 .proximamente {
   position: absolute; inset: 0; display: grid; place-items: center;

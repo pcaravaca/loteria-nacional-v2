@@ -47,7 +47,7 @@ func TestSeedCasinoDobleRTP(t *testing.T) {
 	for _, codigo := range []string{
 		models.CasinoDados, models.CasinoSlots, models.CasinoRuleta,
 		models.CasinoRaspa, models.CasinoKeno, models.CasinoBingo,
-		models.CasinoPinballNeon, models.CasinoPinballClasico, models.CasinoPlinkoPremium,
+		models.CasinoPinballNeon, models.CasinoPinballClasico, models.CasinoMinaDeOro,
 	} {
 		var juego models.CasinoGame
 		if err := db.Where("codigo = ?", codigo).First(&juego).Error; err != nil {

@@ -26,6 +26,7 @@ import tetrisCard from './casino/cards/tetris.webp'
 import pinballNeonCard from './casino/cards/pinball-neon.webp'
 import pinballClasicoCard from './casino/cards/pinball-clasico.webp'
 import plinkoPremiumCard from './casino/cards/plinko-premium.webp'
+import minaCard from './casino/cards/mina-de-oro.webp'
 
 import dadosHero from './casino/hero/dados.webp'
 import slotsHero from './casino/hero/slots.webp'
@@ -54,6 +55,7 @@ import tetrisHero from './casino/hero/tetris.webp'
 import pinballNeonHero from './casino/hero/pinball-neon.webp'
 import pinballClasicoHero from './casino/hero/pinball-clasico.webp'
 import plinkoPremiumHero from './casino/hero/plinko-premium.webp'
+import minaHero from './casino/hero/mina-de-oro.webp'
 
 // Arte del catalogo AST Casino (ilustraciones generadas con la misma paleta).
 import astTuttifruti from './casino/ast/tuttifruti.webp'
@@ -135,6 +137,7 @@ export type CodigoJuego =
   | 'pinball-neon'
   | 'pinball-clasico'
   | 'plinko-premium'
+  | 'mina-de-oro'
   // Catalogo AST Casino
   | 'spy'
   | 'tuttifruti'
@@ -185,6 +188,7 @@ export const cartas: Record<CodigoJuego, string> = {
   'pinball-neon': pinballNeonCard,
   'pinball-clasico': pinballClasicoCard,
   'plinko-premium': plinkoPremiumCard,
+  'mina-de-oro': minaCard,
   ...astArte,
 } as Record<CodigoJuego, string>
 
@@ -216,6 +220,7 @@ export const heroes: Record<CodigoJuego, string> = {
   'pinball-neon': pinballNeonHero,
   'pinball-clasico': pinballClasicoHero,
   'plinko-premium': plinkoPremiumHero,
+  'mina-de-oro': minaHero,
   ...astArte,
 } as Record<CodigoJuego, string>
 

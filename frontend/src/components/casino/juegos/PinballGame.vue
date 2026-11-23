@@ -2,19 +2,10 @@
 import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { colones } from '@/utils/formato'
 import { reproducir } from '@/utils/sfx'
-import pfNeon from '@/assets/casino/playfields/pinball-neon.webp'
-import pfClasico from '@/assets/casino/playfields/pinball-clasico.webp'
-import pfPlinko from '@/assets/casino/playfields/plinko-premium.webp'
 
-// El playfield es ARTE (una imagen por mesa), no una forma geometrica dibujada:
-// Peter lo dejo claro con la foto de la mesa Cinematronics. El canvas va encima,
-// transparente, y dibuja solo lo interactivo (bumpers, troneras, palancas, bola).
-const PLAYFIELDS: Record<string, string> = {
-  'pinball-neon': pfNeon,
-  'pinball-clasico': pfClasico,
-  'plinko-premium': pfPlinko,
-}
-
+// El playfield es SVG: asi bumpers, troneras y paletas comparten las mismas
+// coordenadas que la bola. Con una imagen de fondo el canvas quedaba desalineado
+// y las troneras dibujadas no coincidian con las del arte.
 const props = defineProps<{
   resultado: any
   premio: number
@@ -24,8 +15,6 @@ const props = defineProps<{
 }>()
 const emit = defineEmits<{ jugar: [Record<string, unknown>] }>()
 
-// La fuerza elige cuántos rebotes da la bola (y con eso la tabla de pagos):
-// a más fuerza, mayor dispersión y mayor premio máximo.
 const FUERZAS = [
   { id: 0, nombre: 'Suave' },
   { id: 1, nombre: 'Media' },
@@ -33,24 +22,24 @@ const FUERZAS = [
 ]
 const fuerza = ref(1)
 
-// Cada mesa tiene su propia madera / metal y su acento.
-const PALETAS: Record<string, { fondo: string; marco: string; vetas: string; acento: string; bumped: string[] }> = {
+const PALETAS: Record<string, {
+  fondo1: string; fondo2: string; marco: string; veta: string; acento: string
+  bumped: string[]; metal: string; metal2: string
+}> = {
   'pinball-neon': {
-    fondo: '#150a2a', marco: '#6d3fd1', vetas: '#3a1f7a', acento: '#22d3ee',
-    bumped: ['#22d3ee', '#e879f9', '#34d399'],
+    fondo1: '#1b0f38', fondo2: '#070313', marco: '#6d3fd1', veta: '#3a1f7a', acento: '#22d3ee',
+    bumped: ['#22d3ee', '#e879f9', '#34d399'], metal: '#c7d2fe', metal2: '#4c1d95',
   },
   'pinball-clasico': {
-    fondo: '#1c1106', marco: '#a8742c', vetas: '#5e3a14', acento: '#e8ce7a',
-    bumped: ['#d9a441', '#c0562f', '#3f8f5f'],
+    fondo1: '#2a1a08', fondo2: '#0d0702', marco: '#a8742c', veta: '#5e3a14', acento: '#e8ce7a',
+    bumped: ['#d9a441', '#c0562f', '#3f8f5f'], metal: '#f2d9a4', metal2: '#7c4a16',
   },
   'plinko-premium': {
-    fondo: '#04202a', marco: '#0f766e', vetas: '#0a4a52', acento: '#5eead4',
-    bumped: ['#2dd4bf', '#f5d06a', '#7dd3fc'],
+    fondo1: '#062b33', fondo2: '#021418', marco: '#0f766e', veta: '#0a4a52', acento: '#5eead4',
+    bumped: ['#2dd4bf', '#f5d06a', '#7dd3fc'], metal: '#c9f5ec', metal2: '#0b5a55',
   },
 }
 const paleta = computed(() => PALETAS[props.codigo ?? ''] ?? PALETAS['pinball-neon'])
-const fondo = computed(() => PLAYFIELDS[props.codigo ?? ''] ?? pfNeon)
-const estiloTablero = computed(() => ({ backgroundImage: `url(${fondo.value})` }))
 
 const canvas = ref<HTMLCanvasElement | null>(null)
 const animando = ref(false)
@@ -62,14 +51,18 @@ const tronera = ref<number | null>(null)
 const tabla = computed<number[]>(() => props.resultado?.tabla ?? [])
 const camino = computed<number[]>(() => props.resultado?.camino ?? [])
 
+// Geometria del campo (viewBox 320x416), compartida por el SVG y la bola.
+const BUMPERS = [
+  { x: 92, y: 78, r: 24, mult: 2 },
+  { x: 228, y: 78, r: 24, mult: 3 },
+  { x: 160, y: 134, r: 24, mult: 5 },
+]
+const TRONERA_Y = 330
+const TRONERA_H = 30
+
 function aclarar(hex: string, t: number): string {
   const n = parseInt(hex.slice(1), 16)
   const mez = (c: number) => Math.round(c + (255 - c) * t)
-  return `rgb(${mez((n >> 16) & 255)},${mez((n >> 8) & 255)},${mez(n & 255)})`
-}
-function sombrear(hex: string, t: number): string {
-  const n = parseInt(hex.slice(1), 16)
-  const mez = (c: number) => Math.round(c * (1 - t))
   return `rgb(${mez((n >> 16) & 255)},${mez((n >> 8) & 255)},${mez(n & 255)})`
 }
 
@@ -80,164 +73,31 @@ function dibujar() {
   const cssW = cv.clientWidth || 320
   const dpr = window.devicePixelRatio || 1
   const W = Math.round(cssW * dpr)
-  const H = Math.round(W * 1.3)
+  const H = Math.round(W * 416 / 320)
   if (cv.width !== W) {
     cv.width = W
     cv.height = H
   }
   const u = W / 320
+  ctx.clearRect(0, 0, W, H)
   const P = paleta.value
 
-  ctx.clearRect(0, 0, W, H)
-
-
-  const filas = Math.max(camino.value.length, tabla.value.length ? tabla.value.length - 1 : 0)
-
-  // ---- riel del campo (brillo metálico)
-  ctx.beginPath()
-  ctx.moveTo(30 * u, 60 * u)
-  ctx.quadraticCurveTo(30 * u, 236 * u, 62 * u, 258 * u)
-  ctx.lineTo(258 * u, 258 * u)
-  ctx.quadraticCurveTo(290 * u, 236 * u, 290 * u, 60 * u)
-  ctx.strokeStyle = aclarar(P.marco, 0.35)
-  ctx.lineWidth = 5 * u
-  ctx.stroke()
-  ctx.strokeStyle = 'rgba(255,255,255,.28)'
-  ctx.lineWidth = 1.5 * u
-  ctx.stroke()
-
-  // ---- bumpers con volumen y halo
-  const bumpers = [
-    { x: 92, y: 74, r: 22, mult: 2 },
-    { x: 228, y: 74, r: 22, mult: 3 },
-    { x: 160, y: 128, r: 22, mult: 5 },
-  ]
-  bumpers.forEach((b, i) => {
-    const col = P.bumped[i % P.bumped.length]
-    const halo = ctx.createRadialGradient(b.x * u, b.y * u, b.r * 0.2 * u, b.x * u, b.y * u, b.r * 1.9 * u)
-    halo.addColorStop(0, col + '66')
-    halo.addColorStop(1, col + '00')
+  // ---- sombra de la bola (solo cuando ya hay jugada)
+  if (props.resultado) {
+    const bx = bolaX.value * u
+    const by = bolaY.value * u
+    const rb = 10 * u
     ctx.beginPath()
-    ctx.arc(b.x * u, b.y * u, b.r * 1.9 * u, 0, Math.PI * 2)
-    ctx.fillStyle = halo
+    ctx.ellipse(bx + rb * 0.3, by + rb * 0.5, rb, rb * 0.8, 0, 0, Math.PI * 2)
+    ctx.fillStyle = 'rgba(0,0,0,.5)'
     ctx.fill()
-
-    const cuerpo = ctx.createRadialGradient(
-      (b.x - b.r * 0.35) * u, (b.y - b.r * 0.4) * u, b.r * 0.1 * u,
-      b.x * u, b.y * u, b.r * u,
-    )
-    cuerpo.addColorStop(0, aclarar(col, 0.75))
-    cuerpo.addColorStop(0.45, col)
-    cuerpo.addColorStop(1, sombrear(col, 0.6))
-    ctx.beginPath()
-    ctx.arc(b.x * u, b.y * u, b.r * u, 0, Math.PI * 2)
-    ctx.fillStyle = cuerpo
-    ctx.fill()
-
-    ctx.beginPath()
-    ctx.arc(b.x * u, b.y * u, b.r * u, 0, Math.PI * 2)
-    ctx.strokeStyle = aclarar(P.marco, 0.4)
-    ctx.lineWidth = 2.5 * u
-    ctx.stroke()
-
-    ctx.beginPath()
-    ctx.arc(b.x * u, b.y * u, b.r * 0.55 * u, 0, Math.PI * 2)
-    ctx.fillStyle = 'rgba(255,255,255,.16)'
-    ctx.fill()
-    ctx.strokeStyle = 'rgba(255,255,255,.35)'
-    ctx.lineWidth = 1 * u
-    ctx.stroke()
-
-    ctx.fillStyle = '#0b0f14'
-    ctx.font = `800 ${Math.round(13 * u)}px ui-sans-serif, system-ui`
-    ctx.textAlign = 'center'
-    ctx.textBaseline = 'middle'
-    ctx.fillText(`x${b.mult}`, b.x * u, b.y * u + 1 * u)
-  })
-
-  // ---- guías de caída hacia las troneras (solo cuando ya hay tabla)
-  ctx.strokeStyle = 'rgba(255,255,255,.14)'
-  ctx.lineWidth = 2 * u
-  for (let i = 1; tabla.value.length > 0 && i < tabla.value.length; i++) {
-    const x = (i * 320) / tabla.value.length
-    ctx.beginPath()
-    ctx.moveTo(x * u, 266 * u)
-    ctx.lineTo(x * u, 330 * u)
-    ctx.stroke()
-  }
-
-  // ---- palancas con gradiente metálico (bajo las troneras)
-  const palanca = (x1: number, y1: number, x2: number, y2: number, x3: number, y3: number, x4: number, y4: number) => {
-    const gp = ctx.createLinearGradient(x1 * u, y1 * u, x2 * u, y2 * u)
-    gp.addColorStop(0, '#f6e6b0')
-    gp.addColorStop(0.5, P.marco)
-    gp.addColorStop(1, sombrear(P.marco, 0.5))
-    ctx.beginPath()
-    ctx.moveTo(x1 * u, y1 * u)
-    ctx.lineTo(x2 * u, y2 * u)
-    ctx.lineTo(x3 * u, y3 * u)
-    ctx.lineTo(x4 * u, y4 * u)
-    ctx.closePath()
-    ctx.fillStyle = gp
-    ctx.fill()
-  }
-  palanca(34, 398, 108, 370, 108, 381, 38, 410)
-  palanca(286, 398, 212, 370, 212, 381, 282, 410)
-
-  // ---- troneras con volumen y premio (sin tabla no hay nada que pagar)
-  const n = Math.max(1, tabla.value.length)
-  if (tabla.value.length > 0) {
-  for (let i = 0; i < n; i++) {
-    const x = ((i + 0.5) * 320) / n
-    const ancho = 320 / n
-    const esGanadora =
-      props.resultado && !animando.value && tronera.value === i && tabla.value[i] > 0
-    const x0 = (x - ancho / 2 + 2) * u
-    const w = (ancho - 4) * u
-    const y0 = 330 * u
-    const h = 28 * u
-    const gt = ctx.createLinearGradient(0, y0, 0, y0 + h)
-    if (esGanadora) {
-      gt.addColorStop(0, '#f8e2a8')
-      gt.addColorStop(0.5, P.bumped[0])
-      gt.addColorStop(1, sombrear(P.bumped[0], 0.55))
-    } else {
-      gt.addColorStop(0, 'rgba(255,255,255,.10)')
-      gt.addColorStop(1, 'rgba(0,0,0,.45)')
-    }
-    ctx.fillStyle = gt
-    ctx.fillRect(x0, y0, w, h)
-    ctx.strokeStyle = esGanadora ? '#fff3cf' : aclarar(P.marco, 0.15)
-    ctx.lineWidth = esGanadora ? 2.5 * u : 1.5 * u
-    ctx.strokeRect(x0, y0, w, h)
-    ctx.fillStyle = esGanadora ? '#14100a' : 'rgba(232,225,205,.82)'
-    ctx.font = `800 ${Math.round(12 * u)}px ui-sans-serif, system-ui`
-    ctx.textAlign = 'center'
-    ctx.textBaseline = 'middle'
-    ctx.fillText(`${tabla.value[i]}x`, x * u, y0 + h / 2)
-  }
-  }
-
-  // ---- fila actual del camino
-  if (fila.value >= 0 && fila.value < filas) {
-    const y = (46 + (fila.value + 1) * (250 - 46) / Math.max(1, filas)) * u
-    ctx.strokeStyle = 'rgba(255,255,255,.18)'
-    ctx.lineWidth = 1.5 * u
-    ctx.beginPath()
-    ctx.moveTo(24 * u, y)
-    ctx.lineTo(296 * u, y)
-    ctx.stroke()
   }
 
   // ---- bola de marfil con reflejo
   if (props.resultado) {
     const bx = bolaX.value * u
     const by = bolaY.value * u
-    const rb = 9 * u
-    ctx.beginPath()
-    ctx.ellipse(bx + rb * 0.25, by + rb * 0.4, rb, rb * 0.85, 0, 0, Math.PI * 2)
-    ctx.fillStyle = 'rgba(0,0,0,.45)'
-    ctx.fill()
+    const rb = 10 * u
     const gb = ctx.createRadialGradient(bx - rb * 0.35, by - rb * 0.4, rb * 0.1, bx, by, rb)
     gb.addColorStop(0, '#ffffff')
     gb.addColorStop(0.35, '#f7ecc9')
@@ -249,10 +109,34 @@ function dibujar() {
     ctx.fill()
     ctx.beginPath()
     ctx.arc(bx - rb * 0.3, by - rb * 0.35, rb * 0.22, 0, Math.PI * 2)
-    ctx.fillStyle = 'rgba(255,255,255,.85)'
+    ctx.fillStyle = 'rgba(255,255,255,.9)'
     ctx.fill()
   }
 
+  // ---- fila actual del camino
+  const filas = Math.max(camino.value.length, tabla.value.length ? tabla.value.length - 1 : 0)
+  if (fila.value >= 0 && fila.value < filas) {
+    const y = (46 + (fila.value + 1) * (250 - 46) / Math.max(1, filas)) * u
+    ctx.strokeStyle = 'rgba(255,255,255,.22)'
+    ctx.lineWidth = 2 * u
+    ctx.beginPath()
+    ctx.moveTo(20 * u, y)
+    ctx.lineTo(300 * u, y)
+    ctx.stroke()
+  }
+
+  // ---- halo del bumper por el que pasa la bola
+  if (animando.value && camino.value.length && fila.value >= 0) {
+    const k = Math.min(fila.value, camino.value.length - 1)
+    const b = BUMPERS[k % BUMPERS.length]
+    const halo = ctx.createRadialGradient(b.x * u, b.y * u, 2 * u, b.x * u, b.y * u, b.r * 2.6 * u)
+    halo.addColorStop(0, aclarar(P.bumped[k % P.bumped.length], 0.5))
+    halo.addColorStop(1, 'rgba(255,255,255,0)')
+    ctx.beginPath()
+    ctx.arc(b.x * u, b.y * u, b.r * 2.6 * u, 0, Math.PI * 2)
+    ctx.fillStyle = halo
+    ctx.fill()
+  }
 }
 
 function animar() {
@@ -262,17 +146,23 @@ function animar() {
   fila.value = -1
   bolaX.value = 160
   bolaY.value = 14
-  dibujar()
-  reproducir('caida')
+  try {
+    dibujar()
+    reproducir('caida')
+  } catch {
+    // Si el primer dibujado falla, la jugada igual arranca.
+  }
   let k = 0
-  const timer = setInterval(() => {
-    if (k >= total) {
-      clearInterval(timer)
+  // setTimeout recursivo (no setInterval): en una pestaña en segundo plano el
+  // intervalo se pausaba y la jugada quedaba "Jugando…" para siempre.
+  let pasos = 0
+  const tick = () => {
+    pasos++
+    if (k >= total || pasos > 60) {
       const final = props.resultado?.pos ?? 0
       const n = Math.max(1, tabla.value.length)
-      // la bola queda en el centro de la tronera ganadora, sobre los pagos
       bolaX.value = ((final + 0.5) * 320) / n
-      bolaY.value = 294
+      bolaY.value = TRONERA_Y + TRONERA_H / 2
       tronera.value = final
       animando.value = false
       dibujar()
@@ -281,12 +171,18 @@ function animar() {
       return
     }
     fila.value = k
-    bolaX.value = 160 + (camino.value[k] === 1 ? 1 : -1) * 22
-    bolaY.value = 14 + ((k + 1) / Math.max(1, total)) * 240
-    reproducir('tecla')
-    dibujar()
+    bolaX.value = 160 + (camino.value[k] === 1 ? 1 : -1) * 34
+    bolaY.value = 14 + ((k + 1) / Math.max(1, total)) * (TRONERA_Y - 20)
+    try {
+      reproducir('tecla')
+      dibujar()
+    } catch {
+      // Un dibujado que falle no debe trabar la jugada: la bola sigue avanzando.
+    }
     k++
-  }, 180)
+    setTimeout(tick, 190)
+  }
+  setTimeout(tick, 190)
 }
 
 watch(
@@ -315,8 +211,91 @@ function lanzar() {
 
 <template>
   <div class="pinball">
-    <div class="tablero" :style="estiloTablero">
+    <div class="tablero">
+      <svg class="campo" viewBox="0 0 320 416" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+        <defs>
+          <linearGradient :id="`fondo-${codigo ?? 'x'}`" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" :stop-color="paleta.fondo1" />
+            <stop offset="1" :stop-color="paleta.fondo2" />
+          </linearGradient>
+          <radialGradient :id="`bumper-${codigo ?? 'x'}`" cx="35%" cy="30%" r="75%">
+            <stop offset="0" :stop-color="paleta.metal" />
+            <stop offset="0.45" :stop-color="paleta.acento" />
+            <stop offset="1" :stop-color="paleta.metal2" />
+          </radialGradient>
+          <linearGradient :id="`paleta-${codigo ?? 'x'}`" x1="0" y1="0" x2="1" y2="0">
+            <stop offset="0" :stop-color="paleta.metal" />
+            <stop offset="0.5" :stop-color="paleta.marco" />
+            <stop offset="1" :stop-color="paleta.metal2" />
+          </linearGradient>
+          <linearGradient :id="`tronera-${codigo ?? 'x'}`" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0" stop-color="rgba(255,255,255,.14)" />
+            <stop offset="1" stop-color="rgba(0,0,0,.5)" />
+          </linearGradient>
+        </defs>
+
+        <rect x="0" y="0" width="320" height="416" :fill="`url(#fondo-${codigo ?? 'x'})`" />
+        <!-- vetas del playfield -->
+        <g :stroke="paleta.veta" stroke-width="1" opacity=".55">
+          <path d="M20 40 Q20 250 58 268 L40 268 Q8 240 8 40 Z" fill="none" />
+          <path d="M300 40 Q300 250 262 268 L280 268 Q312 240 312 40 Z" fill="none" />
+        </g>
+        <!-- marco del campo -->
+        <path d="M28 40 Q28 246 62 268 L258 268 Q292 246 292 40"
+              fill="none" :stroke="paleta.marco" stroke-width="5" opacity=".85" />
+        <path d="M28 40 Q28 246 62 268 L258 268 Q292 246 292 40"
+              fill="none" stroke="rgba(255,255,255,.3)" stroke-width="1.4" />
+
+        <!-- salidas laterales -->
+        <g :fill="paleta.marco" opacity=".5">
+          <rect x="10" y="286" width="14" height="70" rx="4" />
+          <rect x="296" y="286" width="14" height="70" rx="4" />
+        </g>
+
+        <!-- bumpers -->
+        <g v-for="(b, i) in BUMPERS" :key="i">
+          <circle :cx="b.x" :cy="b.y" :r="b.r * 1.5" :fill="paleta.bumped[i % paleta.bumped.length]" opacity=".22" />
+          <circle :cx="b.x" :cy="b.y" :r="b.r" :fill="`url(#bumper-${codigo ?? 'x'})`"
+                  :stroke="paleta.metal" stroke-width="2.5" />
+          <circle :cx="b.x" :cy="b.y" :r="b.r * .62" fill="rgba(255,255,255,.18)"
+                  stroke="rgba(255,255,255,.45)" stroke-width="1" />
+          <text :x="b.x" :y="b.y + 1" text-anchor="middle" dominant-baseline="middle"
+                font-family="ui-sans-serif, system-ui" font-size="15" font-weight="800"
+                :fill="paleta.fondo2">x{{ b.mult }}</text>
+        </g>
+
+        <!-- guías de caída -->
+        <g v-if="tabla.length > 1" stroke="rgba(255,255,255,.16)" stroke-width="2">
+          <line v-for="i in tabla.length - 1" :key="i" :x1="(i * 320) / tabla.length"
+                y1="268" :x2="(i * 320) / tabla.length" y2="330" />
+        </g>
+
+        <!-- troneras -->
+        <g v-for="i in Math.max(1, tabla.length)" :key="i">
+          <rect :x="(i - 1) * (320 / Math.max(1, tabla.length)) + 2" :y="TRONERA_Y"
+                :width="320 / Math.max(1, tabla.length) - 4" :height="TRONERA_H" rx="5"
+                :fill="`url(#tronera-${codigo ?? 'x'})`"
+                :stroke="tronera === i - 1 && tabla[i - 1] > 0 ? '#fff3cf' : paleta.marco"
+                :stroke-width="tronera === i - 1 && tabla[i - 1] > 0 ? 2.5 : 1.5" />
+          <text v-if="tabla.length" :x="(i - 0.5) * (320 / Math.max(1, tabla.length))"
+                :y="TRONERA_Y + TRONERA_H / 2" text-anchor="middle" dominant-baseline="middle"
+                font-family="ui-sans-serif, system-ui" font-size="13" font-weight="800"
+                :fill="tronera === i - 1 && tabla[i - 1] > 0 ? '#fff3cf' : 'rgba(232,225,205,.85)'">
+            {{ tabla[i - 1] }}x
+          </text>
+        </g>
+
+        <!-- paletas -->
+        <g>
+          <path d="M36 398 L112 366 L112 382 L40 414 Z" :fill="`url(#paleta-${codigo ?? 'x'})`"
+                :stroke="paleta.metal" stroke-width="1.6" />
+          <path d="M284 398 L208 366 L208 382 L280 414 Z" :fill="`url(#paleta-${codigo ?? 'x'})`"
+                :stroke="paleta.metal" stroke-width="1.6" />
+        </g>
+      </svg>
+
       <canvas ref="canvas" class="mesa" />
+
       <div v-if="resultado && !animando" class="resuelto" :class="{ gana: premio > 0 }">
         <span class="n">x{{ multiplicador ?? resultado.multiplicador ?? 0 }}</span>
         <span v-if="premio > 0" class="p">{{ colones(premio) }}</span>
@@ -338,8 +317,8 @@ function lanzar() {
     </div>
 
     <p class="regla">
-      Suave da 4 rebotes y premio chico; media 7; fuerte 10 o más, con el premio más alto.
-      Cada rebote sale del sorteo: par = izquierda, impar = derecha.
+      La bola rebota en los bumpers (x2, x3, x5) y cae en una tronera: la de más valor paga más.
+      Suave da 4 rebotes y premio chico; media 7; fuerte 10 o más.
     </p>
 
     <button class="btn btn-primary btn-block" :disabled="cargando || animando" @click="lanzar">
@@ -355,23 +334,18 @@ function lanzar() {
   border-radius: 16px; overflow: hidden;
   border: 1px solid var(--border-soft);
   box-shadow: 0 18px 40px rgba(0, 0, 0, .45);
-  background-color: #0b0f14;
-  /* el playfield se ancla abajo: las troneras del arte quedan donde el canvas dibuja las propias */
-  background-size: cover;
-  background-position: bottom center;
-  background-repeat: no-repeat;
 }
-.mesa { display: block; width: 100%; height: auto; aspect-ratio: 320 / 416; }
+.campo { display: block; width: 100%; height: auto; aspect-ratio: 320 / 416; }
+.mesa { position: absolute; inset: 0; display: block; width: 100%; height: 100%; }
 .resuelto {
-  position: absolute; top: 26%; left: 50%; transform: translateX(-50%);
-  display: flex; flex-direction: column; align-items: center; gap: 2px;
-  padding: 10px 20px; border-radius: 12px; text-align: center;
-  background: rgba(6, 8, 12, .88); border: 1px solid var(--border);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, .5);
+  position: absolute; left: 8px; right: 8px; bottom: 8px; z-index: 2;
+  display: flex; align-items: center; justify-content: center; gap: 10px;
+  padding: 7px 12px; border-radius: 10px;
+  background: rgba(4, 6, 10, .92); border: 1px solid var(--border-soft);
 }
-.resuelto .n { font-family: var(--display); font-size: 26px; font-weight: 700; }
-.resuelto .p { color: var(--gold); font-weight: 700; }
-.resuelto .p.cero { color: var(--muted); font-weight: 500; }
+.resuelto .n { font-family: var(--display); font-size: 22px; font-weight: 700; line-height: 1; }
+.resuelto .p { color: var(--gold); font-weight: 700; font-size: 14px; }
+.resuelto .p.cero { color: var(--muted); font-weight: 500; font-size: 13px; }
 .resuelto.gana { border-color: rgba(245, 185, 66, .55); }
 .controles { display: flex; flex-direction: column; gap: 8px; }
 .grupo { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; justify-content: center; }

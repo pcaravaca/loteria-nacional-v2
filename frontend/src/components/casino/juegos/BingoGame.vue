@@ -15,7 +15,9 @@ import {
 import {
   bingoVariante,
   celdasGanadoras,
+  cantoBolilla,
   etiquetaBolilla,
+  jergaBolilla,
   type BingoVarianteCfg,
 } from './bingoVariantes'
 
@@ -149,7 +151,7 @@ function elegirVoz(id: string) {
 }
 
 function probarVoz() {
-  const texto = ronda.value?.bolilla ? etiqueta(ronda.value.bolilla) : 'B 12'
+  const texto = ronda.value?.bolilla ? cantoBolilla(cfg.value, ronda.value.bolilla) : 'B 12'
   cantarBolilla(`¡${texto}!`, vozId.value, true)
 }
 
@@ -237,7 +239,7 @@ async function cantar(manual = false) {
     reproducir('bolilla')
     // La bolilla cantada en voz alta con el preset elegido (si salio una nueva).
     if (data.bolilla > 0 && data.cantadas.length > cantadasAntes) {
-      cantarBolilla(`¡${etiqueta(data.bolilla)}!`, vozId.value)
+      cantarBolilla(`¡${cantoBolilla(cfg.value, data.bolilla)}!`, vozId.value)
     }
     const despues = marcadas.value.flat(2).filter(Boolean).length
     if (despues > antes) reproducir('acierto')
@@ -306,6 +308,7 @@ onUnmounted(() => {
             <span v-for="(b, i) in bolitas" :key="i" class="bolita" :style="b"></span>
           </div>
           <div :key="bolilla" class="bola-grande">{{ etiqueta(bolilla) }}</div>
+          <div v-if="jergaBolilla(bolilla)" class="jerga">{{ jergaBolilla(bolilla) }}</div>
         </div>
         <div class="registro">
           <span v-for="b in cantadas" :key="b" class="bola" :class="{ ultima: b === bolilla }">
@@ -482,6 +485,13 @@ onUnmounted(() => {
   animation: pop .35s ease;
 }
 @keyframes girar { to { transform: rotate(360deg); } }
+/* El remate tico de la bolilla cantada, sobre el tambor. */
+.jerga {
+  position: absolute; left: 50%; bottom: 6px; transform: translateX(-50%);
+  max-width: 92%; text-align: center; font-size: 11.5px; font-weight: 600;
+  color: var(--gold); text-shadow: 0 2px 6px rgba(0, 0, 0, .7);
+  animation: pop .3s ease; pointer-events: none;
+}
 @keyframes pop {
   0% { transform: translate(-50%, -50%) scale(.2); opacity: 0; }
   70% { transform: translate(-50%, -50%) scale(1.12); opacity: 1; }

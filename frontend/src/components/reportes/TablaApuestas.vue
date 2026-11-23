@@ -61,7 +61,7 @@ watch(pagina, cargar)
             <th>Aciertos</th>
             <th>Premio</th>
             <th>Estado</th>
-            <th>Fecha sorteo</th>
+            <th>Fecha del evento</th>
           </tr>
         </thead>
         <tbody>
@@ -87,7 +87,7 @@ watch(pagina, cargar)
             </td>
             <td>
               <div>{{ fechaHora(a.sorteo?.fecha ?? a.created_at) }}</div>
-              <div class="hint">apuesta {{ fechaHora(a.created_at) }}</div>
+              <div class="hint">la apostaste {{ fechaHora(a.created_at) }}</div>
             </td>
           </tr>
         </tbody>

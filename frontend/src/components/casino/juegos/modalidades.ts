@@ -96,10 +96,10 @@ export const MODALIDADES: Record<string, ModalidadCfg[]> = {
     {
       codigo: 'clasica',
       nombre: 'Raspa Clásica',
-      descripcion: 'Tres casillas con 6 símbolos: tres iguales x18 y cualquier par x1.',
+      descripcion: 'Tres casillas con 6 símbolos: tres iguales x3 y cualquier par x2.',
       pagos: [
-        { etiqueta: 'Tres iguales', mult: 'x18' },
-        { etiqueta: 'Cualquier par', mult: 'x1' },
+        { etiqueta: 'Tres iguales', mult: 'x3' },
+        { etiqueta: 'Cualquier par', mult: 'x2' },
       ],
       simbolosTotales: 6,
     },

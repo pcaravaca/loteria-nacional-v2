@@ -30,6 +30,7 @@ import AjedrezGame from './juegos/AjedrezGame.vue'
 import BackgammonGame from './juegos/BackgammonGame.vue'
 import TetrisGame from './juegos/TetrisGame.vue'
 import PinballGame from './juegos/PinballGame.vue'
+import MinaGame from './juegos/MinaGame.vue'
 import { modalidadCompartida } from './juegos/modalidades'
 
 const props = defineProps<{ juego: CasinoGame; clientSeed: string }>()
@@ -361,6 +362,18 @@ const guias: Partial<Record<string, Guia>> = {
       { etq: 'Fuerte (12 rebotes)', mult: 'hasta x11' },
     ],
   },
+  'mina-de-oro': {
+    pasos: [
+      { t: 'Elegí la profundidad', d: 'Suave: 4 filas. Media: 5. Fuerte: 6 y el premio más alto.' },
+      { t: 'Entrá a la mina', d: 'El camino baja una columna por fila; tres minas esperan en cada una.' },
+      { t: 'Cobrar', d: 'Cada fila superada sube el multiplicador. Si pisás una mina, perdés todo.' },
+    ],
+    premios: [
+      { etq: 'Suave (4 filas)', mult: 'hasta x8' },
+      { etq: 'Media (5 filas)', mult: 'hasta x10' },
+      { etq: 'Fuerte (6 filas)', mult: 'hasta x18' },
+    ],
+  },
 }
 
 // Guías genéricas para el catalogo AST (slots y video poker).
@@ -603,6 +616,15 @@ function repetir() {
         v-else-if="juego.codigo === 'tetris'"
         :monto="monto"
         :client-seed="clientSeed"
+      />
+      <MinaGame
+        v-else-if="juego.codigo === 'mina-de-oro'"
+        :codigo="juego.codigo"
+        :resultado="respuesta?.resultado ?? null"
+        :multiplicador="respuesta?.multiplicador ?? 0"
+        :premio="respuesta?.premio ?? 0"
+        :cargando="cargando"
+        @jugar="jugar"
       />
       <PinballGame
         v-else-if="esPinball(juego.codigo)"

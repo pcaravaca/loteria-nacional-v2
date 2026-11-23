@@ -9,12 +9,9 @@ const props = defineProps<{ monto: number; clientSeed: string }>()
 
 const auth = useAuthStore()
 
-const manoId = ref<number | null>(null)
-const mano = ref<number[]>([])
-const crupier = ref<number[]>([])
-const estado = ref('')
-const premio = ref(0)
-const seguro = ref(0)
+const manos = ref<any[]>([])
+const activa = ref<number | null>(null)
+const grupoPremio = ref(0)
 const cargando = ref(false)
 const error = ref('')
 
@@ -28,14 +25,17 @@ const figura = (i: number) => {
 }
 const palo = (i: number) => ['♠', '♥', '♦', '♣'][Math.floor(i / 13)] || ''
 const roja = (i: number) => Math.floor(i / 13) === 1 || Math.floor(i / 13) === 2
+const valorCarta = (i: number) => {
+  const v = i % 13
+  return v === 0 ? 11 : v >= 10 ? 10 : v + 1
+}
 
 const valor = (cartas: number[]) => {
   let total = 0
   let ases = 0
   for (const c of cartas) {
-    const v = c % 13
-    if (v === 0) ases++
-    total += v === 0 ? 11 : v >= 10 ? 10 : v + 1
+    if (c % 13 === 0) ases++
+    total += valorCarta(c)
   }
   while (total > 21 && ases > 0) {
     total -= 10
@@ -44,15 +44,32 @@ const valor = (cartas: number[]) => {
   return total
 }
 
+// La mano en juego: la activa si esta dividida, si no la unica.
+const actual = computed(() => manos.value.find((m) => m.id === activa.value) ?? manos.value[0] ?? null)
+const mano = computed<number[]>(() => actual.value?.mano ?? [])
+const crupier = computed<number[]>(() => actual.value?.crupier ?? [])
+const estado = computed(() => actual.value?.estado ?? '')
+const premio = computed(() => actual.value?.premio ?? 0)
 const valorJugador = computed(() => valor(mano.value))
 const valorCrupier = computed(() => valor(crupier.value))
 const cerrada = computed(() => estado.value !== '' && estado.value !== 'abierta')
+const grupoCerrado = computed(() => manos.value.length > 0 && manos.value.every((m) => m.estado !== 'abierta'))
+const dividida = computed(() => manos.value.length > 1)
+
 // El seguro solo aplica con un As visible del crupier y una sola vez por mano.
 const puedeAsegurar = computed(
-  () => !cerrada.value && crupier.value.length > 0 && crupier.value[0] % 13 === 0 && seguro.value === 0,
+  () => !cerrada.value && crupier.value.length > 0 && crupier.value[0] % 13 === 0 && !actual.value?.seguro,
 )
 // Rendirse es con la mano inicial de dos cartas, antes de pedir o doblar.
-const puedeRendirse = computed(() => !cerrada.value && mano.value.length === 2)
+const puedeRendirse = computed(() => !cerrada.value && !dividida.value && mano.value.length === 2)
+// Dividir: solo la mano inicial, con dos cartas del mismo valor y sin haber dividido.
+const puedeDividir = computed(
+  () =>
+    !cerrada.value &&
+    !dividida.value &&
+    mano.value.length === 2 &&
+    valorCarta(mano.value[0]) === valorCarta(mano.value[1]),
+)
 
 const etiquetas: Record<string, { texto: string; clase: string }> = {
   blackjack: { texto: 'Blackjack · pagas 3:2', clase: 'gana' },
@@ -68,16 +85,14 @@ async function llamar(path: string, body: any = {}) {
   cargando.value = true
   try {
     const { data } = await api.post(path, body)
-    manoId.value = data.mano_id
-    mano.value = data.mano
-    crupier.value = data.crupier
-    estado.value = data.estado
-    premio.value = data.premio ?? 0
-    seguro.value = data.seguro ?? 0
+    manos.value = data.manos ?? []
+    activa.value = data.activa || null
+    grupoPremio.value = data.grupo_premio ?? data.premio ?? 0
     // Reparto/pedida: tono de carta; al cerrar, el arpegio del resultado.
-    if (data.estado && data.estado !== 'abierta') {
-      if (data.estado === 'blackjack' || data.estado === 'ganada') reproducir('ganar')
-      else if (data.estado === 'perdida' || data.estado === 'rendida') reproducir('perder')
+    const ultimo = data.manos?.length ? data.manos[data.manos.length - 1].estado : data.estado
+    if (ultimo && ultimo !== 'abierta') {
+      if (ultimo === 'blackjack' || ultimo === 'ganada') reproducir('ganar')
+      else if (ultimo === 'perdida' || ultimo === 'rendida') reproducir('perder')
       else reproducir('acierto')
     } else {
       reproducir('carta')
@@ -91,23 +106,24 @@ async function llamar(path: string, body: any = {}) {
 }
 
 function empezar() {
-  mano.value = []
-  crupier.value = []
-  estado.value = ''
-  premio.value = 0
-  seguro.value = 0
+  manos.value = []
+  activa.value = null
+  grupoPremio.value = 0
   llamar('/casino/blackjack', { monto: props.monto, client_seed: props.clientSeed })
 }
 
-function pedir() { llamar(`/casino/blackjack/${manoId.value}/hit`) }
-function plantarse() { llamar(`/casino/blackjack/${manoId.value}/stand`) }
-function doblar() { llamar(`/casino/blackjack/${manoId.value}/double`) }
-function rendirse() { llamar(`/casino/blackjack/${manoId.value}/surrender`) }
-function asegurar() { llamar(`/casino/blackjack/${manoId.value}/insurance`) }
+const idActiva = computed(() => activa.value ?? manos.value[0]?.id ?? null)
+function pedir() { llamar(`/casino/blackjack/${idActiva.value}/hit`) }
+function plantarse() { llamar(`/casino/blackjack/${idActiva.value}/stand`) }
+function doblar() { llamar(`/casino/blackjack/${idActiva.value}/double`) }
+function rendirse() { llamar(`/casino/blackjack/${idActiva.value}/surrender`) }
+function asegurar() { llamar(`/casino/blackjack/${idActiva.value}/insurance`) }
+function dividir() { llamar(`/casino/blackjack/${idActiva.value}/split`) }
 
 // No se reparte al abrir la ventana: la apuesta solo se cobra cuando el jugador
 // toca "Repartir". Antes abría el modal y ya te descontaba una mano.
-const listaParaJugar = computed(() => !mano.value.length && !cargando.value)
+const listaParaJugar = computed(() => manos.value.length === 0 && !cargando.value)
+const apostadoTotal = computed(() => props.monto * (dividida.value ? 2 : 1))
 </script>
 
 <template>
@@ -116,15 +132,15 @@ const listaParaJugar = computed(() => !mano.value.length && !cargando.value)
       <span class="placa">Limites {{ colones(monto) }} - {{ colones(monto * 20) }}</span>
       <div class="mesa-head">
         <h3>Blackjack <span class="suits">♠ ♥</span></h3>
-        <p class="reglas">Paga 3 a 2 · La casa se planta en 17 y pide hasta 16</p>
+        <p class="reglas">Paga 3 a 2 · Dividís dos cartas iguales · La casa se planta en 17</p>
       </div>
 
-      <div class="zona" :class="{ 'resalta-ganador': estado === 'perdida' }">
-        <div class="zona-head"><b>Casa</b><span class="valor" v-if="crupier.length">{{ cerrada ? valorCrupier : valor(crupier.slice(0,1)) }}</span></div>
+      <div class="zona" :class="{ 'resalta-ganador': grupoCerrado && estado === 'perdida' }">
+        <div class="zona-head"><b>Casa</b><span class="valor" v-if="crupier.length">{{ grupoCerrado ? valorCrupier : valor(crupier.slice(0,1)) }}</span></div>
         <div class="cartas">
           <div v-for="(c, i) in crupier" :key="i" class="carta"
-               :class="[roja(c) ? 'roja' : 'negra', { oculta: !cerrada && i === 1 }]">
-            <template v-if="cerrada || i !== 1"><span class="fig">{{ figura(c) }}</span><span class="palo">{{ palo(c) }}</span></template>
+               :class="[roja(c) ? 'roja' : 'negra', { oculta: !grupoCerrado && i === 1 }]">
+            <template v-if="grupoCerrado || i !== 1"><span class="fig">{{ figura(c) }}</span><span class="palo">{{ palo(c) }}</span></template>
             <span v-else class="dorso"></span>
           </div>
           <span v-if="!crupier.length" class="vacio">Esperando reparto</span>
@@ -133,28 +149,34 @@ const listaParaJugar = computed(() => !mano.value.length && !cargando.value)
 
       <div class="separador"><span>♠</span><i></i><span>♥</span></div>
 
-      <div class="zona" :class="{ 'resalta-ganador': estado === 'blackjack' || estado === 'ganada' }">
-        <div class="zona-head"><b>Vos</b><span class="valor" v-if="mano.length">{{ valorJugador }}</span></div>
+      <div v-for="(m, idx) in manos" :key="m.id" class="zona"
+           :class="[{ 'en-juego': m.id === activa && !grupoCerrado, 'resalta-ganador': grupoCerrado && (m.estado === 'blackjack' || m.estado === 'ganada') }, 'e-' + m.estado]">
+        <div class="zona-head">
+          <b>{{ dividida ? 'Vos ' + (idx + 1) : 'Vos' }}</b>
+          <span class="valor" v-if="m.mano.length">{{ valor(m.mano) }}</span>
+          <span v-if="dividida" class="mini-estado">{{ m.estado === 'abierta' ? 'En juego' : etiquetas[m.estado]?.texto ?? m.estado }}</span>
+        </div>
         <div class="cartas">
-          <div v-for="(c, i) in mano" :key="i" class="carta" :class="roja(c) ? 'roja' : 'negra'">
+          <div v-for="(c, i) in m.mano" :key="i" class="carta" :class="roja(c) ? 'roja' : 'negra'">
             <span class="fig">{{ figura(c) }}</span><span class="palo">{{ palo(c) }}</span>
           </div>
-          <span v-if="!mano.length" class="vacio">Tu mano aparece aca</span>
+          <span v-if="!m.mano.length" class="vacio">Tu mano aparece aca</span>
         </div>
       </div>
 
       <div class="barra">
-        <span class="barra-item">Saldo <b>{{ colones(auth.user?.saldo ?? 0) }}</b></span>
-        <span class="barra-item">Apuesta <b>{{ colones(monto) }}</b></span>
-        <span class="barra-item aviso">{{ cerrada ? 'Mano terminada' : 'La casa juega en 17' }}</span>
+        <span class="barra-item">Saldo<b>{{ colones(auth.user?.saldo ?? 0) }}</b></span>
+        <span class="barra-item">Apuesta<b>{{ colones(apostadoTotal) }}</b></span>
+        <span class="barra-item aviso">{{ grupoCerrado ? 'Mano terminada' : 'La casa juega en 17' }}</span>
       </div>
     </div>
 
     <div v-if="error" class="error-text">{{ error }}</div>
 
-    <div v-if="estado && estado !== 'abierta'" class="estado" :class="etiquetas[estado]?.clase">
-      <span>{{ etiquetas[estado]?.texto ?? estado }}</span>
-      <strong v-if="premio > 0">{{ colones(premio) }}</strong>
+    <div v-if="grupoCerrado" class="estado"
+         :class="grupoPremio > apostadoTotal ? 'gana' : grupoPremio < apostadoTotal ? 'pierde' : 'empate'">
+      <span>{{ grupoPremio > apostadoTotal ? 'Ganaste' : grupoPremio < apostadoTotal ? 'Perdiste' : 'Empate · devuelve tu apuesta' }}</span>
+      <strong v-if="grupoPremio > apostadoTotal">{{ colones(grupoPremio) }}</strong>
     </div>
 
     <button v-if="listaParaJugar" class="btn btn-primary btn-block" :disabled="cargando" @click="empezar">
@@ -165,6 +187,7 @@ const listaParaJugar = computed(() => !mano.value.length && !cargando.value)
       <button class="btn btn-primary" :disabled="cargando" @click="pedir">Pedir</button>
       <button class="btn btn-ghost" :disabled="cargando" @click="plantarse">Plantarse</button>
       <button class="btn btn-gold" :disabled="cargando" @click="doblar">Doblar</button>
+      <button v-if="puedeDividir" class="btn btn-gold" :disabled="cargando" @click="dividir">Dividir</button>
       <button v-if="puedeAsegurar" class="btn btn-ghost" :disabled="cargando" @click="asegurar">Seguro {{ colones(Math.floor(monto / 2)) }}</button>
       <button v-if="puedeRendirse" class="btn btn-ghost" :disabled="cargando" @click="rendirse">Rendirse</button>
     </div>
@@ -182,13 +205,18 @@ const listaParaJugar = computed(() => !mano.value.length && !cargando.value)
   font-size: 9px; font-weight: 800; letter-spacing: .1em; text-transform: uppercase;
   padding: 4px 7px; border-radius: 4px; box-shadow: 0 3px 8px rgba(0,0,0,.4);
 }
+.mesa { position: relative; padding: 12px 14px 14px; border-radius: 14px; background: linear-gradient(160deg, #0d3b2c, #062018 70%); border: 1px solid rgba(232,206,122,.35); box-shadow: inset 0 14px 30px rgba(0,0,0,.5); }
 .mesa-head { text-align: center; margin-bottom: 8px; padding-top: 6px; }
 .mesa-head h3 { margin: 0; font-size: 22px; letter-spacing: .3em; text-transform: uppercase; color: #f5d778; text-shadow: 0 2px 0 #6b4a12; }
 .mesa-head .suits { letter-spacing: .06em; }
 .reglas { margin: 3px 0 0; font-size: 10.5px; letter-spacing: .08em; color: #e8ce7a; opacity: .9; }
-.zona { display: flex; flex-direction: column; align-items: center; gap: 6px; }
-.zona-head { width: 100%; display: flex; align-items: center; justify-content: space-between; padding: 0 6px; }
+.zona { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 6px 8px; border-radius: 10px; border: 1px solid transparent; }
+.zona.en-juego { border-color: rgba(232,206,122,.4); background: rgba(232,206,122,.06); }
+.zona.e-blackjack, .zona.e-ganada { border-color: rgba(245,185,66,.5); }
+.zona.e-perdida, .zona.e-rendida { border-color: rgba(180,60,60,.45); }
+.zona-head { width: 100%; display: flex; align-items: center; justify-content: space-between; gap: 8px; padding: 0 6px; }
 .zona-head b { font-size: 11px; text-transform: uppercase; letter-spacing: .24em; color: #e8ce7a; }
+.mini-estado { font-size: 10px; opacity: .75; }
 .cartas { display: flex; gap: 8px; flex-wrap: wrap; min-height: 82px; align-items: center; justify-content: center; }
 .vacio { font-size: 12px; opacity: .55; font-style: italic; }
 .carta {
@@ -213,8 +241,11 @@ const listaParaJugar = computed(() => !mano.value.length && !cargando.value)
 .barra-item { font-size: 11px; color: #e8ce7a; opacity: .9; }
 .barra-item b { color: #fff; margin-left: 4px; }
 .barra-item.aviso { opacity: .55; font-style: italic; }
+.error-text { color: #ffb3b3; font-size: 12px; text-align: center; }
 .estado { text-align: center; padding: 9px; border-radius: 10px; background: rgba(0,0,0,.3); border: 1px solid rgba(232,206,122,.35); font-size: 13px; }
-.estado.gana { color: #f5d778; }
+.estado.gana { color: #f5d778; border-color: rgba(245,185,66,.5); }
+.estado.pierde { color: #ffb3b3; border-color: rgba(180,60,60,.45); }
+.estado.empate { color: #e8ce7a; opacity: .9; }
 .estado strong { color: #f5d778; font-size: 17px; margin-left: 6px; }
 .acciones { display: flex; gap: 8px; flex-wrap: wrap; }
 .acciones .btn { flex: 1 1 90px; }
@@ -227,7 +258,7 @@ const listaParaJugar = computed(() => !mano.value.length && !cargando.value)
   .mesa-head h3 { font-size: 17px; letter-spacing: .2em; }
   .reglas { font-size: 9.5px; }
   .placa { top: 7px; left: 8px; font-size: 8px; padding: 3px 5px; }
-  .zona { gap: 4px; }
+  .zona { gap: 4px; padding: 4px 6px; }
   .cartas { min-height: 52px; gap: 5px; }
   .carta { width: 42px; height: 58px; border-radius: 7px; }
   .carta .fig { font-size: 17px; }

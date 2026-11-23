@@ -21,35 +21,56 @@ const cfg = computed(() => modalidadPorCodigo(JUEGO, modalidad.value))
 const pagaRaspa = computed(() => {
   const s = props.resultado?.simbolos ?? []
   if (!s.length || props.premio <= 0) return [false, false, false]
-  // Si dos o mas casilleros son iguales, esos son los que pagaron.
   return s.map((v: any, i: number) => s.some((o: any, j: number) => j !== i && o === v))
 })
 
-const reveladas = ref<boolean[]>([false, false, false])
+// Raspado a mano: el ticket llega comprada del servidor y el jugador va
+// levantando la platea arrastrando el dedo, como en un ticket fisico.
+const raspadas = ref<boolean[]>([false, false, false])
+const raspando = ref(false)
+const comprada = ref(false)
+const todas = computed(() => raspadas.value.every(Boolean))
+
+function revelar(i: number) {
+  if (!comprada.value || raspadas.value[i]) return
+  raspadas.value[i] = true
+  reproducir('rodillo')
+  if (raspadas.value.every(Boolean)) {
+    if (props.premio > 0) reproducir('acierto')
+    else reproducir('perder')
+  }
+}
+
+// El puntero va levantando la platea de cada casilla por la que pasa.
+function porPuntero(e: PointerEvent) {
+  if (!raspando.value) return
+  const el = e.currentTarget as HTMLElement
+  const r = el.getBoundingClientRect()
+  const x = Math.min(Math.max(e.clientX - r.left, 0), r.width)
+  const idx = Math.min(2, Math.floor((x / r.width) * 3))
+  revelar(idx)
+}
 
 watch(
   () => props.resultado,
   (r) => {
     if (!r) return
-    reveladas.value = [false, false, false]
-    r.simbolos.forEach((_: string, i: number) => {
-      window.setTimeout(() => (reveladas.value[i] = true), 500 + i * 450)
-    })
-    // Al terminar de revelar, el acierto se acompana con su propio tono.
-    window.setTimeout(() => {
-      if (props.premio > 0) reproducir('acierto')
-    }, 500 + r.simbolos.length * 450)
+    comprada.value = true
+    raspadas.value = [false, false, false]
   },
 )
 
 function elegirModalidad(codigo: string) {
   modalidad.value = codigo
+  comprada.value = false
+  raspadas.value = [false, false, false]
   reproducir('tecla')
 }
 
-function rascar() {
-  reveladas.value = [false, false, false]
-  reproducir('rodillo')
+function comprar() {
+  comprada.value = false
+  raspadas.value = [false, false, false]
+  reproducir('ficha')
   emit('jugar', { modalidad: modalidad.value })
 }
 </script>
@@ -69,18 +90,31 @@ function rascar() {
     </div>
     <p class="regla">{{ cfg.descripcion }}</p>
 
-    <div class="panel">
-      <div v-for="(s, i) in (resultado?.simbolos ?? ['?', '?', '?'])" :key="i" class="casilla"
-           :class="{ 'resalta-ganador': premio > 0 && pagaRaspa[i] }">
-        <img v-if="reveladas[i]" :src="simbolos[s]" :alt="s" />
+    <div
+      class="panel"
+      :class="{ comprada, lista: todas }"
+      @pointerdown="raspando = true"
+      @pointermove="porPuntero"
+      @pointerup="raspando = false"
+      @pointerleave="raspando = false"
+    >
+      <div
+        v-for="(s, i) in (resultado?.simbolos ?? ['?', '?', '?'])"
+        :key="i"
+        class="casilla"
+        :class="{ 'resalta-ganador': todas && premio > 0 && pagaRaspa[i] }"
+      >
+        <img v-if="raspadas[i]" :src="simbolos[s]" :alt="s" />
         <span v-else class="plata">
           <span class="signo">?</span>
-          <span class="texto">Raspa aqui</span>
+          <span class="texto">Raspa acá</span>
         </span>
       </div>
     </div>
 
-    <div v-if="resultado" class="estado" :class="{ gana: premio > 0 }">
+    <p v-if="comprada && !todas" class="pista">Deslizá el dedo sobre el ticket para raspar.</p>
+
+    <div v-if="todas" class="estado" :class="{ gana: premio > 0 }">
       <template v-if="premio > 0"><span>Ganaste</span><strong>{{ colones(premio) }}</strong></template>
       <span v-else class="neutro">Sin premio · tres iguales pagan {{ cfg.pagos[0].mult }}</span>
     </div>
@@ -89,8 +123,8 @@ function rascar() {
       <span v-for="p in cfg.pagos" :key="p.etiqueta">{{ p.etiqueta }} {{ p.mult }}</span>
     </div>
 
-    <button class="btn btn-primary btn-block" :disabled="cargando" @click="rascar">
-      {{ cargando ? 'Rascando…' : 'Rascar y jugar' }}
+    <button class="btn btn-primary btn-block" :disabled="cargando" @click="comprar">
+      {{ cargando ? 'Comprando…' : comprada ? 'Otro ticket' : 'Comprar ticket' }}
     </button>
   </div>
 </template>
@@ -101,20 +135,26 @@ function rascar() {
 .chip { padding: 6px 12px; border-radius: 999px; border: 1px solid var(--border-soft); background: var(--surface); color: var(--muted); cursor: pointer; font-size: 12px; }
 .chip.activa { border-color: var(--prim); color: var(--prim-2); background: var(--prim-dim); }
 .regla { margin: 0; font-size: 12px; color: var(--faint); text-align: center; line-height: 1.35; }
-.panel { display: flex; gap: 10px; }
+.panel {
+  display: flex; gap: 10px; padding: 6px; border-radius: 16px;
+  background: linear-gradient(160deg, rgba(255,255,255,.04), rgba(255,255,255,.01));
+  border: 1px solid var(--border-soft); touch-action: none; user-select: none;
+}
+.panel.lista { border-color: rgba(245,185,66,.4); }
 .casilla {
-  flex: 1; height: 108px; border-radius: 12px; overflow: hidden; position: relative;
+  flex: 1; height: 118px; border-radius: 12px; overflow: hidden; position: relative;
   background: #05080c; border: 1px solid var(--border); display: grid; place-items: center;
 }
-.casilla img { width: 72px; height: 72px; object-fit: contain; animation: aparecer .35s ease; }
+.casilla img { width: 72px; height: 72px; object-fit: contain; animation: aparecer .3s ease; }
 @keyframes aparecer { from { transform: scale(.7); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 .plata {
   position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
   gap: 4px; background: linear-gradient(140deg, #d7dde4, #98a3b0 40%, #cfd6de 60%, #8b95a1);
-  color: #4a5460;
+  color: #4a5460; cursor: crosshair;
 }
 .plata .signo { font-size: 30px; font-weight: 800; }
 .plata .texto { font-size: 10px; text-transform: uppercase; letter-spacing: .08em; }
+.pista { margin: 0; text-align: center; font-size: 11.5px; color: var(--prim-2); }
 .estado { text-align: center; padding: 10px; border-radius: 10px; background: rgba(255,255,255,.02); border: 1px solid var(--border-soft); color: var(--muted); }
 .estado.gana { background: var(--prim-dim); border-color: rgba(16,185,129,.35); color: var(--prim-2); }
 .estado strong { color: var(--gold); font-size: 18px; margin-left: 6px; }

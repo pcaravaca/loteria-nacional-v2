@@ -736,6 +736,7 @@ func (h *CasinoHandler) BlackjackStart(c *gin.Context) {
 		Mano:           []int{mazo[0], mazo[2]},
 		Crupier:        []int{mazo[1], mazo[3]},
 		Estado:         "abierta",
+		Orden:          1,
 		ClientSeed:     clientSeed,
 		ServerSeedHash: casino.HashSemilla(user.CasinoSeed),
 		Nonce:          nonce,
@@ -777,18 +778,181 @@ func (h *CasinoHandler) BlackjackStart(c *gin.Context) {
 		return
 	}
 
+	// La fila se crea con grupo 0 y se apoda a si misma: asi las divisiones
+	// futuras encuentran el grupo sin una consulta extra.
+	_ = h.db.Model(&models.BlackjackMano{}).Where("id = ?", bj.ID).
+		Update("grupo_id", bj.ID).Error
+	bj.GrupoID = bj.ID
+
+	resp := h.blackjackRespuesta(c, &bj, user.ID)
+	resp["server_seed_hash"] = bj.ServerSeedHash
+	resp["nonce"] = bj.Nonce
+	c.JSON(http.StatusCreated, resp)
+}
+
+
+// blackjackGrupo devuelve las filas de un grupo (una mano y sus divisiones)
+// ordenadas por Orden.
+func (h *CasinoHandler) blackjackGrupo(grupoID uint) []models.BlackjackMano {
+	var filas []models.BlackjackMano
+	if grupoID == 0 {
+		return filas
+	}
+	_ = h.db.Where("grupo_id = ?", grupoID).Order("orden asc, id asc").Find(&filas).Error
+	return filas
+}
+
+// blackjackRespuesta arma la respuesta comun de una mano, con el detalle del
+// grupo cuando esta dividida: la mano activa, las dos manos y el premio total.
+func (h *CasinoHandler) blackjackRespuesta(c *gin.Context, bj *models.BlackjackMano, userID uint) gin.H {
+	hermanas := h.blackjackGrupo(bj.GrupoID)
+	manos := make([]gin.H, 0, len(hermanas)+1)
+	var total int64
+	// activa = 0 cuando el grupo ya esta completo; el frente lo interpreta.
+	activa := uint(0)
+	ordenAbierta := 99
+	agregada := false
+	for _, m := range hermanas {
+		if m.ID == bj.ID {
+			m.Mano = bj.Mano
+			m.Crupier = bj.Crupier
+			m.Estado = bj.Estado
+			m.Premio = bj.Premio
+			m.Orden = bj.Orden
+			agregada = true
+		}
+		// La mano activa es la primera que sigue abierta (la de menor orden),
+		// no la ultima: si hay dos abiertas hay que seguir por la primera.
+		if m.Estado == "abierta" && (activa == 0 || m.Orden < ordenAbierta) {
+			activa = m.ID
+			ordenAbierta = m.Orden
+		}
+		total += m.Premio
+		manos = append(manos, gin.H{
+			"id": m.ID, "orden": m.Orden, "mano": m.Mano, "crupier": m.Crupier,
+			"estado": m.Estado, "premio": m.Premio, "multiplicador": m.Multiplicador,
+		})
+	}
+	if !agregada {
+		manos = append(manos, gin.H{
+			"id": bj.ID, "orden": bj.Orden, "mano": bj.Mano, "crupier": bj.Crupier,
+			"estado": bj.Estado, "premio": bj.Premio, "multiplicador": bj.Multiplicador,
+		})
+		if bj.Estado == "abierta" && ordenAbierta == 99 {
+			activa = bj.ID
+		}
+		total += bj.Premio
+	}
 	var actualizado models.User
-	_ = h.db.First(&actualizado, user.ID)
-	c.JSON(http.StatusCreated, gin.H{
-		"mano_id":          bj.ID,
-		"mano":             bj.Mano,
-		"crupier":          bj.Crupier,
-		"estado":           bj.Estado,
-		"premio":           bj.Premio,
-		"saldo":            actualizado.Saldo,
-		"server_seed_hash": bj.ServerSeedHash,
-		"nonce":            bj.Nonce,
+	_ = h.db.First(&actualizado, userID)
+	return gin.H{
+		"mano_id":       bj.ID,
+		"mano":          bj.Mano,
+		"crupier":       bj.Crupier,
+		"estado":        bj.Estado,
+		"premio":        bj.Premio,
+		"multiplicador": bj.Multiplicador,
+		"saldo":         actualizado.Saldo,
+		"grupo_id":      bj.GrupoID,
+		"activa":        activa,
+		"manos":         manos,
+		"grupo_premio":  total,
+	}
+}
+
+// BlackjackSplit divide la mano inicial en dos cuando las dos cartas valen
+// igual. Cobra una apuesta adicional igual a la original y reparte una carta
+// nueva a cada mano. Ambas se juegan contra el mismo crupier y el premio del
+// grupo es la suma de las dos.
+func (h *CasinoHandler) BlackjackSplit(c *gin.Context) {
+	userID := c.GetUint("userID")
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "id invalido"})
+		return
+	}
+	var bj models.BlackjackMano
+	if err := h.db.Where("id = ? AND user_id = ?", id, userID).First(&bj).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "mano no encontrada"})
+		return
+	}
+	if bj.Estado != "abierta" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "la mano ya esta cerrada"})
+		return
+	}
+	if bj.Orden != 1 || len(bj.Mano) != 2 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "solo se puede dividir la mano inicial"})
+		return
+	}
+	if !casino.BlackjackMismaValor(bj.Mano[0], bj.Mano[1]) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "las dos cartas deben valer igual para dividir"})
+		return
+	}
+
+	var user models.User
+	_ = h.db.First(&user, userID)
+	if user.Saldo < bj.Monto {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "saldo insuficiente para dividir"})
+		return
+	}
+	if !h.verificarLimite(c, user, models.CasinoBlackjack, bj.Monto) {
+		return
+	}
+	if excede, disponible, motivo := EvaluarGasto(h.db, user.ID, bj.Monto); excede {
+		c.JSON(http.StatusTooManyRequests, gin.H{
+			"error":      "tu limite " + motivo + " de gasto se excederia al dividir",
+			"disponible": disponible, "motivo": motivo,
+		})
+		return
+	}
+
+	mazo := casino.Baraja(bj.ClientSeed, user.CasinoSeed, bj.Nonce, 64)
+	grupo := bj.GrupoID
+	if grupo == 0 {
+		grupo = bj.ID
+	}
+	// Cada mano usa su propio bloque del mazo para no pisarse: la primera sigue
+	// en el bloque 0 (posicion 4) y la segunda arranca en el bloque 1 (posicion 20).
+	mano1 := []int{bj.Mano[0], mazo[4]}
+	mano2 := []int{bj.Mano[1], mazo[20]}
+
+	bj.Mano = mano1
+	bj.Orden = 1
+	bj.GrupoID = grupo
+
+	var segunda models.BlackjackMano
+	err = h.db.Transaction(func(tx *gorm.DB) error {
+		if err := tx.Save(&bj).Error; err != nil {
+			return err
+		}
+		segunda = models.BlackjackMano{
+			UserID:         userID,
+			Monto:          bj.Monto,
+			Mano:           mano2,
+			Crupier:        append([]int{}, bj.Crupier...),
+			Estado:         "abierta",
+			Orden:          2,
+			GrupoID:        grupo,
+			ClientSeed:     bj.ClientSeed,
+			ServerSeedHash: bj.ServerSeedHash,
+			Nonce:          bj.Nonce,
+		}
+		if err := tx.Create(&segunda).Error; err != nil {
+			return err
+		}
+		if err := tx.Model(&models.User{}).Where("id = ?", userID).
+			Update("saldo", gorm.Expr("saldo - ?", bj.Monto)).Error; err != nil {
+			return err
+		}
+		mov := models.Movimiento{UserID: userID, Tipo: models.MovCasinoApuesta, Monto: -bj.Monto, Descripcion: "Casino 21 Blackjack (dividir)"}
+		return tx.Create(&mov).Error
 	})
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "no se pudo dividir la mano"})
+		return
+	}
+
+	c.JSON(http.StatusOK, h.blackjackRespuesta(c, &bj, userID))
 }
 
 func (h *CasinoHandler) BlackjackHit(c *gin.Context)    { h.blackjackTurno(c, "hit") }
@@ -849,7 +1013,8 @@ func (h *CasinoHandler) blackjackTurno(c *gin.Context, accion string) {
 			c.JSON(http.StatusInternalServerError, gin.H{"error": "no se pudo guardar la carta"})
 			return
 		}
-		c.JSON(http.StatusOK, gin.H{"mano_id": bj.ID, "mano": mano, "crupier": bj.Crupier, "estado": "abierta", "premio": 0, "saldo": user.Saldo})
+		bj.Mano = mano
+		c.JSON(http.StatusOK, h.blackjackRespuesta(c, &bj, userID))
 		return
 	}
 
@@ -868,6 +1033,9 @@ func (h *CasinoHandler) blackjackTurno(c *gin.Context, accion string) {
 	bj.Estado = estado
 	bj.Premio = premio
 	bj.Multiplicador = mult
+	// Si la mano esta dividida, el crupier completo es de las dos: la hermana
+	// que sigue abierta lo hereda.
+	hermanas := h.blackjackGrupo(bj.GrupoID)
 
 	err = h.db.Transaction(func(tx *gorm.DB) error {
 		if accion == "double" {
@@ -882,6 +1050,15 @@ func (h *CasinoHandler) blackjackTurno(c *gin.Context, accion string) {
 		}
 		if err := tx.Save(&bj).Error; err != nil {
 			return err
+		}
+		for i := range hermanas {
+			if hermanas[i].ID == bj.ID || hermanas[i].Estado != "abierta" {
+				continue
+			}
+			if err := tx.Model(&models.BlackjackMano{}).Where("id = ?", hermanas[i].ID).
+				Update("crupier_raw", bj.CrupierRaw).Error; err != nil {
+				return err
+			}
 		}
 		if premio > 0 {
 			if err := tx.Model(&models.User{}).Where("id = ?", userID).
@@ -900,17 +1077,7 @@ func (h *CasinoHandler) blackjackTurno(c *gin.Context, accion string) {
 		return
 	}
 
-	var actualizado models.User
-	_ = h.db.First(&actualizado, userID)
-	c.JSON(http.StatusOK, gin.H{
-		"mano_id":       bj.ID,
-		"mano":          bj.Mano,
-		"crupier":       bj.Crupier,
-		"estado":        bj.Estado,
-		"premio":        bj.Premio,
-		"multiplicador": bj.Multiplicador,
-		"saldo":         actualizado.Saldo,
-	})
+	c.JSON(http.StatusOK, h.blackjackRespuesta(c, &bj, userID))
 }
 
 // BlackjackSurrender cierra la mano devolviendo la mitad de la apuesta. Solo se

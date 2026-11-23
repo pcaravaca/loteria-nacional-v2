@@ -17,3 +17,6 @@ backend/loteria.db
 Thumbs.db
 .vscode/
 .idea/
+
+# El symlink local de dependencias no se versiona
+frontend/node_modules

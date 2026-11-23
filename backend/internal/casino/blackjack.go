@@ -82,6 +82,10 @@ func ValorBlackjack(mano []int) (valor int, soft bool, pasado bool) {
 	return total, ases > 0, total > 21
 }
 
+// BlackjackMismaValor indica si dos cartas se pueden dividir: mismo valor
+// (un 10 y una J también, que es como se divide en la practica).
+func BlackjackMismaValor(a, b int) bool { return blackjackValorCarta(a) == blackjackValorCarta(b) }
+
 func BlackjackNatural(mano []int) bool {
 	if len(mano) != 2 {
 		return false

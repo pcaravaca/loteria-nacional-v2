@@ -77,7 +77,7 @@ func TestSeedCasino(t *testing.T) {
 
 	// Las tres mesas de pinball quedan activas.
 	for _, codigo := range []string{
-		models.CasinoPinballNeon, models.CasinoPinballClasico, models.CasinoPlinkoPremium,
+		models.CasinoPinballNeon, models.CasinoPinballClasico, models.CasinoMinaDeOro,
 	} {
 		var juego models.CasinoGame
 		if err := db.Where("codigo = ?", codigo).First(&juego).Error; err != nil {

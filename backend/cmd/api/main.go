@@ -198,6 +198,7 @@ func main() {
 	bj.POST("/casino/blackjack/:id/stand", casinoH.BlackjackStand)
 	bj.POST("/casino/blackjack/:id/double", casinoH.BlackjackDouble)
 	bj.POST("/casino/blackjack/:id/surrender", casinoH.BlackjackSurrender)
+	bj.POST("/casino/blackjack/:id/split", casinoH.BlackjackSplit)
 	bj.POST("/casino/blackjack/:id/insurance", casinoH.BlackjackInsurance)
 
 	// Bingo 75: se apuesta al abrir la jugada y las bolillas se cantan de a una.

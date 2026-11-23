@@ -37,6 +37,7 @@ const (
 	CasinoPinballNeon    = "pinball-neon"
 	CasinoPinballClasico = "pinball-clasico"
 	CasinoPlinkoPremium  = "plinko-premium"
+	CasinoMinaDeOro      = "mina-de-oro"
 )
 
 // CasinoGame es un juego del mini casino con sus limites y su RTP declarado.
@@ -90,6 +91,10 @@ type BlackjackMano struct {
 	Multiplicador  float64   `gorm:"not null;default:0" json:"multiplicador"`
 	Premio         int64     `gorm:"not null;default:0" json:"premio"`
 	Seguro         int64     `gorm:"not null;default:0" json:"seguro"` // costo del seguro cobrado; 0 = sin seguro
+	// GrupoID/Orden: las manos divididas (split) son filas hermanas. Orden 1 y 2;
+	// el crupier es comun y el premio del grupo es la suma de las dos.
+	GrupoID uint `gorm:"index" json:"grupo_id"`
+	Orden   int  `gorm:"not null;default:1" json:"orden"`
 	ClientSeed     string    `gorm:"size:64" json:"client_seed"`
 	ServerSeedHash string    `gorm:"size:64" json:"server_seed_hash"`
 	Nonce          int64     `json:"nonce"`

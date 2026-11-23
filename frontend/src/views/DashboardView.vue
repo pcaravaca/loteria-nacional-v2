@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { onMounted, ref } from 'vue'
+// El panel es la pantalla de inicio de la app: saldo, accesos y próximos sorteos.
 import { api } from '@/api/client'
 import type { Dashboard, Sorteo } from '@/types'
 import { colones, estadoApuesta, fechaHora } from '@/utils/formato'
@@ -80,6 +81,15 @@ async function onComprada() {
         />
       </div>
 
+      <div class="section-title">Accesos</div>
+      <div class="accesos">
+        <router-link class="acceso" to="/loterias"><b>🎱</b><span>Loterías</span></router-link>
+        <router-link class="acceso" to="/quinielas"><b>⚽</b><span>Quinielas</span></router-link>
+        <router-link class="acceso" to="/rifas"><b>🎁</b><span>Rifas</span></router-link>
+        <router-link class="acceso" to="/casino"><b>🎰</b><span>Casino</span></router-link>
+        <router-link class="acceso" to="/reportes?tab=apuestas"><b>📊</b><span>Reportes</span></router-link>
+      </div>
+
       <div class="section-title">Próximos sorteos</div>
       <div v-if="proximos.length" class="grid grid-3">
         <SorteoCard v-for="s in proximos" :key="s.id" :sorteo="s" @jugar="sorteoParaJugar = s" />
@@ -99,7 +109,7 @@ async function onComprada() {
               <th>Números</th>
               <th>Monto</th>
               <th>Estado</th>
-              <th>Fecha</th>
+              <th>Fecha del evento</th>
             </tr>
           </thead>
           <tbody>
@@ -116,7 +126,10 @@ async function onComprada() {
                   {{ (estadoApuesta[a.estado] ?? {}).texto ?? a.estado }}
                 </span>
               </td>
-              <td>{{ fechaHora(a.created_at) }}</td>
+              <td>
+                <div>{{ fechaHora(a.sorteo?.fecha ?? a.created_at) }}</div>
+                <div class="hint">la apostaste {{ fechaHora(a.created_at) }}</div>
+              </td>
             </tr>
           </tbody>
         </table>
@@ -131,6 +144,21 @@ async function onComprada() {
         </EmptyState>
       </div>
     </template>
+
+<style scoped>
+.accesos { display: grid; grid-template-columns: repeat(5, 1fr); gap: 10px; }
+.acceso {
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  padding: 12px 6px; border-radius: 12px; text-align: center;
+  background: linear-gradient(180deg, var(--surface), var(--bg-2));
+  border: 1px solid var(--border-soft); color: var(--muted);
+}
+.acceso b { font-size: 20px; }
+.acceso span { font-size: 11.5px; }
+.acceso:hover { color: var(--text); border-color: var(--border); }
+.hint { font-size: 10.5px; color: var(--faint); margin-top: 2px; }
+@media (max-width: 560px) { .accesos { grid-template-columns: repeat(3, 1fr); } }
+</style>
 
     <ApuestaModal
       v-if="sorteoParaJugar"

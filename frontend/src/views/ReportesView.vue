@@ -8,13 +8,15 @@ import TablaApuestas from '@/components/reportes/TablaApuestas.vue'
 import TablaJugadas from '@/components/reportes/TablaJugadas.vue'
 import TablaMovimientos from '@/components/reportes/TablaMovimientos.vue'
 import TablaResultados from '@/components/reportes/TablaResultados.vue'
+import TablaRifas from '@/components/reportes/TablaRifas.vue'
 
 // Reportes concentra todos los listados del cliente: el resumen, las apuestas
-// de sorteo, las jugadas del casino y los movimientos de saldo. Cada seccion
-// pagina por su lado.
+// de sorteo, las rifas, las jugadas del casino y los movimientos de saldo. Cada
+// seccion pagina por su lado.
 const TABS = [
   { id: 'resumen', titulo: 'Resumen' },
   { id: 'apuestas', titulo: 'Mis apuestas' },
+  { id: 'rifas', titulo: 'Mis rifas' },
   { id: 'jugadas', titulo: 'Jugadas del casino' },
   { id: 'movimientos', titulo: 'Movimientos de saldo' },
   { id: 'resultados', titulo: 'Resultados por sorteo' },
@@ -62,7 +64,7 @@ onMounted(() => {
     <div class="page-head">
       <div class="eyebrow">Estadísticas</div>
       <h1>Reportes</h1>
-      <p>Tus apuestas, jugadas, movimientos y resultados, todos paginados.</p>
+      <p>Tus apuestas, rifas, jugadas, movimientos y resultados, todos paginados.</p>
     </div>
 
     <div class="chips-filtro" role="navigation" aria-label="Secciones de reportes">
@@ -134,6 +136,7 @@ onMounted(() => {
     </div>
 
     <TablaApuestas v-else-if="tab === 'apuestas'" />
+    <TablaRifas v-else-if="tab === 'rifas'" />
     <TablaJugadas v-else-if="tab === 'jugadas'" />
     <TablaMovimientos v-else-if="tab === 'movimientos'" />
     <TablaResultados v-else-if="tab === 'resultados'" />

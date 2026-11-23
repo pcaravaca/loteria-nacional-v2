@@ -111,6 +111,46 @@ export function bingoVariante(codigo: string): BingoVarianteCfg {
   return BINGO_VARIANTES[codigo] ?? BINGO_VARIANTES.bingo
 }
 
+
+// Jerga del bingo: cada bolilla cantada con su nombre tradicional (y un remate
+// tico cuando aplica). El llamador la canta en voz alta y tambien se muestra.
+const JERGA_BINGO: Record<number, string> = {
+  2: 'los dos patitos',
+  4: 'la cama, ¡el gato!',
+  7: 'la muleta, el revólver',
+  8: 'la señora gorda',
+  9: '¡levántale el rabo a la burra y bebe!',
+  11: 'las banderillas',
+  12: 'la docena',
+  13: 'la mala pata, ni te cases ni te embarques',
+  15: 'la niña bonita',
+  19: 'el correo para Cuba',
+  22: 'los dos patitos en el lago',
+  25: 'Navidad',
+  27: 'la baraja, ¡pura vida!',
+  33: 'la edad de Cristo',
+  36: 'la mala pata, ¡aguás!',
+  48: 'el borrego',
+  55: 'los dos cinco, ¡tuanis!',
+  63: 'la cebolla',
+  70: 'el medio siglo',
+  75: 'fin del juego',
+  81: 'el matrimonio',
+  88: 'las gordas',
+  90: 'el abuelo',
+}
+
+export function jergaBolilla(n: number): string {
+  return JERGA_BINGO[n] ?? ''
+}
+
+// Canto completo: la letra y el numero con su jerga.
+export function cantoBolilla(cfg: BingoVarianteCfg, n: number): string {
+  const base = etiquetaBolilla(cfg, n)
+  const j = jergaBolilla(n)
+  return j ? `${base}, ${j}` : base
+}
+
 // etiquetaBolilla deja el número con su letra (B-12, I-25…). En el ticket 90
 // se usa la columna (1-12, 2-25…) porque no hay letras BINGO.
 export function etiquetaBolilla(cfg: BingoVarianteCfg, n: number): string {

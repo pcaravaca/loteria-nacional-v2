@@ -318,8 +318,10 @@ type raspaCfg struct {
 	Par      int64
 }
 
+// El par paga x2: antes pagaba x1 y el jugador "ganaba" lo mismo que habia
+// apostado, lo que no se entendia. Los triple se ajustaron para conservar el RTP.
 var raspaCfgs = map[string]raspaCfg{
-	"clasica": {Simbolos: 6, Triple: 18, Par: 1},
+	"clasica": {Simbolos: 6, Triple: 3, Par: 2},
 	"expres":  {Simbolos: 4, Triple: 5, Par: 1},
 }
 
@@ -989,6 +991,8 @@ func Jugar(codigo string, monto int64, draws []int, p Params) (Outcome, error) {
 		return jugarBaccarat(monto, draws, p)
 	case "pinball-neon", "pinball-clasico", "plinko-premium":
 		return jugarPinball(codigo, monto, draws, p)
+	case minaCodigoBase:
+		return minaJugar(codigo, monto, draws, p)
 	}
 	// Catalogo AST Casino: maquinas tragamonedas y mesas de video poker.
 	if _, ok := BuscarSlot(codigo); ok {
@@ -1094,6 +1098,10 @@ func MultiplicadorMaximo(codigo string, maxMultipl int64) int64 {
 	if m := pinballMaxMult(codigo); m > 0 {
 		return m
 	}
+	// Mina de Oro: el multiplicador lo marca la tabla del nivel (hasta x3).
+	if codigo == minaCodigoBase {
+		return minaMultiplicadorMaximo()
+	}
 	// Los juegos que tienen modalidades pueden pagar mas que el multiplicador
 	// declarado en el catalogo (el hilo en racha paga x6). El tope cubre todas
 	// las modalidades para que ninguna apuesta supere el techo de premio.
@@ -1155,6 +1163,9 @@ func Draws(codigo string) int {
 		return 6
 	case "pinball-neon", "pinball-clasico", "plinko-premium":
 		return pinballDraws(codigo)
+	case minaCodigoBase:
+		// 6 filas (la dificultad mas larga) por 3 draws por fila.
+		return minaMaxFilas * (minaPorFila + 1)
 	}
 	// Catalogo AST: cada rodillo y fila de la ventana consume un draw.
 	if s, ok := BuscarSlot(codigo); ok {
@@ -1229,6 +1240,8 @@ func paramsRTP(codigo, modalidad string) Params {
 	case "raspa":
 	case "pinball-neon", "pinball-clasico", "plinko-premium":
 		p["fuerza"] = 1
+	case minaCodigoBase:
+		p["dificultad"] = 1
 	}
 	return p
 }
