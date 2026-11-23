@@ -458,7 +458,7 @@ function repetir() {
 </script>
 
 <template>
-  <Modal :titulo="juego.nombre" :sub="juego.descripcion" ancho="lg" mostrar-cerrar @cerrar="emit('cerrar')">
+  <Modal :titulo="''" ancho="lg" mostrar-cerrar @cerrar="emit('cerrar')">
     <div class="casino-modal" :data-tema="auth.temaCasino" :style="{ zoom: zoom / 100 }">
       <div class="tema-marquesina">
         <b>{{ juego.nombre }}</b>
@@ -696,18 +696,7 @@ function repetir() {
 
 /* En pantallas chicas el tablero manda: se saca el arte decorativo y se compactan
    los controles para que el cartón o la mesa queden visibles sin scrollear. */
-@media (max-width: 640px) {
-  .casino-modal { gap: 8px; }
-  .tema-marquesina { padding: 5px 10px; font-size: 11px; }
-  .tema-marquesina > span { display: none; }
-  .step { width: 32px; height: 32px; font-size: 15px; }
-  .monto { padding: 5px; }
-  .monto strong { font-size: 17px; }
-  .rapidos { gap: 5px; }
-  .rapidos .chip { padding: 4px 8px; font-size: 11px; }
-  .saldo { font-size: 11px; }
-  .hero { display: none; }
-}
+
 .casino-modal > div { min-width: 0; }
 .rapidos { flex-wrap: wrap; }
 /* Controles compactos: cuanto menos ocupen, mas lugar tiene el tablero. */
@@ -789,4 +778,27 @@ function repetir() {
 .acciones-resultado { display: flex; gap: 10px; justify-content: flex-end; }
 .nota { font-size: 11px; color: var(--faint); text-align: center; }
 .hash { font-family: ui-monospace, monospace; }
+
+@media (max-width: 640px) {
+  .casino-modal { gap: 6px; }
+  /* El encabezado (titulo/sub) se saca: la marquesina ya identifica el juego y
+     el carton necesita esos ~120 px. */
+  .tema-marquesina {
+    padding: 5px 10px; font-size: 10.5px; letter-spacing: .08em;
+    gap: 6px; row-gap: 3px; border-radius: 10px; flex-wrap: nowrap;
+  }
+  .tema-marquesina > b { font-size: 11px; }
+  .tema-marquesina > span { display: none; }
+  .zoom-ctl button { padding: 1px 6px; font-size: 11px; }
+  .zoom-ctl .zoom-val { min-width: 38px; }
+  .btn-pantalla { width: 27px; height: 24px; }
+  .apuesta { gap: 6px; }
+  .step { width: 30px; height: 30px; font-size: 14px; }
+  .monto { padding: 4px 6px; }
+  .monto strong { font-size: 16px; }
+  .rapidos { gap: 5px; }
+  .rapidos .chip { padding: 4px 7px; font-size: 10.5px; }
+  .saldo { font-size: 11px; }
+  .hero { display: none; }
+}
 </style>
