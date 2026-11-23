@@ -63,9 +63,13 @@ func (h *RifasHandler) Listar(c *gin.Context) {
 	}
 	type salida struct {
 		models.Rifa
-		Vendidos  int                `json:"vendidos"`
-		Total     int                `json:"total"`
+		Vendidos  int                  `json:"vendidos"`
+		Total     int                  `json:"total"`
 		Ganadores []models.GanadorRifa `json:"ganadores,omitempty"`
+		// Vencida: la fecha de sorteo ya paso y nadie graduo la rifa. Sigue en
+		// el estado "abierta" de la tabla hasta que el operador la sortee o la
+		// cancele, pero ya no se puede comprar.
+		Vencida bool `json:"vencida"`
 	}
 	out := make([]salida, 0, len(rifas))
 	for _, r := range rifas {
@@ -73,6 +77,9 @@ func (h *RifasHandler) Listar(c *gin.Context) {
 		var vendidos int64
 		h.db.Model(&models.RifaNumero{}).Where("rifa_id = ? AND user_id IS NOT NULL", r.ID).Count(&vendidos)
 		s := salida{Rifa: r, Vendidos: int(vendidos), Total: total}
+		if r.Estado == models.RifaAbierta && r.FechaSorteo.Before(time.Now()) {
+			s.Vencida = true
+		}
 		if r.Estado == models.RifaSorteada {
 			s.Ganadores = rifasGanadores(h.db, r)
 		}
@@ -154,6 +161,12 @@ func (h *RifasHandler) Comprar(c *gin.Context) {
 	}
 	if rifa.Estado != models.RifaAbierta {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "la rifa no está abierta"})
+		return
+	}
+	// La fecha de sorteo vencida bloquea la compra: la rifa tiene que graduarse
+	// antes de que se le carguen numeros.
+	if rifa.FechaSorteo.Before(time.Now()) {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "esta rifa ya venció; tiene que ser sorteada antes de recibir numeros"})
 		return
 	}
 	// El acceso por paquete o por jugador puede apagar la rifa: la compra se
@@ -249,14 +262,14 @@ func (h *RifasHandler) Mias(c *gin.Context) {
 		return
 	}
 	type item struct {
-		RifaID   uint   `json:"rifa_id"`
-		Titulo   string `json:"titulo"`
-		Premio   string `json:"premio"`
-		Estado   string `json:"estado"`
-		Numero   int    `json:"numero"`
-		Monto    int64  `json:"monto"`
-		Fecha    string `json:"fecha_sorteo"`
-		Ganador  bool   `json:"ganador"`
+		RifaID  uint   `json:"rifa_id"`
+		Titulo  string `json:"titulo"`
+		Premio  string `json:"premio"`
+		Estado  string `json:"estado"`
+		Numero  int    `json:"numero"`
+		Monto   int64  `json:"monto"`
+		Fecha   string `json:"fecha_sorteo"`
+		Ganador bool   `json:"ganador"`
 	}
 	out := make([]item, 0, len(nums))
 	for _, n := range nums {

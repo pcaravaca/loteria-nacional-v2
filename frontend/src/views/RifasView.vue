@@ -25,6 +25,7 @@ interface RifaCard {
   numeros_ganadores: number[]
   vendidos: number
   total: number
+  vencida: boolean
   ganadores?: { numero: number; nombre: string }[]
 }
 
@@ -160,8 +161,11 @@ const totalCompra = computed(() =>
         <div v-for="r in rifas" :key="r.id" class="card card-hover rifa">
           <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:8px">
             <h3 style="font-size:17px">{{ r.titulo }}</h3>
-            <span class="badge" :class="r.estado === 'abierta' ? 'badge-ok' : r.estado === 'sorteada' ? 'badge-gold' : 'badge-bad'">
-              {{ r.estado }}
+            <span
+              class="badge"
+              :class="r.vencida ? 'badge-bad' : r.estado === 'abierta' ? 'badge-ok' : r.estado === 'sorteada' ? 'badge-gold' : 'badge-bad'"
+            >
+              {{ r.vencida ? 'vencida' : r.estado }}
             </span>
           </div>
           <p class="texto-muted" style="font-size:13px; margin:6px 0 0">{{ r.descripcion }}</p>
@@ -189,12 +193,16 @@ const totalCompra = computed(() =>
             </ul>
           </div>
 
+          <p v-if="r.vencida" class="hint" style="color: var(--danger, #ff9b9b)">
+            El sorteo ya pasó; el operador tiene que graduarla antes de que se pueda jugar.
+          </p>
           <button
             v-if="r.estado === 'abierta'"
             class="btn btn-primary btn-block"
+            :disabled="r.vencida"
             @click="abrir(r)"
           >
-            Jugar
+            {{ r.vencida ? 'Vencida' : 'Jugar' }}
           </button>
         </div>
       </div>
