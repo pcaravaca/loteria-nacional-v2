@@ -1093,8 +1093,8 @@ func MultiplicadorMaximo(codigo string, maxMultipl int64) int64 {
 	if m := MaxMultiplPoker(codigo); m > 0 {
 		return m
 	}
-	// Pinball: el multiplicador lo pone la tronera, la fuerza y los bumpers; el
-	// tope de la mesa cubre los tres sin tocar el catálogo.
+	// Pinball: el multiplicador sale de la tabla de tramos sobre el puntaje de
+	// la partida; el tope de la mesa cubre las tres sin tocar el catálogo.
 	if m := pinballMaxMult(codigo); m > 0 {
 		return m
 	}
@@ -1162,7 +1162,8 @@ func Draws(codigo string) int {
 	case "baccarat":
 		return 6
 	case "pinball-neon", "pinball-clasico", "plinko-premium":
-		return pinballDraws(codigo)
+		// El pinball no sortea draws: el resultado sale de la traza de inputs.
+		return 0
 	case minaCodigoBase:
 		// 6 filas (la dificultad mas larga) por 3 draws por fila.
 		return minaMaxFilas * (minaPorFila + 1)
@@ -1239,7 +1240,7 @@ func paramsRTP(codigo, modalidad string) Params {
 		p["tipo"] = "banca"
 	case "raspa":
 	case "pinball-neon", "pinball-clasico", "plinko-premium":
-		p["fuerza"] = 1
+		// sin params: la traza la pone el llamador
 	case minaCodigoBase:
 		p["dificultad"] = 1
 	}

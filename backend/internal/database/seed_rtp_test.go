@@ -3,6 +3,7 @@ package database
 import (
 	"testing"
 
+	"loteria-backend/internal/casino"
 	"loteria-backend/internal/config"
 	"loteria-backend/internal/models"
 )
@@ -43,11 +44,31 @@ func TestSeedCasinoDobleRTP(t *testing.T) {
 		}
 	}
 
+	// Las tres mesas de pinball son de habilidad: declaran los dos numeros
+	// (el hábil es el campo rtp). Sus cifras salen del mismo motor que paga
+	// (casino.PinballRTPHabil/Casual), no de una estimacion.
+	for _, codigo := range []string{
+		models.CasinoPinballNeon, models.CasinoPinballClasico, models.CasinoPlinkoPremium,
+	} {
+		var juego models.CasinoGame
+		if err := db.Where("codigo = ?", codigo).First(&juego).Error; err != nil {
+			t.Fatalf("%s: %v", codigo, err)
+		}
+		if juego.RTPCasual <= 0 {
+			t.Errorf("%s: rtp_casual = %.2f, debe estar declarado", codigo, juego.RTPCasual)
+		}
+		if juego.RTP != casino.PinballRTPHabil() || juego.RTPCasual != casino.PinballRTPCasual() {
+			t.Errorf("%s: declara %.2f/%.2f, el motor mide %.2f/%.2f",
+				codigo, juego.RTP, juego.RTPCasual,
+				casino.PinballRTPHabil(), casino.PinballRTPCasual())
+		}
+	}
+
 	// Azar puro: un solo RTP, rtp_casual = 0.
 	for _, codigo := range []string{
 		models.CasinoDados, models.CasinoSlots, models.CasinoRuleta,
 		models.CasinoRaspa, models.CasinoKeno, models.CasinoBingo,
-		models.CasinoPinballNeon, models.CasinoPinballClasico, models.CasinoMinaDeOro,
+		models.CasinoMinaDeOro,
 	} {
 		var juego models.CasinoGame
 		if err := db.Where("codigo = ?", codigo).First(&juego).Error; err != nil {

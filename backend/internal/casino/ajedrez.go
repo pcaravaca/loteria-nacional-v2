@@ -217,7 +217,7 @@ const (
 	// x1.7 por victoria y devolver lo apostado en empate cierran el hábil en
 	// ~85 % (banda 78-92 %); el casual queda declarado (~5 %).
 	AjedrezPartidaMultVictoria = 1.7
-	AjedrezPartidaMultEmpate  = 1.0
+	AjedrezPartidaMultEmpate   = 1.0
 )
 
 // AjedrezPosicion es el estado completo de un tablero.
@@ -288,7 +288,7 @@ func ajedrezIndice(s string) (int, bool) {
 	if c < 0 || c > 7 || f < 0 || f > 7 {
 		return 0, false
 	}
-	return (7 - f) * 8 + c, true
+	return (7-f)*8 + c, true
 }
 
 // ajedrezCasilla convierte un indice en notacion algebraica.
@@ -578,7 +578,7 @@ func (t *AjedrezPosicion) pseudoMovs() []AjedrezMovimiento {
 			if nf >= 0 && nf < 8 && t.Casillas[nf*8+c] == 0 {
 				out = append(out, ajedrezPromoMovs(idx, nf*8+c, nf == fin)...)
 				if f == ini && t.Casillas[(f+2*dir)*8+c] == 0 {
-					out = append(out, AjedrezMovimiento{Desde: idx, Hasta: (f + 2*dir) * 8 + c, Doble: true})
+					out = append(out, AjedrezMovimiento{Desde: idx, Hasta: (f+2*dir)*8 + c, Doble: true})
 				}
 			}
 			for _, dc := range []int{-1, 1} {
@@ -1154,7 +1154,7 @@ func AjedrezSimularPartida(semilla int64, habil, jugadorBlancas bool) float64 {
 	if !jugadorBlancas {
 		color = "negras"
 	}
-	return AjedrezPartidaMultiplicador(AjedrezResultadoSimulacion(semilla, habil,jugadorBlancas), color)
+	return AjedrezPartidaMultiplicador(AjedrezResultadoSimulacion(semilla, habil, jugadorBlancas), color)
 }
 
 // RTPAjedrezPartida mide el retorno de la partida completa simulando dos

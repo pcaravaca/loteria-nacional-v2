@@ -130,7 +130,7 @@ func TetrisSoltar(tablero []int, secuencia []int, pieza, col, rot int) (int, boo
 		return 0, false
 	}
 	y := 0
-	for fits(y+1) {
+	for fits(y + 1) {
 		y++
 	}
 	valor := secuencia[pieza] + 1

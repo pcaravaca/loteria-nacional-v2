@@ -130,7 +130,7 @@ func BlackjackResultado(jugador, crupier []int, apostado int64) (string, int64, 
 }
 
 // Palo y Figura se exponen para dibujar las cartas en el cliente.
-func PaloCarta(i int) string { return blackjackPalo(i) }
+func PaloCarta(i int) string   { return blackjackPalo(i) }
 func FiguraCarta(i int) string { return blackjackFigura(i) }
 
 // Rendirse (surrender): solo con la mano inicial de dos cartas, antes de pedir.

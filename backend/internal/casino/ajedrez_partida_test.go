@@ -300,7 +300,7 @@ func pct(p, n int) float64 { return float64(p) / float64(n) * 100 }
 // TestAjedrezFENConocidos verifica algunas posiciones y jugadas de referencia.
 func TestAjedrezFENConocidos(t *testing.T) {
 	casos := []struct {
-		fen    string
+		fen     string
 		legales int
 	}{
 		{"rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1", 20},
@@ -325,7 +325,7 @@ func TestAjedrezFENConocidos(t *testing.T) {
 // TestAjedrezNotacionUCI abarca las cuatro esquinas del tablero.
 func TestAjedrezNotacionUCI(t *testing.T) {
 	for _, c := range []struct {
-		idx  int
+		idx    int
 		nombre string
 	}{
 		{0, "a8"}, {7, "h8"}, {56, "a1"}, {63, "h1"}, {60, "e1"}, {4, "e8"}, {36, "e4"},

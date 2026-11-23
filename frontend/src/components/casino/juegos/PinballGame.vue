@@ -1,11 +1,44 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, ref, watch } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import { colones } from '@/utils/formato'
 import { reproducir } from '@/utils/sfx'
+import { crearSim, SPEC, type Evento, type SimPinball } from './pinballFisica'
 
-// El playfield es SVG: asi bumpers, troneras y paletas comparten las mismas
-// coordenadas que la bola. Con una imagen de fondo el canvas quedaba desalineado
-// y las troneras dibujadas no coincidian con las del arte.
+// Pinball real: el jugador controla los flippers y el plunger con un motor
+// determinista de paso fijo (1 frame = 1/60 s). La traza de inputs se manda al
+// servidor, que la replica y paga segun la tabla de tramos de la casa.
+//
+// La tabla está duplicada acá y en backend/internal/casino/pinball.go: si se
+// cambia una, cambia la otra (TestPinballRTP verifica el RTP de la del server).
+// Espejo de casino.pinballTramos; el componente prefiere los tramos que manda
+// el servidor en la respuesta y usa estos solo si llegan vacíos.
+const TRAMOS_RESPALDO: Array<[number, number]> = [
+  [0, 0],
+  [900, 1],
+  [1500, 2],
+  [2400, 3],
+  [3600, 5],
+  [5000, 7],
+]
+
+type TramoPinball = { desde?: number; mult?: number; Desde?: number; Mult?: number }
+
+function tramosDeServidor(raw: unknown): Array<[number, number]> | null {
+  if (!Array.isArray(raw) || raw.length === 0) return null
+  const out: Array<[number, number]> = []
+  for (const t of raw as TramoPinball[]) {
+    const desde = Number(t.desde ?? t.Desde ?? 0)
+    const mult = Number(t.mult ?? t.Mult ?? 0)
+    if (!Number.isFinite(desde) || !Number.isFinite(mult)) continue
+    out.push([desde, Math.round(mult)])
+  }
+  return out.length > 0 ? out : null
+}
+
+const tramos = computed<Array<[number, number]>>(() =>
+  tramosDeServidor(props.resultado?.tramos) ?? TRAMOS_RESPALDO,
+)
+
 const props = defineProps<{
   resultado: any
   premio: number
@@ -14,13 +47,6 @@ const props = defineProps<{
   multiplicador?: number
 }>()
 const emit = defineEmits<{ jugar: [Record<string, unknown>] }>()
-
-const FUERZAS = [
-  { id: 0, nombre: 'Suave' },
-  { id: 1, nombre: 'Media' },
-  { id: 2, nombre: 'Fuerte' },
-]
-const fuerza = ref(1)
 
 const PALETAS: Record<string, {
   fondo1: string; fondo2: string; marco: string; veta: string; acento: string
@@ -40,173 +66,244 @@ const PALETAS: Record<string, {
   },
 }
 const paleta = computed(() => PALETAS[props.codigo ?? ''] ?? PALETAS['pinball-neon'])
+const uid = computed(() => props.codigo ?? 'x')
 
-const canvas = ref<HTMLCanvasElement | null>(null)
-const animando = ref(false)
-const fila = ref(-1)
-const bolaX = ref(160)
-const bolaY = ref(14)
-const tronera = ref<number | null>(null)
+// ---- estado de la simulacion (refs porque se actualizan 60 veces por segundo)
+let sim: SimPinball = crearSim()
+const fase = ref<'lista' | 'jugando' | 'cobrando'>('lista')
+const bola = ref<{ x: number; y: number; r: number } | null>(null)
+const angL = ref<number>(SPEC.FLIP_L.reposo)
+const angR = ref<number>(SPEC.FLIP_R.reposo)
+const actL = ref(false)
+const actR = ref(false)
+const puntos = ref(0)
+const enJuego = ref(0)
+const bolasRestantes = ref<number>(SPEC.BOLAS)
+const carga = ref(0)
+const cargandoPlunger = ref(false)
 
-const tabla = computed<number[]>(() => props.resultado?.tabla ?? [])
-const camino = computed<number[]>(() => props.resultado?.camino ?? [])
+let frame = 0
+let cola: Array<{ k: 'L' | 'R' | 'P'; v: number }> = []
+const traza: Evento[] = []
+let flipLState = false
+let flipRState = false
+let temporizador = 0
+let ultimo = 0
+let acumulado = 0
+let cobroPendiente = 0
 
-// Geometria del campo (viewBox 320x416), compartida por el SVG y la bola.
-const BUMPERS = [
-  { x: 92, y: 78, r: 24, mult: 2 },
-  { x: 228, y: 78, r: 24, mult: 3 },
-  { x: 160, y: 134, r: 24, mult: 5 },
-]
-const TRONERA_Y = 330
-const TRONERA_H = 30
+const PASO = 1 / 60
 
-function aclarar(hex: string, t: number): string {
-  const n = parseInt(hex.slice(1), 16)
-  const mez = (c: number) => Math.round(c + (255 - c) * t)
-  return `rgb(${mez((n >> 16) & 255)},${mez((n >> 8) & 255)},${mez(n & 255)})`
+const multEstimado = computed(() => {
+  let m = 0
+  for (const [desde, mult] of tramos.value) if (puntos.value >= desde) m = mult
+  return m
+})
+
+// Texto de la regla derivado de la tabla vigente: si cambia la tabla no hace
+// falta tocar el template.
+const textoRegla = computed(() => {
+  const pagan = tramos.value.filter(([, m]) => m > 0)
+  const primero = pagan[0]
+  const ultimo = pagan[pagan.length - 1]
+  if (!primero || !ultimo) return ''
+  return `Cada partida son 3 bolas; los puntos de bumpers y slingshots definen el tramo: `
+    + `desde ${primero[0]} puntos pagás x${primero[1]}, y el tramo más alto paga x${ultimo[1]} `
+    + `a partir de ${ultimo[0]} puntos.`
+})
+
+const paredes = computed(() =>
+  SPEC.PAREDES.reduce<Array<{ x1: number; y1: number; x2: number; y2: number }>>((acc, p, i) => {
+    if (i % 2 === 0 && SPEC.PAREDES[i + 1]) {
+      acc.push({ x1: p[0], y1: p[1], x2: SPEC.PAREDES[i + 1][0], y2: SPEC.PAREDES[i + 1][1] })
+    }
+    return acc
+  }, []),
+)
+
+const paletaL = computed(() => ({
+  x1: SPEC.FLIP_L.px,
+  y1: SPEC.FLIP_L.py,
+  x2: SPEC.FLIP_L.px + Math.cos(angL.value) * SPEC.FLIP_L.len,
+  y2: SPEC.FLIP_L.py + Math.sin(angL.value) * SPEC.FLIP_L.len,
+}))
+const paletaR = computed(() => ({
+  x1: SPEC.FLIP_R.px,
+  y1: SPEC.FLIP_R.py,
+  x2: SPEC.FLIP_R.px + Math.cos(angR.value) * SPEC.FLIP_R.len,
+  y2: SPEC.FLIP_R.py + Math.sin(angR.value) * SPEC.FLIP_R.len,
+}))
+
+// halo del bumper al que se está acercando la bola
+const halos = computed(() => {
+  const out: number[] = [0, 0, 0]
+  const b = bola.value
+  if (!b) return out
+  SPEC.BUMPERS.forEach((bp, i) => {
+    const d = Math.hypot(b.x - bp.x, b.y - bp.y)
+    out[i] = Math.max(0, Math.min(1, 1 - (d - bp.r) / 26))
+  })
+  return out
+})
+
+function sincronizar() {
+  const b = sim.bola()
+  bola.value = b ? { x: b.x, y: b.y, r: b.r } : null
+  const f = sim.flippers()
+  angL.value = f.angL
+  angR.value = f.angR
+  actL.value = f.activoL
+  actR.value = f.activoR
+  puntos.value = sim.puntaje()
+  enJuego.value = sim.puntosEnJuego()
+  bolasRestantes.value = Math.max(0, SPEC.BOLAS - sim.bolas())
 }
 
-function dibujar() {
-  const cv = canvas.value
-  if (!cv) return
-  const ctx = cv.getContext('2d')!
-  const cssW = cv.clientWidth || 320
-  const dpr = window.devicePixelRatio || 1
-  const W = Math.round(cssW * dpr)
-  const H = Math.round(W * 416 / 320)
-  if (cv.width !== W) {
-    cv.width = W
-    cv.height = H
-  }
-  const u = W / 320
-  ctx.clearRect(0, 0, W, H)
-  const P = paleta.value
+function tick() {
+  const now = performance.now()
+  if (!ultimo) ultimo = now
+  const dt = Math.min(0.25, (now - ultimo) / 1000)
+  ultimo = now
+  acumulado += dt
 
-  // ---- sombra de la bola (solo cuando ya hay jugada)
-  if (props.resultado) {
-    const bx = bolaX.value * u
-    const by = bolaY.value * u
-    const rb = 10 * u
-    ctx.beginPath()
-    ctx.ellipse(bx + rb * 0.3, by + rb * 0.5, rb, rb * 0.8, 0, 0, Math.PI * 2)
-    ctx.fillStyle = 'rgba(0,0,0,.5)'
-    ctx.fill()
+  while (acumulado >= PASO) {
+    acumulado -= PASO
+    const evs: Evento[] = cola.map((e) => ({ f: frame, k: e.k, v: e.v }))
+    if (evs.length) traza.push(...evs)
+    cola = []
+    sim.paso(frame, evs)
+    frame++
   }
 
-  // ---- bola de marfil con reflejo
-  if (props.resultado) {
-    const bx = bolaX.value * u
-    const by = bolaY.value * u
-    const rb = 10 * u
-    const gb = ctx.createRadialGradient(bx - rb * 0.35, by - rb * 0.4, rb * 0.1, bx, by, rb)
-    gb.addColorStop(0, '#ffffff')
-    gb.addColorStop(0.35, '#f7ecc9')
-    gb.addColorStop(0.75, '#c9922a')
-    gb.addColorStop(1, '#6d4a08')
-    ctx.beginPath()
-    ctx.arc(bx, by, rb, 0, Math.PI * 2)
-    ctx.fillStyle = gb
-    ctx.fill()
-    ctx.beginPath()
-    ctx.arc(bx - rb * 0.3, by - rb * 0.35, rb * 0.22, 0, Math.PI * 2)
-    ctx.fillStyle = 'rgba(255,255,255,.9)'
-    ctx.fill()
+  if (cargandoPlunger.value) {
+    carga.value = Math.min(1, carga.value + dt / 1.4)
   }
 
-  // ---- fila actual del camino
-  const filas = Math.max(camino.value.length, tabla.value.length ? tabla.value.length - 1 : 0)
-  if (fila.value >= 0 && fila.value < filas) {
-    const y = (46 + (fila.value + 1) * (250 - 46) / Math.max(1, filas)) * u
-    ctx.strokeStyle = 'rgba(255,255,255,.22)'
-    ctx.lineWidth = 2 * u
-    ctx.beginPath()
-    ctx.moveTo(20 * u, y)
-    ctx.lineTo(300 * u, y)
-    ctx.stroke()
-  }
+  sincronizar()
 
-  // ---- halo del bumper por el que pasa la bola
-  if (animando.value && camino.value.length && fila.value >= 0) {
-    const k = Math.min(fila.value, camino.value.length - 1)
-    const b = BUMPERS[k % BUMPERS.length]
-    const halo = ctx.createRadialGradient(b.x * u, b.y * u, 2 * u, b.x * u, b.y * u, b.r * 2.6 * u)
-    halo.addColorStop(0, aclarar(P.bumped[k % P.bumped.length], 0.5))
-    halo.addColorStop(1, 'rgba(255,255,255,0)')
-    ctx.beginPath()
-    ctx.arc(b.x * u, b.y * u, b.r * 2.6 * u, 0, Math.PI * 2)
-    ctx.fillStyle = halo
-    ctx.fill()
+  if (fase.value === 'jugando' && sim.bolas() >= SPEC.BOLAS) {
+    fase.value = 'cobrando'
+    sincronizar()
+    cobroPendiente = window.setTimeout(cobrar, 900)
+    temporizador = 0
+    return // no re-armar el bucle: la jugada termino
+  }
+  temporizador = window.setTimeout(tick, 1000 * PASO)
+}
+
+function cobrar() {
+  if (traza.length === 0) return
+  emit('jugar', { eventos: traza.slice() })
+}
+
+function pulsar(k: 'L' | 'R') {
+  if (fase.value !== 'jugando') return
+  if (k === 'L') {
+    if (flipLState) return
+    flipLState = true
+  } else {
+    if (flipRState) return
+    flipRState = true
+  }
+  cola.push({ k, v: 1 })
+  reproducir('tecla')
+}
+
+function soltar(k: 'L' | 'R') {
+  if (k === 'L') {
+    if (!flipLState) return
+    flipLState = false
+  } else {
+    if (!flipRState) return
+    flipRState = false
+  }
+  cola.push({ k, v: 0 })
+}
+
+function plungerDown() {
+  if (fase.value !== 'jugando' || sim.bola()) return
+  cargandoPlunger.value = true
+  carga.value = 0
+}
+
+function plungerUp() {
+  if (!cargandoPlunger.value) return
+  cargandoPlunger.value = false
+  if (fase.value !== 'jugando' || sim.bola()) return
+  if (carga.value < 0.08) carga.value = 0.08
+  // Si ya quedó un lanzamiento sin aplicar (pulsacion rapida antes de que el
+  // bucle avance), no lo acumules: el motor solo crea una bola.
+  if (cola.some((c) => c.k === 'P')) return
+  cola.push({ k: 'P', v: Math.round(carga.value * 100) / 100 })
+  reproducir('deflector')
+  carga.value = 0
+}
+
+function arrancar() {
+  if (fase.value === 'cobrando') return
+  fase.value = 'jugando'
+  if (!temporizador) {
+    ultimo = 0
+    acumulado = 0
+    temporizador = window.setTimeout(tick, 1000 * PASO)
   }
 }
 
-function animar() {
-  const total = camino.value.length
-  animando.value = true
-  tronera.value = null
-  fila.value = -1
-  bolaX.value = 160
-  bolaY.value = 14
-  try {
-    dibujar()
-    reproducir('caida')
-  } catch {
-    // Si el primer dibujado falla, la jugada igual arranca.
+function reiniciar() {
+  sim = crearSim()
+  frame = 0
+  cola = []
+  traza.length = 0
+  flipLState = false
+  flipRState = false
+  carga.value = 0
+  cargandoPlunger.value = false
+  window.clearTimeout(temporizador)
+  temporizador = 0
+  fase.value = 'lista'
+  sincronizar()
+}
+
+// teclado: flechas o Z/M para las paletas, espacio para el plunger
+function onKey(e: KeyboardEvent, down: boolean) {
+  const t = e.target as HTMLElement | null
+  if (t && (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA')) return
+  if (e.code === 'ArrowLeft' || e.key === 'z' || e.key === 'Z') {
+    if (down) { if (fase.value === 'lista') arrancar(); pulsar('L') } else soltar('L')
+    e.preventDefault()
+  } else if (e.code === 'ArrowRight' || e.key === 'm' || e.key === 'M') {
+    if (down) { if (fase.value === 'lista') arrancar(); pulsar('R') } else soltar('R')
+    e.preventDefault()
+  } else if (e.code === 'Space') {
+    if (down) { if (fase.value === 'lista') arrancar(); plungerDown() } else plungerUp()
+    e.preventDefault()
   }
-  let k = 0
-  // setTimeout recursivo (no setInterval): en una pestaña en segundo plano el
-  // intervalo se pausaba y la jugada quedaba "Jugando…" para siempre.
-  let pasos = 0
-  const tick = () => {
-    pasos++
-    if (k >= total || pasos > 60) {
-      const final = props.resultado?.pos ?? 0
-      const n = Math.max(1, tabla.value.length)
-      bolaX.value = ((final + 0.5) * 320) / n
-      bolaY.value = TRONERA_Y + TRONERA_H / 2
-      tronera.value = final
-      animando.value = false
-      dibujar()
-      if (props.premio > 0) reproducir('ganar')
-      else reproducir('perder')
-      return
-    }
-    fila.value = k
-    bolaX.value = 160 + (camino.value[k] === 1 ? 1 : -1) * 34
-    bolaY.value = 14 + ((k + 1) / Math.max(1, total)) * (TRONERA_Y - 20)
-    try {
-      reproducir('tecla')
-      dibujar()
-    } catch {
-      // Un dibujado que falle no debe trabar la jugada: la bola sigue avanzando.
-    }
-    k++
-    setTimeout(tick, 190)
-  }
-  setTimeout(tick, 190)
 }
 
 watch(
   () => props.resultado,
-  async (r) => {
-    if (!r) return
-    await nextTick()
-    animar()
+  (r) => {
+    if (!r) reiniciar()
   },
 )
 
-watch(() => props.codigo, async () => {
-  await nextTick()
-  dibujar()
+let tecladoBajo: (e: KeyboardEvent) => void = () => {}
+let tecladoAlto: (e: KeyboardEvent) => void = () => {}
+
+onMounted(() => {
+  sincronizar()
+  tecladoBajo = (e) => onKey(e, true)
+  tecladoAlto = (e) => onKey(e, false)
+  window.addEventListener('keydown', tecladoBajo)
+  window.addEventListener('keyup', tecladoAlto)
 })
 
-onMounted(async () => {
-  await nextTick()
-  dibujar()
+onBeforeUnmount(() => {
+  window.clearTimeout(temporizador)
+  window.clearTimeout(cobroPendiente)
+  window.removeEventListener('keydown', tecladoBajo)
+  window.removeEventListener('keyup', tecladoAlto)
 })
-
-function lanzar() {
-  emit('jugar', { fuerza: fuerza.value })
-}
 </script>
 
 <template>
@@ -214,116 +311,126 @@ function lanzar() {
     <div class="tablero">
       <svg class="campo" viewBox="0 0 320 416" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
         <defs>
-          <linearGradient :id="`fondo-${codigo ?? 'x'}`" x1="0" y1="0" x2="0" y2="1">
+          <linearGradient :id="`fondo-${uid}`" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0" :stop-color="paleta.fondo1" />
             <stop offset="1" :stop-color="paleta.fondo2" />
           </linearGradient>
-          <radialGradient :id="`bumper-${codigo ?? 'x'}`" cx="35%" cy="30%" r="75%">
+          <radialGradient :id="`bumper-${uid}`" cx="35%" cy="30%" r="75%">
             <stop offset="0" :stop-color="paleta.metal" />
             <stop offset="0.45" :stop-color="paleta.acento" />
             <stop offset="1" :stop-color="paleta.metal2" />
           </radialGradient>
-          <linearGradient :id="`paleta-${codigo ?? 'x'}`" x1="0" y1="0" x2="1" y2="0">
+          <linearGradient :id="`brazo-${uid}`" x1="0" y1="0" x2="1" y2="0">
             <stop offset="0" :stop-color="paleta.metal" />
             <stop offset="0.5" :stop-color="paleta.marco" />
             <stop offset="1" :stop-color="paleta.metal2" />
           </linearGradient>
-          <linearGradient :id="`tronera-${codigo ?? 'x'}`" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0" stop-color="rgba(255,255,255,.14)" />
-            <stop offset="1" stop-color="rgba(0,0,0,.5)" />
-          </linearGradient>
+          <radialGradient :id="`bola-${uid}`" cx="35%" cy="30%" r="80%">
+            <stop offset="0" stop-color="#ffffff" />
+            <stop offset="0.35" stop-color="#f7ecc9" />
+            <stop offset="0.75" stop-color="#c9922a" />
+            <stop offset="1" stop-color="#6d4a08" />
+          </radialGradient>
         </defs>
 
-        <rect x="0" y="0" width="320" height="416" :fill="`url(#fondo-${codigo ?? 'x'})`" />
-        <!-- vetas del playfield -->
-        <g :stroke="paleta.veta" stroke-width="1" opacity=".55">
-          <path d="M20 40 Q20 250 58 268 L40 268 Q8 240 8 40 Z" fill="none" />
-          <path d="M300 40 Q300 250 262 268 L280 268 Q312 240 312 40 Z" fill="none" />
-        </g>
-        <!-- marco del campo -->
-        <path d="M28 40 Q28 246 62 268 L258 268 Q292 246 292 40"
-              fill="none" :stroke="paleta.marco" stroke-width="5" opacity=".85" />
-        <path d="M28 40 Q28 246 62 268 L258 268 Q292 246 292 40"
-              fill="none" stroke="rgba(255,255,255,.3)" stroke-width="1.4" />
+        <rect x="0" y="0" width="320" height="416" :fill="`url(#fondo-${uid})`" />
 
-        <!-- salidas laterales -->
-        <g :fill="paleta.marco" opacity=".5">
-          <rect x="10" y="286" width="14" height="70" rx="4" />
-          <rect x="296" y="286" width="14" height="70" rx="4" />
+        <!-- vetas del playfield -->
+        <g :stroke="paleta.veta" stroke-width="1" opacity=".55" fill="none">
+          <path d="M20 40 Q20 250 58 268 L40 268 Q8 240 8 40 Z" />
+          <path d="M300 40 Q300 250 262 268 L280 268 Q312 240 312 40 Z" />
+        </g>
+
+        <!-- paredes reales del motor -->
+        <g stroke-linecap="round">
+          <line v-for="(p, i) in paredes" :key="i"
+                :x1="p.x1" :y1="p.y1" :x2="p.x2" :y2="p.y2"
+                :stroke="paleta.marco" stroke-width="6" opacity=".9" />
+          <line v-for="(p, i) in paredes" :key="`b${i}`"
+                :x1="p.x1" :y1="p.y1" :x2="p.x2" :y2="p.y2"
+                stroke="rgba(255,255,255,.28)" stroke-width="1.6" />
+        </g>
+
+        <!-- slingshots -->
+        <g :fill="paleta.acento" opacity=".8">
+          <polygon :points="`${SPEC.SLINGS[0].x1},${SPEC.SLINGS[0].y1} ${SPEC.SLINGS[0].x2},${SPEC.SLINGS[0].y2} ${SPEC.SLINGS[0].x3},${SPEC.SLINGS[0].y3}`" />
+          <polygon :points="`${SPEC.SLINGS[1].x1},${SPEC.SLINGS[1].y1} ${SPEC.SLINGS[1].x2},${SPEC.SLINGS[1].y2} ${SPEC.SLINGS[1].x3},${SPEC.SLINGS[1].y3}`" />
         </g>
 
         <!-- bumpers -->
-        <g v-for="(b, i) in BUMPERS" :key="i">
-          <circle :cx="b.x" :cy="b.y" :r="b.r * 1.5" :fill="paleta.bumped[i % paleta.bumped.length]" opacity=".22" />
-          <circle :cx="b.x" :cy="b.y" :r="b.r" :fill="`url(#bumper-${codigo ?? 'x'})`"
+        <g v-for="(b, i) in SPEC.BUMPERS" :key="i">
+          <circle :cx="b.x" :cy="b.y" :r="b.r * 1.6" :fill="paleta.bumped[i]"
+                  :opacity="0.06 + halos[i] * 0.3" />
+          <circle :cx="b.x" :cy="b.y" :r="b.r" :fill="`url(#bumper-${uid})`"
                   :stroke="paleta.metal" stroke-width="2.5" />
-          <circle :cx="b.x" :cy="b.y" :r="b.r * .62" fill="rgba(255,255,255,.18)"
+          <circle :cx="b.x" :cy="b.y" :r="b.r * .6" fill="rgba(255,255,255,.16)"
                   stroke="rgba(255,255,255,.45)" stroke-width="1" />
           <text :x="b.x" :y="b.y + 1" text-anchor="middle" dominant-baseline="middle"
-                font-family="ui-sans-serif, system-ui" font-size="15" font-weight="800"
-                :fill="paleta.fondo2">x{{ b.mult }}</text>
-        </g>
-
-        <!-- guías de caída -->
-        <g v-if="tabla.length > 1" stroke="rgba(255,255,255,.16)" stroke-width="2">
-          <line v-for="i in tabla.length - 1" :key="i" :x1="(i * 320) / tabla.length"
-                y1="268" :x2="(i * 320) / tabla.length" y2="330" />
-        </g>
-
-        <!-- troneras -->
-        <g v-for="i in Math.max(1, tabla.length)" :key="i">
-          <rect :x="(i - 1) * (320 / Math.max(1, tabla.length)) + 2" :y="TRONERA_Y"
-                :width="320 / Math.max(1, tabla.length) - 4" :height="TRONERA_H" rx="5"
-                :fill="`url(#tronera-${codigo ?? 'x'})`"
-                :stroke="tronera === i - 1 && tabla[i - 1] > 0 ? '#fff3cf' : paleta.marco"
-                :stroke-width="tronera === i - 1 && tabla[i - 1] > 0 ? 2.5 : 1.5" />
-          <text v-if="tabla.length" :x="(i - 0.5) * (320 / Math.max(1, tabla.length))"
-                :y="TRONERA_Y + TRONERA_H / 2" text-anchor="middle" dominant-baseline="middle"
-                font-family="ui-sans-serif, system-ui" font-size="13" font-weight="800"
-                :fill="tronera === i - 1 && tabla[i - 1] > 0 ? '#fff3cf' : 'rgba(232,225,205,.85)'">
-            {{ tabla[i - 1] }}x
-          </text>
+                font-family="ui-sans-serif, system-ui" font-size="14" font-weight="800"
+                :fill="paleta.fondo2">{{ b.pts }}</text>
         </g>
 
         <!-- paletas -->
-        <g>
-          <path d="M36 398 L112 366 L112 382 L40 414 Z" :fill="`url(#paleta-${codigo ?? 'x'})`"
-                :stroke="paleta.metal" stroke-width="1.6" />
-          <path d="M284 398 L208 366 L208 382 L280 414 Z" :fill="`url(#paleta-${codigo ?? 'x'})`"
-                :stroke="paleta.metal" stroke-width="1.6" />
+        <line :x1="paletaL.x1" :y1="paletaL.y1" :x2="paletaL.x2" :y2="paletaL.y2"
+              :stroke="actL ? paleta.metal : `url(#brazo-${uid})`"
+              :stroke-width="actL ? 13 : 12" stroke-linecap="round" />
+        <line :x1="paletaR.x1" :y1="paletaR.y1" :x2="paletaR.x2" :y2="paletaR.y2"
+              :stroke="actR ? paleta.metal : `url(#brazo-${uid})`"
+              :stroke-width="actR ? 13 : 12" stroke-linecap="round" />
+        <circle :cx="SPEC.FLIP_L.px" :cy="SPEC.FLIP_L.py" r="5" :fill="paleta.metal" />
+        <circle :cx="SPEC.FLIP_R.px" :cy="SPEC.FLIP_R.py" r="5" :fill="paleta.metal" />
+
+        <!-- bola -->
+        <circle v-if="bola" :cx="bola.x" :cy="bola.y" :r="bola.r"
+                :fill="`url(#bola-${uid})`" stroke="rgba(0,0,0,.35)" stroke-width="1" />
+
+        <!-- resorte del plunger -->
+        <g v-if="!bola && fase === 'jugando'">
+          <rect :x="298" :y="374 + carga * 26" width="10" :height="18 - carga * 26"
+                rx="3" :fill="paleta.acento" opacity=".85" />
         </g>
       </svg>
 
-      <canvas ref="canvas" class="mesa" />
-
-      <div v-if="resultado && !animando" class="resuelto" :class="{ gana: premio > 0 }">
-        <span class="n">x{{ multiplicador ?? resultado.multiplicador ?? 0 }}</span>
-        <span v-if="premio > 0" class="p">{{ colones(premio) }}</span>
-        <span v-else class="p cero">Sin premio</span>
+      <div class="hud">
+        <span class="bola">{{ bolasRestantes }}</span>
+        <span class="etq">bolas</span>
+        <span class="pts">{{ puntos + enJuego }}</span>
+        <span class="etq">pts</span>
+        <span class="mult">x{{ multEstimado }}</span>
       </div>
+    </div>
+
+    <div v-if="resultado && !cargando" class="resuelto" :class="{ gana: premio > 0 }">
+      <span class="n">x{{ multiplicador ?? resultado.multiplicador ?? 0 }}</span>
+      <span v-if="premio > 0" class="p">{{ colones(premio) }}</span>
+      <span v-else class="p cero">Sin premio</span>
     </div>
 
     <div class="controles">
-      <div class="grupo">
-        <span class="etq">Fuerza</span>
-        <button
-          v-for="f in FUERZAS"
-          :key="f.id"
-          class="chip"
-          :class="{ activa: fuerza === f.id }"
-          @click="fuerza = f.id; reproducir('tecla')"
-        >{{ f.nombre }}</button>
-      </div>
+      <button class="paleta-btn izq" :class="{ activa: actL }"
+              @pointerdown.prevent="fase === 'lista' && arrancar(); pulsar('L')"
+              @pointerup.prevent="soltar('L')" @pointerleave.prevent="soltar('L')">
+        ◀ Paleta
+      </button>
+      <button class="paleta-btn der" :class="{ activa: actR }"
+              @pointerdown.prevent="fase === 'lista' && arrancar(); pulsar('R')"
+              @pointerup.prevent="soltar('R')" @pointerleave.prevent="soltar('R')">
+        Paleta ▶
+      </button>
     </div>
 
-    <p class="regla">
-      La bola rebota en los bumpers (x2, x3, x5) y cae en una tronera: la de más valor paga más.
-      Suave da 4 rebotes y premio chico; media 7; fuerte 10 o más.
-    </p>
-
-    <button class="btn btn-primary btn-block" :disabled="cargando || animando" @click="lanzar">
-      {{ cargando || animando ? 'Jugando…' : 'Lanzar bola' }}
+    <button v-if="fase !== 'cobrando'" class="btn btn-primary btn-block"
+            :disabled="cargando || (fase === 'jugando' && !!bola)"
+            @pointerdown.prevent="arrancar(); plungerDown()"
+            @pointerup.prevent="plungerUp()" @pointerleave.prevent="plungerUp()">
+      {{ cargando ? 'Cobrando…' : fase === 'lista' ? 'Mantené para lanzar' : 'Mantené para lanzar la bola' }}
     </button>
+    <p v-else class="cobrando">Cobrando la jugada…</p>
+
+    <p class="regla">
+      Mantené apretadas las paletas (flechas o Z/M) y soltá el impulsor con espacio.
+      {{ textoRegla }}
+    </p>
   </div>
 </template>
 
@@ -334,29 +441,35 @@ function lanzar() {
   border-radius: 16px; overflow: hidden;
   border: 1px solid var(--border-soft);
   box-shadow: 0 18px 40px rgba(0, 0, 0, .45);
+  touch-action: none;
 }
 .campo { display: block; width: 100%; height: auto; aspect-ratio: 320 / 416; }
-.mesa { position: absolute; inset: 0; display: block; width: 100%; height: 100%; }
+.hud {
+  display: flex; align-items: baseline; gap: 6px;
+  padding: 5px 8px 7px;
+  font-family: ui-monospace, monospace;
+}
+.hud .bola { font-size: 18px; font-weight: 800; color: var(--gold); }
+.hud .pts { font-size: 16px; font-weight: 700; color: #fff; margin-left: auto; }
+.hud .mult { font-size: 15px; font-weight: 800; color: var(--prim-2, #7dd3fc); }
+.hud .etq { font-size: 10px; letter-spacing: .1em; text-transform: uppercase; color: var(--faint); }
 .resuelto {
-  position: absolute; left: 8px; right: 8px; bottom: 8px; z-index: 2;
   display: flex; align-items: center; justify-content: center; gap: 10px;
-  padding: 7px 12px; border-radius: 10px;
+  min-height: 40px; padding: 7px 12px; border-radius: 10px;
   background: rgba(4, 6, 10, .92); border: 1px solid var(--border-soft);
 }
 .resuelto .n { font-family: var(--display); font-size: 22px; font-weight: 700; line-height: 1; }
 .resuelto .p { color: var(--gold); font-weight: 700; font-size: 14px; }
 .resuelto .p.cero { color: var(--muted); font-weight: 500; font-size: 13px; }
 .resuelto.gana { border-color: rgba(245, 185, 66, .55); }
-.controles { display: flex; flex-direction: column; gap: 8px; }
-.grupo { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; justify-content: center; }
-.etq {
-  font-size: 11px; letter-spacing: .12em; text-transform: uppercase;
-  color: var(--faint); min-width: 58px; text-align: right;
+.controles { display: flex; gap: 8px; }
+.paleta-btn {
+  flex: 1; padding: 14px 8px; border-radius: 12px; cursor: pointer;
+  border: 1px solid var(--border-soft); background: var(--surface);
+  color: var(--muted); font-weight: 700; font-size: 13px;
+  touch-action: none; user-select: none;
 }
-.chip {
-  padding: 6px 12px; border-radius: 999px; border: 1px solid var(--border-soft);
-  background: var(--surface); color: var(--muted); cursor: pointer; font-size: 12px;
-}
-.chip.activa { border-color: var(--prim); color: var(--prim-2); background: var(--prim-dim); }
+.paleta-btn.activa { border-color: var(--prim); color: var(--prim-2); background: var(--prim-dim); }
+.cobrando { margin: 0; text-align: center; font-size: 12px; color: var(--faint); }
 .regla { margin: 0; font-size: 11.5px; color: var(--faint); text-align: center; line-height: 1.35; }
 </style>

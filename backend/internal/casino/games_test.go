@@ -51,12 +51,12 @@ func TestMultiplicadorMaximoBlackjack(t *testing.T) {
 // carta y las validaciones de la apuesta.
 func TestBaccarat(t *testing.T) {
 	casos := []struct {
-		nombre     string
-		draws      []int
-		tipo       string
-		esperado   int64
-		resultado  string
-		wantErr    bool
+		nombre    string
+		draws     []int
+		tipo      string
+		esperado  int64
+		resultado string
+		wantErr   bool
 	}{
 		{"natural gana jugador", []int{4, 5, 4, 4}, "jugador", 2, "jugador", false},
 		{"natural banca", []int{3, 4, 4, 4}, "banca", 2, "banca", false},

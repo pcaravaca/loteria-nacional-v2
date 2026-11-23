@@ -26,23 +26,23 @@ type AstBand struct {
 
 // AstSlot es una maquina tragamonedas del catalogo.
 type AstSlot struct {
-	Codigo          string           `json:"codigo"`
-	Nombre          string           `json:"nombre"`
-	Rodillos         int              `json:"rodillos"`
-	Filas           int              `json:"filas"`
-	Lineas          [][]int          `json:"lineas"`
-	Bonus           bool             `json:"bonus"`
-	GirosLibres     bool             `json:"giros_libres"`
-	Jackpot         bool             `json:"jackpot"`
-	BandaPorDefecto string           `json:"banda_por_defecto"`
+	Codigo          string             `json:"codigo"`
+	Nombre          string             `json:"nombre"`
+	Rodillos        int                `json:"rodillos"`
+	Filas           int                `json:"filas"`
+	Lineas          [][]int            `json:"lineas"`
+	Bonus           bool               `json:"bonus"`
+	GirosLibres     bool               `json:"giros_libres"`
+	Jackpot         bool               `json:"jackpot"`
+	BandaPorDefecto string             `json:"banda_por_defecto"`
 	Bandas          map[string]AstBand `json:"bandas"`
 }
 
 // AstPoker es una mesa de video poker del catalogo.
 type AstPoker struct {
-	Codigo      string `json:"codigo"`
-	Nombre      string `json:"nombre"`
-	Pagos       []struct {
+	Codigo string `json:"codigo"`
+	Nombre string `json:"nombre"`
+	Pagos  []struct {
 		Mano    string `json:"mano"`
 		Multipl int64  `json:"multipl"`
 	} `json:"pagos"`

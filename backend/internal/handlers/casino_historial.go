@@ -79,6 +79,8 @@ type Verificacion struct {
 	Nonce          int64     `json:"nonce"`
 	Sorteo         any       `json:"sorteo,omitempty"`
 	Resultado      any       `json:"resultado,omitempty"`
+	Reproducido    any       `json:"reproducido,omitempty"`
+	Traza          any       `json:"traza,omitempty"`
 	Verificado     bool      `json:"verificado"`
 	CreatedAt      time.Time `json:"created_at,omitempty"`
 }
@@ -464,7 +466,7 @@ func (h *CasinoHandler) verificarCasino(c *gin.Context, userID uint, id uint64) 
 	}
 
 	draws := casino.Sortear(user.CasinoSeed, ronda.ClientSeed, ronda.Nonce, casino.Draws(ronda.GameCodigo), 1<<31-1)
-	c.JSON(http.StatusOK, Verificacion{
+	resp := Verificacion{
 		RondaID:        ronda.ID,
 		Source:         FuenteCasino,
 		Juego:          ronda.GameCodigo,
@@ -481,7 +483,29 @@ func (h *CasinoHandler) verificarCasino(c *gin.Context, userID uint, id uint64) 
 		Resultado:      ronda.Resultado,
 		Verificado:     casino.HashSemilla(user.CasinoSeed) == ronda.ServerSeedHash,
 		CreatedAt:      ronda.CreatedAt,
-	})
+	}
+	// Pinball: el resultado no sale de los draws sino de la traza de inputs.
+	// Se reproduce con el motor del servidor y se compareta contra lo declarado.
+	if casino.EsPinball(ronda.GameCodigo) {
+		if evs, err := casino.EventosDeResultado(ronda.Resultado); err == nil {
+			res := casino.SimularPinball(evs)
+			resp.Traza = evs
+			resp.Reproducido = map[string]any{
+				"puntaje": res.Puntaje,
+				"porBola": res.PorBola,
+				"frames":  res.Frames,
+			}
+			decl, _ := ronda.Resultado.(map[string]any)
+			if decl != nil {
+				if pDecl, ok := decl["puntaje"].(float64); ok && int(pDecl) != res.Puntaje {
+					resp.Verificado = false
+				}
+			}
+		} else {
+			resp.Verificado = false
+		}
+	}
+	c.JSON(http.StatusOK, resp)
 	return true
 }
 
