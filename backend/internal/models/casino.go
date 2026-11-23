@@ -80,21 +80,21 @@ func (CasinoRound) TableName() string { return "casino_rondas" }
 // demas juegos, el blackjack necesita varios turnos (pedir, plantarse, doblar),
 // por eso la mano vive en su propia tabla hasta que se resuelve.
 type BlackjackMano struct {
-	ID             uint      `gorm:"primaryKey" json:"id"`
-	UserID         uint      `gorm:"not null;index" json:"user_id"`
-	Monto          int64     `gorm:"not null" json:"monto"`
-	ManoRaw        string    `gorm:"column:mano_raw" json:"-"`
-	Mano           []int     `gorm:"-" json:"mano"`
-	CrupierRaw     string    `gorm:"column:crupier_raw" json:"-"`
-	Crupier        []int     `gorm:"-" json:"crupier"`
-	Estado         string    `gorm:"not null;default:abierta" json:"estado"`
-	Multiplicador  float64   `gorm:"not null;default:0" json:"multiplicador"`
-	Premio         int64     `gorm:"not null;default:0" json:"premio"`
-	Seguro         int64     `gorm:"not null;default:0" json:"seguro"` // costo del seguro cobrado; 0 = sin seguro
+	ID            uint    `gorm:"primaryKey" json:"id"`
+	UserID        uint    `gorm:"not null;index" json:"user_id"`
+	Monto         int64   `gorm:"not null" json:"monto"`
+	ManoRaw       string  `gorm:"column:mano_raw" json:"-"`
+	Mano          []int   `gorm:"-" json:"mano"`
+	CrupierRaw    string  `gorm:"column:crupier_raw" json:"-"`
+	Crupier       []int   `gorm:"-" json:"crupier"`
+	Estado        string  `gorm:"not null;default:abierta" json:"estado"`
+	Multiplicador float64 `gorm:"not null;default:0" json:"multiplicador"`
+	Premio        int64   `gorm:"not null;default:0" json:"premio"`
+	Seguro        int64   `gorm:"not null;default:0" json:"seguro"` // costo del seguro cobrado; 0 = sin seguro
 	// GrupoID/Orden: las manos divididas (split) son filas hermanas. Orden 1 y 2;
 	// el crupier es comun y el premio del grupo es la suma de las dos.
-	GrupoID uint `gorm:"index" json:"grupo_id"`
-	Orden   int  `gorm:"not null;default:1" json:"orden"`
+	GrupoID        uint      `gorm:"index" json:"grupo_id"`
+	Orden          int       `gorm:"not null;default:1" json:"orden"`
 	ClientSeed     string    `gorm:"size:64" json:"client_seed"`
 	ServerSeedHash string    `gorm:"size:64" json:"server_seed_hash"`
 	Nonce          int64     `json:"nonce"`
@@ -200,6 +200,11 @@ type BingoRonda struct {
 	ClientSeed     string    `gorm:"size:64" json:"client_seed"`
 	ServerSeedHash string    `gorm:"size:64" json:"server_seed_hash"`
 	Nonce          int64     `json:"nonce"`
+	// IdempotencyKey identifica la jugada desde el cliente: reenviar el mismo
+	// start con la misma clave devuelve la ronda ya creada en vez de cobrar
+	// dos veces si la respuesta se perdio (sin datos, 502, timeout).
+	IdempotencyKey string    `gorm:"size:64;uniqueIndex:uq_bingo_idem,where:idempotency_key <> ''" json:"-"`
+	RequestID      string    `gorm:"size:40;index" json:"request_id"`
 	CreatedAt      time.Time `json:"created_at"`
 }
 
@@ -303,7 +308,6 @@ func (g *GemasRonda) AfterFind(tx *gorm.DB) error {
 	}
 	return nil
 }
-
 
 // DominoRonda es una mano de domino contra la casa. La apuesta se descuenta
 // al abrir y la mano queda abierta mientras el jugador y la casa juegan fichas.

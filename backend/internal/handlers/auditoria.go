@@ -35,6 +35,7 @@ func RegistrarAuditoria(db *gorm.DB, c *gin.Context, actorID uint, accion, entid
 		EntidadID: entidadID,
 		Detalle:   detalle,
 		IP:        ip,
+		RequestID: requestIDDe(c),
 	}).Error
 }
 

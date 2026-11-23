@@ -39,17 +39,17 @@ const (
 
 // Movimiento de saldo.
 const (
-	MovRecarga       = "recarga"
-	MovApuesta       = "apuesta"
-	MovPremio        = "premio"
-	MovBono          = "bono"
-	MovRetiro        = "retiro"
-	MovAjuste        = "ajuste"
-	MovCasinoApuesta = "casino_apuesta"
-	MovCasinoPremio  = "casino_premio"
-	MovRifaCompra    = "rifa_compra"
-	MovRifaPremio    = "rifa_premio"
-	MovRifaReembolso = "rifa_reembolso"
+	MovRecarga         = "recarga"
+	MovApuesta         = "apuesta"
+	MovPremio          = "premio"
+	MovBono            = "bono"
+	MovRetiro          = "retiro"
+	MovAjuste          = "ajuste"
+	MovCasinoApuesta   = "casino_apuesta"
+	MovCasinoPremio    = "casino_premio"
+	MovRifaCompra      = "rifa_compra"
+	MovRifaPremio      = "rifa_premio"
+	MovRifaReembolso   = "rifa_reembolso"
 	MovSorteoReembolso = "sorteo_reembolso"
 )
 
@@ -139,7 +139,7 @@ type User struct {
 	// tropical, medianoche, rubi). Default: premium.
 	TemaCasino string `gorm:"size:32;not null;default:'premium'" json:"tema_casino"`
 	// Tema visual de toda la aplicacion (esmeralda, zafiro, rubi, amatista, grafito).
-	TemaApp string `gorm:"size:32;not null;default:'esmeralda'" json:"tema_app"`
+	TemaApp     string `gorm:"size:32;not null;default:'esmeralda'" json:"tema_app"`
 	CasinoSeed  string `gorm:"size:64" json:"-"`
 	CasinoNonce int64  `json:"-"`
 	// Juego responsable: autoexclusion voluntaria. Es NULL si no aplica y, si
@@ -165,20 +165,20 @@ func (u *User) AfterFind(tx *gorm.DB) error {
 
 // Loteria es un juego (Lotería Nacional, Quiniela, etc.).
 type Loteria struct {
-	ID            uint      `gorm:"primaryKey" json:"id"`
-	Codigo        string    `gorm:"uniqueIndex;not null" json:"codigo"`
-	Nombre        string    `gorm:"not null" json:"nombre"`
-	Tipo          string    `gorm:"not null;default:loteria" json:"tipo"`
-	Descripcion   string    `json:"descripcion"`
-	CostoNumero   int64     `gorm:"not null;default:1000" json:"costo_numero"`
-	LongitudNum   int       `gorm:"not null;default:2" json:"longitud_num"`
-	MaxNumeros    int       `gorm:"not null;default:1" json:"max_numeros"`
-	Multiplicador int64     `gorm:"not null;default:50" json:"multiplicador"`
+	ID            uint   `gorm:"primaryKey" json:"id"`
+	Codigo        string `gorm:"uniqueIndex;not null" json:"codigo"`
+	Nombre        string `gorm:"not null" json:"nombre"`
+	Tipo          string `gorm:"not null;default:loteria" json:"tipo"`
+	Descripcion   string `json:"descripcion"`
+	CostoNumero   int64  `gorm:"not null;default:1000" json:"costo_numero"`
+	LongitudNum   int    `gorm:"not null;default:2" json:"longitud_num"`
+	MaxNumeros    int    `gorm:"not null;default:1" json:"max_numeros"`
+	Multiplicador int64  `gorm:"not null;default:50" json:"multiplicador"`
 	// TablaPremios es JSON {"1":3,"2":10,...}: multiplicador por aciertos parciales.
 	// Sin entrada para un acierto cae al 2x historico.
-	TablaPremios  string    `gorm:"column:tabla_premios" json:"tabla_premios"`
-	Activa        bool      `gorm:"not null;default:true" json:"activa"`
-	CreatedAt     time.Time `json:"created_at"`
+	TablaPremios string    `gorm:"column:tabla_premios" json:"tabla_premios"`
+	Activa       bool      `gorm:"not null;default:true" json:"activa"`
+	CreatedAt    time.Time `json:"created_at"`
 }
 
 // Sorteo es un concurso con fecha y, al cerrarse, números ganadores.
@@ -224,14 +224,17 @@ type Movimiento struct {
 // AuditLog deja constancia inmutable de las acciones relevantes (admin, KYC,
 // limites, configuracion de juegos) para la fiscalizacion.
 type AuditLog struct {
-	ID        uint      `gorm:"primaryKey" json:"id"`
-	ActorID   uint      `gorm:"index" json:"actor_id"`
-	ActorName string    `gorm:"size:120" json:"actor_nombre"`
-	Accion    string    `gorm:"not null;size:64;index" json:"accion"`
-	Entidad   string    `gorm:"size:64;index" json:"entidad"`
-	EntidadID string    `gorm:"size:64" json:"entidad_id"`
-	Detalle   string    `gorm:"type:text" json:"detalle"`
-	IP        string    `gorm:"size:64" json:"ip"`
+	ID        uint   `gorm:"primaryKey" json:"id"`
+	ActorID   uint   `gorm:"index" json:"actor_id"`
+	ActorName string `gorm:"size:120" json:"actor_nombre"`
+	Accion    string `gorm:"not null;size:64;index" json:"accion"`
+	Entidad   string `gorm:"size:64;index" json:"entidad"`
+	EntidadID string `gorm:"size:64" json:"entidad_id"`
+	Detalle   string `gorm:"type:text" json:"detalle"`
+	IP        string `gorm:"size:64" json:"ip"`
+	// RequestID correlaciona la accion con la peticion HTTP exacta (lo pone el
+	// middleware.RequestID y el cliente lo reenvia si reintenta).
+	RequestID string    `gorm:"size:40;index" json:"request_id"`
 	CreatedAt time.Time `json:"created_at"`
 }
 

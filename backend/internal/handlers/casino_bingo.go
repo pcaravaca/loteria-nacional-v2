@@ -20,6 +20,56 @@ type bingoRequest struct {
 	Cartones   int    `json:"cartones"`
 	ClientSeed string `json:"client_seed"`
 	Variante   string `json:"variante"`
+	// IdempotencyKey: si el cliente reenvia el mismo start (sin datos, timeout,
+	// 502), se devuelve la ronda ya creada en lugar de cobrar dos veces.
+	IdempotencyKey string `json:"idempotency_key"`
+}
+
+// bingoHitRequest trae el estado que el cliente ya ve. Con eso el servidor
+// detecta un reintento y no canta de mas.
+type bingoHitRequest struct {
+	// CantadasEsperadas: cuantas bolillas ya ve el cliente. Si el servidor va
+	// mas adelante, la respuesta le entrega las que faltan en vez de saltar una.
+	// Si no viene (cliente viejo), se mantiene el comportamiento de siempre.
+	CantadasEsperadas *int   `json:"cantadas_esperadas"`
+	RequestID         string `json:"request_id"`
+}
+
+// ultimaBolilla devuelve la ultima bolilla cantada (0 si ninguna).
+func ultimaBolilla(ronda models.BingoRonda) int {
+	if len(ronda.Cantadas) == 0 {
+		return 0
+	}
+	return ronda.Cantadas[len(ronda.Cantadas)-1]
+}
+
+// bingoPorClave busca la ronda que abrio un idempotency key.
+func bingoPorClave(db *gorm.DB, userID uint, clave string) (models.BingoRonda, bool) {
+	var ronda models.BingoRonda
+	err := db.Where("user_id = ? AND idempotency_key = ?", userID, clave).
+		Order("created_at desc").First(&ronda).Error
+	if err != nil {
+		return ronda, false
+	}
+	return ronda, true
+}
+
+// bingoRepetida responde un reintento de start que ya se habia aplicado.
+func (h *CasinoHandler) bingoRepetida(c *gin.Context, ronda models.BingoRonda, reanudar bool) {
+	estado := "repetida"
+	if reanudar {
+		estado = "reanudada"
+	}
+	RegistrarAccionJugador(h.db, c, ronda.UserID, "bingo_start_"+estado, "bingo_ronda",
+		strconv.FormatUint(uint64(ronda.ID), 10),
+		"monto="+strconv.FormatInt(ronda.Monto, 10)+" cartones="+strconv.Itoa(ronda.Cartones))
+	c.JSON(http.StatusOK, gin.H{
+		"repetida":     true,
+		"ronda_id":     ronda.ID,
+		"idempotencia": true,
+		"estado":       estado,
+		"resumen":      bingoResumen(ronda, saldoDe(h.db, ronda.UserID, 0), ultimaBolilla(ronda)),
+	})
 }
 
 // bingoJuego carga la configuración de la variante y verifica que esté activa.
@@ -107,6 +157,13 @@ func (h *CasinoHandler) BingoStart(c *gin.Context) {
 	if !GuardJugada(c, h.cfg, user) {
 		return
 	}
+	// Reintento del mismo start: no vuelve a cobrar ni a generar cartones.
+	if req.IdempotencyKey != "" {
+		if ronda, ok := bingoPorClave(h.db, user.ID, req.IdempotencyKey); ok {
+			h.bingoRepetida(c, ronda, false)
+			return
+		}
+	}
 	variante := req.Variante
 	if variante == "" {
 		variante = models.CasinoBingo
@@ -171,6 +228,8 @@ func (h *CasinoHandler) BingoStart(c *gin.Context) {
 		ClientSeed:     clientSeed,
 		ServerSeedHash: casino.HashSemilla(user.CasinoSeed),
 		Nonce:          nonce,
+		IdempotencyKey: req.IdempotencyKey,
+		RequestID:      requestIDDe(c),
 	}
 	err := h.db.Transaction(func(tx *gorm.DB) error {
 		if err := tx.Create(&ronda).Error; err != nil {
@@ -186,9 +245,22 @@ func (h *CasinoHandler) BingoStart(c *gin.Context) {
 		return tx.Create(&mov).Error
 	})
 	if err != nil {
+		// Dos peticiones con la misma clave llegaron juntas: la base de datos
+		// dejo pasar una sola. Se devuelve la que quedo, no un error.
+		if req.IdempotencyKey != "" {
+			if repetida, ok := bingoPorClave(h.db, user.ID, req.IdempotencyKey); ok {
+				h.bingoRepetida(c, repetida, false)
+				return
+			}
+		}
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "no se pudo abrir la jugada"})
 		return
 	}
+
+	RegistrarAccionJugador(h.db, c, user.ID, "bingo_start", "bingo_ronda",
+		strconv.FormatUint(uint64(ronda.ID), 10),
+		"variante="+variante+" monto="+strconv.FormatInt(total, 10)+" cartones="+strconv.Itoa(req.Cartones)+
+			" semilla_hash="+ronda.ServerSeedHash)
 
 	var actualizado models.User
 	_ = h.db.First(&actualizado, user.ID)
@@ -197,6 +269,10 @@ func (h *CasinoHandler) BingoStart(c *gin.Context) {
 
 // BingoHit canta la siguiente bolilla. Cierra y paga cuando un cartón se llena
 // o cuando se acaban las cantadas de la ronda.
+//
+// Es idempotente: el cliente avisa cuantas bolillas ya ve y, si el servidor va
+// mas adelante (la respuesta anterior se perdio), le devuelve el estado en vez
+// de cantar una bolilla de mas. Si ya se cerro, devuelve el resultado.
 func (h *CasinoHandler) BingoHit(c *gin.Context) {
 	userID := c.GetUint("userID")
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
@@ -204,13 +280,31 @@ func (h *CasinoHandler) BingoHit(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "id invalido"})
 		return
 	}
+	var req bingoHitRequest
+	_ = c.ShouldBindJSON(&req)
+	if req.RequestID != "" {
+		c.Set("request_id", req.RequestID)
+	}
+
 	var ronda models.BingoRonda
 	if err := h.db.Where("id = ? AND user_id = ?", id, userID).First(&ronda).Error; err != nil {
 		c.JSON(http.StatusNotFound, gin.H{"error": "la jugada no existe"})
 		return
 	}
+
+	responderEstado := func(accion string) {
+		RegistrarAccionJugador(h.db, c, userID, accion, "bingo_ronda",
+			strconv.FormatUint(uint64(ronda.ID), 10),
+			"bolilla="+strconv.Itoa(ultimaBolilla(ronda))+" cantadas="+strconv.Itoa(len(ronda.Cantadas))+
+				" estado="+ronda.Estado)
+		var user models.User
+		_ = h.db.First(&user, userID)
+		c.JSON(http.StatusOK, bingoResumen(ronda, user.Saldo, ultimaBolilla(ronda)))
+	}
+
 	if ronda.Estado != "abierta" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "la jugada ya esta cerrada"})
+		// Reintento de un hit que ya cerro la ronda: no es un error.
+		responderEstado("bingo_hit_cerrada")
 		return
 	}
 	codigo := ronda.Variante
@@ -223,11 +317,17 @@ func (h *CasinoHandler) BingoHit(c *gin.Context) {
 		codigo = models.CasinoBingo
 	}
 	if len(ronda.Cantadas) >= v.TopeCantadas {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "ya se cantaron todas las bolillas"})
+		h.cerrarBingo(c, &ronda, userID, ultimaBolilla(ronda))
 		return
 	}
 	if len(ronda.Orden) == 0 {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "la jugada no tiene bolillas"})
+		return
+	}
+	// Sincronizacion por posicion: un hit reenviado despues de un error de red
+	// no puede hacer avanzar la ronda dos veces.
+	if req.CantadasEsperadas != nil && *req.CantadasEsperadas != len(ronda.Cantadas) {
+		responderEstado("bingo_hit_sincroniza")
 		return
 	}
 
@@ -244,12 +344,17 @@ func (h *CasinoHandler) BingoHit(c *gin.Context) {
 		return
 	}
 
+	RegistrarAccionJugador(h.db, c, userID, "bingo_hit", "bingo_ronda",
+		strconv.FormatUint(uint64(ronda.ID), 10),
+		"bolilla="+strconv.Itoa(bolilla)+" cantadas="+strconv.Itoa(len(ronda.Cantadas)))
+
 	var user models.User
 	_ = h.db.First(&user, userID)
 	c.JSON(http.StatusOK, bingoResumen(ronda, user.Saldo, bolilla))
 }
 
-// BingoClose cobra el patrón logrado hasta el momento.
+// BingoClose cobra el patrón logrado hasta el momento. Si la ronda ya se cobro
+// (la respuesta anterior se perdio), devuelve el mismo resultado.
 func (h *CasinoHandler) BingoClose(c *gin.Context) {
 	userID := c.GetUint("userID")
 	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
@@ -263,13 +368,16 @@ func (h *CasinoHandler) BingoClose(c *gin.Context) {
 		return
 	}
 	if ronda.Estado != "abierta" {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "la jugada ya esta cerrada"})
+		bolilla := ultimaBolilla(ronda)
+		RegistrarAccionJugador(h.db, c, userID, "bingo_close_repetida", "bingo_ronda",
+			strconv.FormatUint(uint64(ronda.ID), 10),
+			"premio="+strconv.FormatInt(ronda.Premio, 10)+" cantadas="+strconv.Itoa(len(ronda.Cantadas)))
+		var user models.User
+		_ = h.db.First(&user, userID)
+		c.JSON(http.StatusOK, bingoResumen(ronda, user.Saldo, bolilla))
 		return
 	}
-	bolilla := 0
-	if len(ronda.Cantadas) > 0 {
-		bolilla = ronda.Cantadas[len(ronda.Cantadas)-1]
-	}
+	bolilla := ultimaBolilla(ronda)
 	h.cerrarBingo(c, &ronda, userID, bolilla)
 }
 
@@ -309,6 +417,11 @@ func (h *CasinoHandler) cerrarBingo(c *gin.Context, ronda *models.BingoRonda, us
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "no se pudo cerrar la jugada"})
 		return
 	}
+
+	RegistrarAccionJugador(h.db, c, userID, "bingo_close", "bingo_ronda",
+		strconv.FormatUint(uint64(ronda.ID), 10),
+		"premio="+strconv.FormatInt(premio, 10)+" cantadas="+strconv.Itoa(len(ronda.Cantadas))+
+			" multiplicador="+strconv.FormatFloat(ronda.Multiplicador, 'f', 2, 64))
 
 	var user models.User
 	_ = h.db.First(&user, userID)

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref } from 'vue'
 import { api } from '@/api/client'
 import { useAuthStore } from '@/stores/auth'
 import { colones } from '@/utils/formato'
@@ -61,6 +61,38 @@ const cartonesQty = ref(1)
 const ronda = ref<BingoEstado | null>(null)
 const cargando = ref(false)
 const error = ref('')
+// Clave de idempotencia de la jugada actual: se genera una sola vez y se
+// reenvia si el start se reintentó, para que el servidor no cobre dos veces.
+const idKey = ref('')
+const reanudando = ref(false)
+
+function uuid(): string {
+  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) return crypto.randomUUID()
+  return 'j-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2, 12)
+}
+
+// Un error de red (sin respuesta, timeout, 5xx) es el unico que se reintenta:
+// un 4xx es una negativa del servidor y repetir no cambia nada.
+function esErrorDeRed(e: any): boolean {
+  if (!e) return false
+  if (!e.response) return true
+  return e.response.status >= 500
+}
+
+async function conReintento<T>(fn: () => Promise<T>, veces = 3): Promise<T> {
+  let ultimo: any
+  for (let i = 0; i < veces; i++) {
+    try {
+      return await fn()
+    } catch (e) {
+      ultimo = e
+      if (!esErrorDeRed(e) || i === veces - 1) throw e
+      await new Promise((r) => setTimeout(r, 400 * (i + 1)))
+    }
+  }
+  throw ultimo
+}
+
 // El canto es automático por defecto: se puede pausar o cantar a mano.
 const auto = ref(true)
 // Voz que canta las bolillas (estilo Waze: el cliente elige el preset).
@@ -202,15 +234,22 @@ async function cantoAutomatico() {
 async function empezar() {
   error.value = ''
   cargando.value = true
+  if (!idKey.value) idKey.value = uuid()
   try {
-    const { data } = await api.post<BingoEstado>('/casino/bingo/start', {
-      monto: props.monto,
-      cartones: cartonesQty.value,
-      client_seed: props.clientSeed,
-      variante: props.variante ?? 'bingo',
-    })
-    ronda.value = data
-    if (auth.user) auth.user.saldo = data.saldo
+    // La misma idempotency_key en cada reintento: si el servidor ya cobró, la
+    // respuesta trae `resumen` y no vuelve a descontar.
+    const { data } = await conReintento(() =>
+      api.post<any>('/casino/bingo/start', {
+        monto: props.monto,
+        cartones: cartonesQty.value,
+        client_seed: props.clientSeed,
+        variante: props.variante ?? 'bingo',
+        idempotency_key: idKey.value,
+      }),
+    )
+    ronda.value = data.resumen ?? data
+    if (data.repetida) reanudando.value = true
+    if (auth.user) auth.user.saldo = ronda.value!.saldo
     reproducir('tambor')
     auto.value = true
     programar()
@@ -229,10 +268,15 @@ async function cantar(manual = false) {
   cargando.value = true
   const antes = marcadas.value.flat(2).filter(Boolean).length
   const cantadasAntes = cantadas.value.length
+  // El request id se genera una vez por intento y se reenvia en el reintento:
+  // el servidor lo usa para correlacionar la accion en el registro de CS.
+  const requestID = uuid()
   try {
-    const { data } = await api.post<BingoEstado>(
-      `/casino/bingo/${ronda.value.ronda_id}/hit`,
-      {},
+    const { data } = await conReintento(() =>
+      api.post<BingoEstado>(
+        `/casino/bingo/${ronda.value!.ronda_id}/hit`,
+        { cantadas_esperadas: cantadasAntes, request_id: requestID },
+      ),
     )
     ronda.value = data
     if (auth.user) auth.user.saldo = data.saldo
@@ -263,7 +307,9 @@ async function cerrar() {
   error.value = ''
   cargando.value = true
   try {
-    const { data } = await api.post<BingoEstado>(`/casino/bingo/${ronda.value.ronda_id}/close`)
+    const { data } = await conReintento(() =>
+      api.post<BingoEstado>(`/casino/bingo/${ronda.value!.ronda_id}/close`),
+    )
     ronda.value = data
     detenerTimers()
     auto.value = false
@@ -282,7 +328,29 @@ function nueva() {
   ronda.value = null
   error.value = ''
   auto.value = true
+  // Jugada nueva, clave nueva: si se reintentara el start anterior ya quedo
+  // cobrado y no debe reutilizarse.
+  idKey.value = uuid()
+  reanudando.value = false
 }
+
+// Si la conexion se corto con una ronda abierta, el servidor la tiene guardada:
+// se retoma en vez de perder la apuesta.
+async function recuperar() {
+  try {
+    const { data } = await api.get<{ ronda?: BingoEstado }>('/casino/bingo/abierta')
+    if (!data?.ronda) return
+    ronda.value = data.ronda
+    reanudando.value = true
+    if (auth.user) auth.user.saldo = data.ronda.saldo
+    auto.value = true
+    programar()
+  } catch {
+    // Sin ronda abierta o sin conexion: se arranca una jugada nueva.
+  }
+}
+
+onMounted(recuperar)
 
 onUnmounted(() => {
   detenerTimers()
@@ -380,6 +448,9 @@ onUnmounted(() => {
     </div>
 
     <p v-if="error" class="error-text">{{ error }}</p>
+    <p v-if="reanudando" class="aviso-reanudar">
+      Se retomó la jugada que quedó abierta; la apuesta ya estaba cobrada y no se volvió a descontar.
+    </p>
 
     <div v-if="!ronda" class="controles">
       <div class="selector">
@@ -606,4 +677,5 @@ onUnmounted(() => {
 }
 
 .error-text { color: #f87171; font-size: 12px; margin: 0; }
+.aviso-reanudar { color: #fbbf24; font-size: 12px; margin: 0; }
 </style>

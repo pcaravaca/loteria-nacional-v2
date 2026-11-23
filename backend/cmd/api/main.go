@@ -61,6 +61,9 @@ func main() {
 
 	r := gin.Default()
 	r.Use(cors())
+	// Identificador por peticion: lo usa el registro de acciones y el cliente lo
+	// puede reenviar al reintentar para no perder la correlacion.
+	r.Use(middleware.RequestID())
 
 	api := r.Group("/api")
 	// Las rutas publicas de contenido identifican al usuario si trae token,
@@ -205,6 +208,7 @@ func main() {
 	bg := authed.Group("")
 	bg.Use(middleware.GeoBlock(cfg))
 	bg.POST("/casino/bingo/start", casinoH.BingoStart)
+	bg.GET("/casino/bingo/abierta", casinoH.BingoReanudarHandler)
 	bg.POST("/casino/bingo/:id/hit", casinoH.BingoHit)
 	bg.POST("/casino/bingo/:id/close", casinoH.BingoClose)
 

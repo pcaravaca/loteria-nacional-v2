@@ -3,9 +3,11 @@ package handlers
 import (
 	"bytes"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
+	"sync/atomic"
 	"testing"
 
 	"github.com/gin-gonic/gin"
@@ -23,13 +25,27 @@ type bingoTestEnv struct {
 	user models.User
 }
 
+// basesSeq distingue las bases en memoria cuando un mismo test crea varios env.
+var basesSeq atomic.Int64
+
 func nuevoBingoTestEnv(t *testing.T) *bingoTestEnv {
 	t.Helper()
 	gin.SetMode(gin.TestMode)
-	db, err := database.Open(&config.Config{DatabasePath: ":memory:"})
+	// Cada llamada necesita su propia base: con ":memory:" simple el pool de
+	// conexiones comparte la misma base entre pruebas (y entre iteraciones de
+	// un mismo bucle) y las filas de una se mezclan con las de otra.
+	db, err := database.Open(&config.Config{
+		DatabasePath: fmt.Sprintf("file:%s_%d?mode=memory&cache=shared",
+			nombreBase(t.Name()), basesSeq.Add(1)),
+	})
 	if err != nil {
 		t.Fatalf("open: %v", err)
 	}
+	t.Cleanup(func() {
+		if crudo, err := db.DB(); err == nil {
+			_ = crudo.Close()
+		}
+	})
 	if err := database.SeedCasino(db); err != nil {
 		t.Fatalf("seed casino: %v", err)
 	}
@@ -71,6 +87,22 @@ func (e *bingoTestEnv) hit(id uint) *httptest.ResponseRecorder {
 	params := gin.Params{{Key: "id", Value: strconv.FormatUint(uint64(id), 10)}}
 	c, w := e.contexto("POST", "/casino/bingo/x/hit", nil, params)
 	e.h.BingoHit(c)
+	return w
+}
+
+// hitCon manda el estado que el cliente ya ve, como hace la app cuando pide
+// una bolilla. Es lo que evita cantar dos veces tras un error de red.
+func (e *bingoTestEnv) hitCon(id uint, cantadasEsperadas int) *httptest.ResponseRecorder {
+	params := gin.Params{{Key: "id", Value: strconv.FormatUint(uint64(id), 10)}}
+	c, w := e.contexto("POST", "/casino/bingo/x/hit",
+		map[string]any{"cantadas_esperadas": cantadasEsperadas}, params)
+	e.h.BingoHit(c)
+	return w
+}
+
+func (e *bingoTestEnv) reanudar() *httptest.ResponseRecorder {
+	c, w := e.contexto("GET", "/casino/bingo/abierta", nil, gin.Params{})
+	e.h.BingoReanudarHandler(c)
 	return w
 }
 
@@ -200,12 +232,15 @@ func TestBingoHitYClose(t *testing.T) {
 		t.Errorf("saldo final %d, esperaba %d", env.saldo(), 49500+res.PremioPagado)
 	}
 
-	// una ronda cerrada no se puede volver a cerrar ni cantar
-	if w := env.close(res.RondaID); w.Code != http.StatusBadRequest {
-		t.Errorf("re-cerrar responde %d, esperaba 400", w.Code)
+	// una ronda cerrada sigue respondiendo el resultado, pero no vuelve a pagar
+	if w := env.close(res.RondaID); w.Code != http.StatusOK {
+		t.Errorf("re-cerrar responde %d, esperaba 200", w.Code)
 	}
-	if w := env.hit(res.RondaID); w.Code != http.StatusBadRequest {
-		t.Errorf("cantar en cerrada responde %d, esperaba 400", w.Code)
+	if w := env.hit(res.RondaID); w.Code != http.StatusOK {
+		t.Errorf("cantar en cerrada responde %d, esperaba 200", w.Code)
+	}
+	if env.saldo() != 49500+res.PremioPagado {
+		t.Errorf("el reintento duplico el pago: saldo %d", env.saldo())
 	}
 }
 
@@ -238,9 +273,16 @@ func TestBingoSeCierraAlLlegarALas40(t *testing.T) {
 		t.Errorf("saldo final %d, esperaba %d", env.saldo(), 49500+ult.PremioPagado)
 	}
 
-	// no se puede cantar de más
-	if w := env.hit(res.RondaID); w.Code != http.StatusBadRequest {
-		t.Errorf("hit 41 responde %d, esperaba 400", w.Code)
+	// un hit despues de cerrada no vuelve a pagar ni a cantar
+	w = env.hit(res.RondaID)
+	if w.Code != http.StatusOK {
+		t.Errorf("hit 41 responde %d, esperaba 200", w.Code)
+	}
+	if desp := decodearBingo(t, w); desp.Estado != "pagada" || len(desp.Cantadas) != casino.BingoCantadas {
+		t.Errorf("reintento altero la ronda: estado %q con %d cantadas", desp.Estado, len(desp.Cantadas))
+	}
+	if env.saldo() != 49500+ult.PremioPagado {
+		t.Errorf("el reintento duplico el pago: saldo %d", env.saldo())
 	}
 }
 
@@ -429,4 +471,137 @@ func TestBingoCierrePorVariante(t *testing.T) {
 			t.Errorf("%s: ronda guardada estado %q premio %d", c.variante, guardada.Estado, guardada.Premio)
 		}
 	}
+}
+
+// TestBingoStartEsIdempotente verifica que reenviar el start con la misma clave
+// (sin datos, timeout, 502) no cobra dos veces: devuelve la ronda ya creada.
+func TestBingoStartEsIdempotente(t *testing.T) {
+	env := nuevoBingoTestEnv(t)
+	cuerpo := map[string]any{"monto": 500, "cartones": 2, "client_seed": "cli-idem", "idempotency_key": "clave-1"}
+
+	w := env.start(cuerpo)
+	if w.Code != http.StatusCreated {
+		t.Fatalf("start respondio %d: %s", w.Code, w.Body.String())
+	}
+	primera := decodearBingo(t, w)
+	if env.saldo() != 49000 {
+		t.Errorf("saldo tras el primer start: %d", env.saldo())
+	}
+
+	// Segundo start con la misma clave: debe responder la ronda existente.
+	w = env.start(cuerpo)
+	if w.Code != http.StatusOK {
+		t.Fatalf("start repetido respondio %d: %s", w.Code, w.Body.String())
+	}
+	var repetida struct {
+		Repetida bool           `json:"repetida"`
+		Resumen  bingoRespuesta `json:"resumen"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &repetida); err != nil {
+		t.Fatalf("decode %s: %v", w.Body.String(), err)
+	}
+	if !repetida.Repetida {
+		t.Errorf("el segundo start no se marco como repetido: %s", w.Body.String())
+	}
+	if repetida.Resumen.RondaID != primera.RondaID {
+		t.Errorf("el repetido abrio otra ronda: %d != %d", repetida.Resumen.RondaID, primera.RondaID)
+	}
+	if env.saldo() != 49000 {
+		t.Errorf("el reintento volvio a cobrar: saldo %d", env.saldo())
+	}
+	var filas int64
+	env.db.Model(&models.BingoRonda{}).Count(&filas)
+	if filas != 1 {
+		t.Errorf("quedaron %d rondas para la misma clave", filas)
+	}
+}
+
+// TestBingoHitNoSeRepite verifica que un hit reenviado no canta dos veces.
+func TestBingoHitNoSeRepite(t *testing.T) {
+	env := nuevoBingoTestEnv(t)
+	w := env.start(map[string]any{"monto": 500, "cartones": 1})
+	res := decodearBingo(t, w)
+
+	w = env.hitCon(res.RondaID, 0)
+	if w.Code != http.StatusOK {
+		t.Fatalf("hit respondio %d: %s", w.Code, w.Body.String())
+	}
+	primera := decodearBingo(t, w)
+	if len(primera.Cantadas) != 1 {
+		t.Fatalf("primer hit dejo %d cantadas", len(primera.Cantadas))
+	}
+
+	// Reintento con el mismo estado: el servidor ya canto, no debe avanzar.
+	w = env.hitCon(res.RondaID, 0)
+	if w.Code != http.StatusOK {
+		t.Fatalf("hit repetido respondio %d: %s", w.Code, w.Body.String())
+	}
+	if reps := decodearBingo(t, w); len(reps.Cantadas) != 1 {
+		t.Errorf("el reintento canto de mas: %d cantadas", len(reps.Cantadas))
+	}
+
+	// Al avanzar el contador del cliente, si canta la siguiente.
+	w = env.hitCon(res.RondaID, 1)
+	if w.Code != http.StatusOK {
+		t.Fatalf("hit 2 respondio %d: %s", w.Code, w.Body.String())
+	}
+	if seg := decodearBingo(t, w); len(seg.Cantadas) != 2 {
+		t.Errorf("segundo hit dejo %d cantadas", len(seg.Cantadas))
+	}
+}
+
+// TestBingoSeReanuda verifica que la ronda abierta se puede retomar.
+func TestBingoSeReanuda(t *testing.T) {
+	env := nuevoBingoTestEnv(t)
+	w := env.start(map[string]any{"monto": 500, "cartones": 1})
+	res := decodearBingo(t, w)
+
+	w = env.reanudar()
+	if w.Code != http.StatusOK {
+		t.Fatalf("reanudar respondio %d: %s", w.Code, w.Body.String())
+	}
+	var salida struct {
+		Reanudar bool           `json:"reanudar"`
+		Ronda    bingoRespuesta `json:"ronda"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &salida); err != nil {
+		t.Fatalf("decode %s: %v", w.Body.String(), err)
+	}
+	if !salida.Reanudar || salida.Ronda.RondaID != res.RondaID {
+		t.Errorf("no se retomo la ronda: %+v", salida)
+	}
+
+	w = env.close(res.RondaID)
+	if w.Code != http.StatusOK {
+		t.Fatalf("close respondio %d", w.Code)
+	}
+	w = env.reanudar()
+	if w.Code != http.StatusOK {
+		t.Fatalf("reanudar sin ronda abierta respondio %d: %s", w.Code, w.Body.String())
+	}
+	var vacia struct {
+		Reanudar bool           `json:"reanudar"`
+		Ronda    bingoRespuesta `json:"ronda"`
+	}
+	if err := json.Unmarshal(w.Body.Bytes(), &vacia); err != nil {
+		t.Fatalf("decode %s: %v", w.Body.String(), err)
+	}
+	if vacia.Reanudar || vacia.Ronda.RondaID != 0 {
+		t.Errorf("reanudar sin ronda abierta devolvio una ronda: %+v", vacia)
+	}
+}
+
+// nombreBase vuelve el nombre de la prueba seguro para usarlo como nombre de
+// una base SQLite en memoria (sin barras ni espacios).
+func nombreBase(nombre string) string {
+	out := make([]rune, 0, len(nombre))
+	for _, r := range nombre {
+		switch {
+		case r == '/' || r == ' ' || r == '\\':
+			out = append(out, '_')
+		default:
+			out = append(out, r)
+		}
+	}
+	return string(out)
 }
