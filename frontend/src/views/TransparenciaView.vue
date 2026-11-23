@@ -34,6 +34,10 @@ const rtpJuegos = [
   { nombre: 'Ajedrez Relámpago', codigo: 'ajedrez', rtp: '86.59' },
   { nombre: 'Backgammon', codigo: 'backgammon', rtp: '89.21' },
   { nombre: 'Tetris por Líneas', codigo: 'tetris', rtp: '82.95' },
+  { nombre: 'Mina de Oro', codigo: 'mina-de-oro', rtp: '85.0' },
+  { nombre: 'Pinball Neón', codigo: 'pinball-neon', rtp: '79.8' },
+  { nombre: 'Pinball Clásico', codigo: 'pinball-clasico', rtp: '79.8' },
+  { nombre: 'Pinball Premium', codigo: 'plinko-premium', rtp: '79.8' },
 ]
 
 // rtpCasualDe devuelve el RTP casual declarado de un juego, o null si es de
@@ -301,7 +305,8 @@ function rtpCasualDe(codigo: string): string | null {
         </div>
         <p class="seccion-nota">
           <b>Jugando bien</b> asume que se aplica la jugada hábil: en dominó la ficha de mayor puntaje, en
-          ajedrez el mate, en backgammon la ficha más atrasada y en tetris mantener el pozo bajo.
+          ajedrez el mate, en backgammon la ficha más atrasada, en tetris mantener el pozo bajo y en el
+          pinball sostener la bola con las paletas para encadenar bumpers.
           <b>Jugando al azar</b> es el mismo juego decidiendo al azar, sin estrategia: es la cifra que
           obtiene quien no piensa la jugada, y es la que la casa espera como línea de base.
           Los juegos de azar puro (ruleta, keno, raspa, bingo, slots, dados) no tienen segunda cifra

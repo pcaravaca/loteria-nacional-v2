@@ -5,7 +5,8 @@
 //
 // - rtp: retorno jugando bien (la jugada hábil que simula el backend).
 // - rtp_casual: retorno jugando al azar, sin estrategia. Solo aplica a los
-//   juegos con decisiones; el resto queda con 0 ("no aplica").
+//   juegos con decisiones (mesas de habilidad y pinball); el resto queda con 0
+//   ("no aplica").
 
 export interface RtpJuego {
   rtp: number
@@ -17,6 +18,9 @@ export const rtpJuegos: Record<string, RtpJuego> = {
   ajedrez: { rtp: 86.59, rtp_casual: 86.59 },
   backgammon: { rtp: 89.21, rtp_casual: 19.17 },
   tetris: { rtp: 82.95, rtp_casual: 4.51 },
+  'pinball-neon': { rtp: 79.8, rtp_casual: 29.8 },
+  'pinball-clasico': { rtp: 79.8, rtp_casual: 29.8 },
+  'plinko-premium': { rtp: 79.8, rtp_casual: 29.8 },
 }
 
 // rtpDe devuelve el par de RTP declarado de un juego, o undefined si el juego
