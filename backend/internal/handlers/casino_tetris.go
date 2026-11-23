@@ -95,6 +95,10 @@ func (h *CasinoHandler) TetrisStart(c *gin.Context) {
 	}
 	var actualizado models.User
 	_ = h.db.First(&actualizado, user.ID)
+	RegistrarAccionJugador(h.db, c, user.ID, "tetris_start", "tetris_ronda",
+		strconv.FormatUint(uint64(ronda.ID), 10),
+		"monto="+strconv.FormatInt(ronda.Monto, 10))
+
 	c.JSON(http.StatusCreated, tetrisResumen(ronda, actualizado.Saldo))
 }
 

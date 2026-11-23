@@ -103,6 +103,10 @@ func (h *CasinoHandler) AjedrezStart(c *gin.Context) {
 	}
 	var actualizado models.User
 	_ = h.db.First(&actualizado, user.ID)
+	RegistrarAccionJugador(h.db, c, user.ID, "ajedrez_start", "ajedrez_ronda",
+		strconv.FormatUint(uint64(ronda.ID), 10),
+		"monto="+strconv.FormatInt(ronda.Monto, 10))
+
 	c.JSON(http.StatusCreated, ajedrezResumen(ronda, actualizado.Saldo))
 }
 
@@ -330,6 +334,10 @@ func (h *CasinoHandler) AjedrezPartidaStart(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "no se pudo abrir la partida"})
 		return
 	}
+	RegistrarAccionJugador(h.db, c, user.ID, "ajedrez_partida_start", "ajedrez_partida",
+		strconv.FormatUint(uint64(partida.ID), 10),
+		"monto="+strconv.FormatInt(req.Monto, 10))
+
 	var actualizado models.User
 	_ = h.db.First(&actualizado, user.ID)
 	c.JSON(http.StatusCreated, ajedrezResumenPartida(partida, &j, actualizado.Saldo))

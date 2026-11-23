@@ -120,6 +120,10 @@ func (h *CasinoHandler) DominoStart(c *gin.Context) {
 	}
 	var actualizado models.User
 	_ = h.db.First(&actualizado, user.ID)
+	RegistrarAccionJugador(h.db, c, user.ID, "domino_start", "domino_ronda",
+		strconv.FormatUint(uint64(ronda.ID), 10),
+		"monto="+strconv.FormatInt(ronda.Monto, 10))
+
 	c.JSON(http.StatusCreated, dominoResumen(ronda, actualizado.Saldo, false))
 }
 

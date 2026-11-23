@@ -69,6 +69,7 @@ func Open(cfg *config.Config) (*gorm.DB, error) {
 		&models.GrupoJugadores{},
 		&models.JugadorGrupo{},
 		&models.AccesoContenido{},
+		&models.AlertaCS{},
 	); err != nil {
 		return nil, fmt.Errorf("automigrate: %w", err)
 	}

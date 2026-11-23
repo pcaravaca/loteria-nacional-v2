@@ -155,6 +155,10 @@ func (h *CasinoHandler) GemasStart(c *gin.Context) {
 
 	var actualizado models.User
 	_ = h.db.First(&actualizado, user.ID)
+	RegistrarAccionJugador(h.db, c, user.ID, "gemas_start", "gemas_ronda",
+		strconv.FormatUint(uint64(ronda.ID), 10),
+		"monto="+strconv.FormatInt(ronda.Monto, 10)+" semilla_hash="+ronda.ServerSeedHash)
+
 	c.JSON(http.StatusCreated, gemasResumen(ronda, actualizado.Saldo, nil))
 }
 

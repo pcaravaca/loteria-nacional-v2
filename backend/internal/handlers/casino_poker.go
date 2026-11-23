@@ -133,6 +133,10 @@ func (h *CasinoHandler) PokerRepartir(c *gin.Context) {
 		return
 	}
 
+	RegistrarAccionJugador(h.db, c, user.ID, "poker_start", "poker_mano",
+		strconv.FormatUint(uint64(mano.ID), 10),
+		"monto="+strconv.FormatInt(mano.Monto, 10)+" semilla_hash="+ronda.ServerSeedHash)
+
 	var actualizado models.User
 	_ = h.db.First(&actualizado, user.ID)
 	c.JSON(http.StatusCreated, gin.H{

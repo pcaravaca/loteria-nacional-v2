@@ -23,6 +23,11 @@ const tabs: { id: Tab; label: string; ico: string }[] = [
 const route = useRoute()
 const tab = ref<Tab>((route.query.tab as Tab) || 'usuarios')
 
+function irA(id: Tab) {
+  tab.value = id
+  if (id === 'cs') void cargarAlertas()
+}
+
 const cargando = ref(true)
 const error = ref('')
 const usuarios = ref<User[]>([])
@@ -44,6 +49,48 @@ const csEntradas = ref<AuditEntry[]>([])
 const csJugador = ref<Record<string, any> | null>(null)
 const csTotal = ref(0)
 const csCargando = ref(false)
+interface AlertaCS {
+  id: number
+  tipo: string
+  severidad: string
+  user_id: number
+  entidad: string
+  entidad_id: string
+  detalle: string
+  revisada: boolean
+  created_at: string
+}
+const csAlertas = ref<AlertaCS[]>([])
+const csAlertasCargando = ref(false)
+
+async function cargarAlertas() {
+  csAlertasCargando.value = true
+  try {
+    const { data } = await api.get<{ total: number; alertas: AlertaCS[] }>('/admin/cs/alertas')
+    csAlertas.value = data.alertas
+  } catch (e: any) {
+    mensaje.value = e.message
+  } finally {
+    csAlertasCargando.value = false
+  }
+}
+
+async function revisarAlerta(a: AlertaCS) {
+  try {
+    await api.post(`/admin/cs/alertas/${a.id}/revisar`)
+    a.revisada = true
+    csAlertas.value = csAlertas.value.filter((x) => x.id !== a.id)
+    mensaje.value = 'Alerta marcada como revisada'
+  } catch (e: any) {
+    mensaje.value = e.message
+  }
+}
+
+const severidadClase: Record<string, string> = {
+  alta: 'badge-bad',
+  media: 'badge-gold',
+  informativa: 'badge-info',
+}
 const cargandoAuditoria = ref(false)
 
 const reportesDisponibles = [
@@ -206,6 +253,7 @@ async function cargarAuditoria() {
 
 async function cargarCs() {
   csCargando.value = true
+  void cargarAlertas()
   csJugador.value = null
   csEntradas.value = []
   try {
@@ -440,7 +488,7 @@ async function cerrarSorteo() {
     </div>
 
     <div class="tabs">
-      <button v-for="t in tabs" :key="t.id" class="tab" :class="{ activa: tab === t.id }" @click="tab = t.id">
+      <button v-for="t in tabs" :key="t.id" class="tab" :class="{ activa: tab === t.id }" @click="irA(t.id)">
         <span>{{ t.ico }}</span> {{ t.label }}
       </button>
     </div>
@@ -713,6 +761,37 @@ async function cerrarSorteo() {
 
     <div v-show="tab === 'cs'">
       <div class="card">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px">
+          <h3 style="font-size: 16px; margin: 0">Alertas para revisar</h3>
+          <button class="btn btn-ghost btn-sm" :disabled="csAlertasCargando" @click="cargarAlertas">
+            {{ csAlertasCargando ? 'Actualizando…' : 'Actualizar' }}
+          </button>
+        </div>
+        <p class="hint" style="margin-bottom: 12px">
+          Las genera el sistema solo: una apuesta que quedó retenida, un reintento que delata un
+          corte de conexión o un pago resuelto dos veces. No mueven dinero.
+        </p>
+        <div v-if="csAlertas.length" class="table-wrap">
+          <table class="table">
+            <thead>
+              <tr><th>Fecha</th><th>Tipo</th><th>Severidad</th><th>Jugador</th><th>Detalle</th><th></th></tr>
+            </thead>
+            <tbody>
+              <tr v-for="a in csAlertas" :key="a.id">
+                <td class="mono">{{ fechaHora(a.created_at) }}</td>
+                <td class="mono">{{ a.tipo }}</td>
+                <td><span class="badge" :class="severidadClase[a.severidad] ?? 'badge-info'">{{ a.severidad }}</span></td>
+                <td class="mono">{{ a.user_id }}</td>
+                <td class="hint" style="font-size: 12px">{{ a.detalle }}</td>
+                <td><button class="btn btn-ghost btn-sm" @click="revisarAlerta(a)">Marcar revisada</button></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <p v-else-if="!csAlertasCargando" class="hint">Sin alertas pendientes.</p>
+      </div>
+
+      <div class="card" style="margin-top: 16px">
         <h3 style="font-size: 16px; margin-bottom: 6px">Línea de tiempo del jugador</h3>
         <p class="hint" style="margin-bottom: 12px">
           Busca por jugador o por <span class="mono">request_id</span> (el identificador que la app

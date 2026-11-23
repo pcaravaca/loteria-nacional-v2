@@ -109,6 +109,10 @@ func (h *CasinoHandler) BackgammonStart(c *gin.Context) {
 	}
 	var actualizado models.User
 	_ = h.db.First(&actualizado, user.ID)
+	RegistrarAccionJugador(h.db, c, user.ID, "backgammon_start", "backgammon_ronda",
+		strconv.FormatUint(uint64(ronda.ID), 10),
+		"monto="+strconv.FormatInt(ronda.Monto, 10))
+
 	c.JSON(http.StatusCreated, backgammonResumen(ronda, actualizado.Saldo))
 }
 

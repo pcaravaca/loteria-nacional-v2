@@ -7,6 +7,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 
+	"loteria-backend/internal/alertas"
 	"loteria-backend/internal/config"
 	"loteria-backend/internal/database"
 	"loteria-backend/internal/handlers"
@@ -81,6 +82,11 @@ func main() {
 	cfgH := handlers.NewConfigHandler(db)
 	casinoH := handlers.NewCasinoHandler(db, cfg)
 	csH := handlers.NewCsHandler(db)
+	alertasH := handlers.NewAlertasHandler(db)
+	// Detección de casos para servicio al cliente: primera pasada al arrancar y
+	// después cada 2 minutos. No toca el saldo, solo lee y deja alertas.
+	_ = alertas.Detectar(db)
+	go alertas.Trabajador(db)
 	cuentaH := handlers.NewCuentaHandler(db, cfg)
 	auditoriaH := handlers.NewAuditoriaHandler(db)
 	exportH := handlers.NewExportacionesHandler(db)
@@ -194,6 +200,8 @@ func main() {
 	admin.GET("/casino/stats", casinoH.Stats)
 	// Servicio al cliente: linea de tiempo de lo que un jugador hizo.
 	admin.GET("/cs/timeline", csH.LineaDeTiempo)
+	admin.GET("/cs/alertas", alertasH.Listar)
+	admin.POST("/cs/alertas/:id/revisar", alertasH.Revisar)
 	admin.PATCH("/casino/games/:codigo", casinoH.ActualizarJuego)
 
 	// Blackjack: una mano de varios turnos (con bloqueo geografico).
