@@ -751,12 +751,15 @@ onUnmounted(() => {
   .pie > .voz { flex: 1 1 auto; min-width: 0; }
 }
 
-/* Escritorio/tablet ancha: sobra ancho y falta alto. Se deja de apilar el
-   tablero debajo del carton y se ponen uno al lado del otro. */
+/* Escritorio/tablet ancha: con UN solo carton sobra ancho y falta alto, asi que
+   carton y tablero se ponen uno al lado del otro. Con dos o mas cartones no:
+   el carril queda angosto, los cartones se apilan en torre y el tablero se
+   aplasta; ahi conviene que los cartones usen todo el ancho en fila y el tablero
+   quede como tira debajo. */
 @media (min-width: 901px) {
-  .zona { flex-direction: row; align-items: flex-start; gap: 14px; }
-  .cartones { flex: 0 0 auto; grid-template-columns: repeat(auto-fit, minmax(210px, 320px)); }
-  .tablero { flex: 1 1 auto; min-width: 0; max-width: 420px; }
+  .zona:has(.cartones.n1) { flex-direction: row; align-items: flex-start; gap: 14px; }
+  .zona:has(.cartones.n1) .cartones { flex: 0 0 auto; grid-template-columns: minmax(210px, 320px); }
+  .zona:has(.cartones.n1) .tablero { flex: 1 1 auto; min-width: 0; }
 }
 
 .error-text { color: #f87171; font-size: 12px; margin: 0; }

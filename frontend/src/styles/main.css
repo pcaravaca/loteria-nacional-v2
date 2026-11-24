@@ -312,7 +312,6 @@ input, select, textarea, button { font-size: 16px; } /* evita el zoom automatico
   overscroll-behavior: contain;
   -webkit-overflow-scrolling: touch;
 }
-.modal.modal-lg { width: min(100%, 720px); }
 
 
 /* ---------- temas de toda la aplicacion (elegidos por el usuario) ---------- */
@@ -387,8 +386,14 @@ input, select, textarea, button { font-size: 16px; } /* evita el zoom automatico
 .modal-acciones { display: flex; gap: 10px; justify-content: flex-end; margin-top: 20px; }
 /* Variante ancha para los juegos del casino (aprobada por Peter).
    El tablero manda: el modal es lo mas grande posible sin pasarse de alto,
-   y el area de juego absorbe el espacio que dejan los controles. */
+   y el area de juego absorbe el espacio que dejan los controles.
+   En escritorio se ensancha hasta 1080px: con 720-840 los tres cartones del
+   bingo quedaban en torre, el tablero aplastado y una franja vacia a la derecha. */
 .modal.modal-lg { max-width: 840px; padding: 18px 20px; }
+@media (min-width: 1100px) {
+  .modal.modal-lg { width: min(100%, 1080px); max-width: 1080px; }
+}
+
 .modal-x {
   position: absolute; top: 14px; right: 14px; width: 34px; height: 34px;
   border-radius: 10px; border: 1px solid var(--border);
