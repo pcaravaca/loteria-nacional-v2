@@ -122,6 +122,8 @@ func main() {
 	authed.GET("/movimientos", reportesH.Movimientos)
 	authed.GET("/resultados", reportesH.Resultados)
 	authed.GET("/reportes/resumen", reportesH.Resumen)
+// Reporte compacto para térmica (Sunmi V2 58 mm / POS-80 80 mm).
+authed.GET("/reportes/ticket", reportesH.TicketResumen)
 
 	authed.POST("/apuestas", middleware.GeoBlock(cfg), apuestasH.Crear)
 	authed.GET("/apuestas/mias", apuestasH.Mias)

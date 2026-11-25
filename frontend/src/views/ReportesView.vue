@@ -9,6 +9,8 @@ import TablaJugadas from '@/components/reportes/TablaJugadas.vue'
 import TablaMovimientos from '@/components/reportes/TablaMovimientos.vue'
 import TablaResultados from '@/components/reportes/TablaResultados.vue'
 import TablaRifas from '@/components/reportes/TablaRifas.vue'
+import { anchoPapelMM, fijarAnchoPapelMM } from '@/lib/impresion'
+import { imprimirReporteTermico } from '@/lib/tiquete'
 
 // Reportes concentra todos los listados del cliente: el resumen, las apuestas
 // de sorteo, las rifas, las jugadas del casino y los movimientos de saldo. Cada
@@ -40,6 +42,25 @@ watch(tab, (v) => {
 const datos = ref<Resumen | null>(null)
 const cargando = ref(true)
 const error = ref('')
+const desde = ref('')
+const hasta = ref('')
+const ancho = ref(anchoPapelMM())
+const imprimiendoReporte = ref(false)
+const errorReporte = ref('')
+
+async function imprimirReporte() {
+  imprimiendoReporte.value = true
+  errorReporte.value = ''
+  try {
+    await imprimirReporteTermico(desde.value, hasta.value)
+  } catch (e: any) {
+    errorReporte.value = e.message
+  } finally {
+    imprimiendoReporte.value = false
+  }
+}
+
+watch(ancho, (v) => fijarAnchoPapelMM(v))
 
 async function cargarResumen() {
   cargando.value = true
@@ -76,6 +97,20 @@ onMounted(() => {
         @click="tab = t.id"
       >{{ t.titulo }}</button>
     </div>
+
+    <div class="termico-bar">
+      <span class="hint">Reporte térmico</span>
+      <input v-model="desde" type="date" aria-label="Desde" />
+      <input v-model="hasta" type="date" aria-label="Hasta" />
+      <select v-model.number="ancho" aria-label="Ancho de papel">
+        <option :value="58">58 mm · Sunmi V2</option>
+        <option :value="80">80 mm · POS-80</option>
+      </select>
+      <button class="btn-termico" :disabled="imprimiendoReporte" @click="imprimirReporte">
+        {{ imprimiendoReporte ? 'Generando…' : '🖨 Imprimir reporte' }}
+      </button>
+    </div>
+    <p v-if="errorReporte" class="error-text">{{ errorReporte }}</p>
 
     <div v-if="tab === 'resumen'">
       <div v-if="cargando" class="cargando"><span class="spinner"></span> Cargando reportes…</div>
@@ -153,4 +188,18 @@ onMounted(() => {
 }
 .chip:hover { color: var(--text); border-color: var(--border); }
 .chip.activo { border-color: var(--prim); color: var(--prim-2); background: var(--prim-dim); }
+.termico-bar {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  padding: 10px 12px; margin: -6px 0 18px;
+  border: 1px solid var(--border-soft); border-radius: 10px; background: var(--surface);
+}
+.termico-bar input, .termico-bar select {
+  background: var(--bg); color: var(--text); border: 1px solid var(--border-soft);
+  border-radius: 6px; padding: 6px 8px; font-size: 12px;
+}
+.btn-termico {
+  border: 1px solid var(--prim); border-radius: 6px; padding: 7px 12px;
+  background: var(--prim-dim); color: var(--prim-2); cursor: pointer; font-size: 12px;
+}
+.btn-termico:disabled { opacity: 0.5; cursor: wait; }
 </style>

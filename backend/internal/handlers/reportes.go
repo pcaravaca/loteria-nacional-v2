@@ -2,10 +2,13 @@ package handlers
 
 import (
 	"net/http"
+	"strconv"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 
+	"loteria-backend/internal/impresion"
 	"loteria-backend/internal/models"
 )
 
@@ -215,4 +218,75 @@ func (h *ReportesHandler) Resumen(c *gin.Context) {
 		"loterias_activas": loteriasActivas,
 		"usuarios":        usuariosTotales,
 	})
+}
+
+// TicketResumen genera un reporte compacto para impresora térmica (58 u 80 mm).
+// Usa la misma agregación que el resumen de Reportes, con filtro de fechas
+// opcional (`desde`/`hasta` en YYYY-MM-DD) y el alcance del rol del usuario.
+func (h *ReportesHandler) TicketResumen(c *gin.Context) {
+	rol, _ := c.Get("rol")
+	ancho := impresion.NormalizarAncho(0)
+	if v := c.Query("ancho"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			ancho = impresion.NormalizarAncho(n)
+		}
+	}
+	desde, hasta := c.Query("desde"), c.Query("hasta")
+
+	type fila struct {
+		Nombre   string
+		Apostado int64
+		Premios  int64
+		Apuestas int64
+	}
+	q := h.db.Table("apuestas a").
+		Select("l.nombre AS nombre, COALESCE(SUM(a.monto),0) AS apostado, COALESCE(SUM(a.premio),0) AS premios, COUNT(a.id) AS apuestas").
+		Joins("JOIN sorteos s ON s.id = a.sorteo_id").
+		Joins("JOIN loterias l ON l.id = s.loteria_id").
+		Group("l.id, l.nombre").
+		Order("apostado desc")
+	if rol == models.RolCliente {
+		q = q.Where("a.user_id = ?", c.GetUint("userID"))
+	}
+	if desde != "" {
+		if t, err := time.Parse("2006-01-02", desde); err == nil {
+			q = q.Where("a.created_at >= ?", t)
+		}
+	}
+	if hasta != "" {
+		if t, err := time.Parse("2006-01-02", hasta); err == nil {
+			q = q.Where("a.created_at < ?", t.AddDate(0, 0, 1))
+		}
+	}
+	var filas []fila
+	if err := q.Scan(&filas).Error; err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "no se pudo generar el reporte térmico"})
+		return
+	}
+
+	var totalApuestas, totalApostado, totalPremios int64
+	d := impresion.ReporteDatos{
+		Periodo:      impresion.PeriodoReporte(desde, hasta),
+		Generado:     impresion.HoraReporte(),
+		AnchoMM:      ancho,
+		AnchoPX:      impresion.AnchoPXCalculado(ancho),
+	}
+	for _, f := range filas {
+		d.Filas = append(d.Filas, impresion.FilaReporte{
+			Nombre: f.Nombre, Apuestas: strconv.FormatInt(f.Apuestas, 10),
+			Apostado: montoCR(f.Apostado), Premios: montoCR(f.Premios),
+		})
+		totalApuestas += f.Apuestas
+		totalApostado += f.Apostado
+		totalPremios += f.Premios
+	}
+	d.TotalApuestas = strconv.FormatInt(totalApuestas, 10)
+	d.TotalApostado = montoCR(totalApostado)
+	d.TotalPremios = montoCR(totalPremios)
+	html, err := impresion.GenerarReporte(d)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "no se pudo renderizar el reporte"})
+		return
+	}
+	c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(html))
 }
