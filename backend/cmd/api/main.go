@@ -125,6 +125,9 @@ func main() {
 
 	authed.POST("/apuestas", middleware.GeoBlock(cfg), apuestasH.Crear)
 	authed.GET("/apuestas/mias", apuestasH.Mias)
+// GET /api/apuestas/:id/ticket — comprobante térmico (58 u 80 mm) para la
+// impresora Sunmi V2 (puente AndroidPOS) o la POS-80 del PC (window.print).
+authed.GET("/apuestas/:id/ticket", apuestasH.Ticket)
 	authed.POST("/rifas/:id/comprar", middleware.GeoBlock(cfg), rifasH.Comprar)
 	authed.GET("/rifas/mias", rifasH.Mias)
 

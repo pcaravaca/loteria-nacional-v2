@@ -3,6 +3,7 @@ import { onMounted, ref, watch } from 'vue'
 import { api } from '@/api/client'
 import type { Apuesta } from '@/types'
 import { colones, estadoApuesta, fechaHora } from '@/utils/formato'
+import { imprimirTiqueteApuesta } from '@/lib/tiquete'
 import Paginador from './Paginador.vue'
 
 interface Pagina<T> {
@@ -19,6 +20,20 @@ const paginas = ref(1)
 const total = ref(0)
 const cargando = ref(true)
 const error = ref('')
+const errorPrint = ref('')
+const imprimiendoId = ref<number | null>(null)
+
+async function imprimir(a: Apuesta) {
+  imprimiendoId.value = a.id
+  errorPrint.value = ''
+  try {
+    await imprimirTiqueteApuesta(a.id)
+  } catch (e: any) {
+    errorPrint.value = e.message
+  } finally {
+    imprimiendoId.value = null
+  }
+}
 
 function esAcierto(a: Apuesta, n: number): boolean {
   if (a.estado === 'pendiente') return false
@@ -50,6 +65,7 @@ watch(pagina, cargar)
   <div>
     <div v-if="cargando" class="cargando"><span class="spinner"></span> Cargando…</div>
     <p v-else-if="error" class="error-text">{{ error }}</p>
+    <p v-if="errorPrint" class="error-text">{{ errorPrint }}</p>
 
     <div v-else-if="items.length" class="table-wrap">
       <table class="table">
@@ -62,6 +78,7 @@ watch(pagina, cargar)
             <th>Premio</th>
             <th>Estado</th>
             <th>Fecha del evento</th>
+            <th>Tique</th>
           </tr>
         </thead>
         <tbody>
@@ -89,6 +106,11 @@ watch(pagina, cargar)
               <div>{{ fechaHora(a.sorteo?.fecha ?? a.created_at) }}</div>
               <div class="hint">la apostaste {{ fechaHora(a.created_at) }}</div>
             </td>
+            <td>
+              <button class="btn-tique" :disabled="imprimiendoId === a.id" @click="imprimir(a)">
+                {{ imprimiendoId === a.id ? '…' : '🖨' }}
+              </button>
+            </td>
           </tr>
         </tbody>
       </table>
@@ -106,4 +128,15 @@ watch(pagina, cargar)
 
 <style scoped>
 .hint { font-size: 10.5px; color: var(--faint); margin-top: 2px; }
+.btn-tique {
+  background: transparent;
+  border: 1px solid var(--border-soft, #3d4a45);
+  color: var(--text, #e8f2ed);
+  border-radius: 6px;
+  padding: 4px 8px;
+  cursor: pointer;
+  font-size: 14px;
+}
+.btn-tique:hover { border-color: var(--accent, #0099ff); }
+.btn-tique:disabled { opacity: 0.5; cursor: wait; }
 </style>

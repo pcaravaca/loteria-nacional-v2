@@ -4,6 +4,9 @@ import App from './App.vue'
 import { router } from './router'
 import './styles/main.css'
 import './styles/casino-temas.css'
+import { instalarPuenteImpresion } from './lib/impresion'
+
+instalarPuenteImpresion()
 
 const app = createApp(App)
 app.use(createPinia())

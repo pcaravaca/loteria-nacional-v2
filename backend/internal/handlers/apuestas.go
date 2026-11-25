@@ -1,13 +1,16 @@
 package handlers
 
 import (
+	"fmt"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 
 	"loteria-backend/internal/config"
+	"loteria-backend/internal/impresion"
 	"loteria-backend/internal/models"
 )
 
@@ -132,8 +135,9 @@ func (h *ApuestasHandler) Crear(c *gin.Context) {
 	_ = h.db.First(&actualizado, userID)
 
 	c.JSON(http.StatusCreated, gin.H{
-		"monto": monto,
-		"saldo": actualizado.Saldo,
+		"id":     idApuesta,
+		"monto":  monto,
+		"saldo":  actualizado.Saldo,
 	})
 }
 
@@ -168,4 +172,77 @@ func uniqCount(nums []int) int {
 		seen[n] = true
 	}
 	return len(seen)
+}
+
+// Ticket genera un comprobante térmico de una apuesta. Sólo el dueño puede verlo:
+// el tique muestra números, monto y premio de esa cuenta.
+func (h *ApuestasHandler) Ticket(c *gin.Context) {
+	userID := c.GetUint("userID")
+	id, err := strconv.ParseUint(c.Param("id"), 10, 64)
+	if err != nil || id == 0 {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "id de apuesta inválido"})
+		return
+	}
+	var apuesta models.Apuesta
+	if err := h.db.Preload("Sorteo.Loteria").First(&apuesta, id).Error; err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "apuesta no encontrada"})
+		return
+	}
+	if apuesta.UserID != userID {
+		c.JSON(http.StatusForbidden, gin.H{"error": "esta apuesta no es tuya"})
+		return
+	}
+	ancho := impresion.NormalizarAncho(0)
+	if v := c.Query("ancho"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil {
+			ancho = impresion.NormalizarAncho(n)
+		}
+	}
+	jugada := "Sorteo"
+	if apuesta.Sorteo.Loteria.Nombre != "" {
+		jugada = apuesta.Sorteo.Loteria.Nombre
+	}
+	if apuesta.Sorteo.Loteria.Tipo != "" {
+		jugada += " · " + apuesta.Sorteo.Loteria.Tipo
+	}
+	d := impresion.Datos{
+		Numero:   fmt.Sprintf("%06d", apuesta.ID),
+		Fecha:    impresion.FechaLocal(apuesta.CreatedAt),
+		Sorteo:   apuesta.Sorteo.Titulo,
+		Loteria:  apuesta.Sorteo.Loteria.Codigo,
+		Jugada:   jugada,
+		Numeros:  impresion.FormatearNumeros(apuesta.Numeros, apuesta.Sorteo.Loteria.LongitudNum),
+		Monto:    montoCR(apuesta.Monto),
+		Estado:   apuesta.Estado,
+		Aciertos: apuesta.Aciertos,
+		AnchoPX:  impresion.AnchoPXCalculado(ancho),
+	}
+	if apuesta.Premio > 0 {
+		d.Premio = montoCR(apuesta.Premio)
+	}
+	html, err := impresion.Generar(d)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "no se pudo generar el comprobante"})
+		return
+	}
+	c.Header("Content-Type", "text/html; charset=utf-8")
+	c.Header("Cache-Control", "no-store")
+	c.Data(http.StatusOK, "text/html; charset=utf-8", []byte(html))
+}
+
+// montoCR agrupa miles para que el tique se lea igual que el resto de la app.
+func montoCR(v int64) string {
+	s := strconv.FormatInt(v, 10)
+	if len(s) <= 3 {
+		return "₡" + s
+	}
+	var out strings.Builder
+	out.WriteString("₡")
+	for i, ch := range s {
+		if i > 0 && (len(s)-i)%3 == 0 {
+			out.WriteByte('.')
+		}
+		out.WriteRune(ch)
+	}
+	return out.String()
 }
